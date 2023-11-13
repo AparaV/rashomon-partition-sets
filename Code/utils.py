@@ -65,6 +65,7 @@ def factors(n):
 
 
 def num_admissible_poolings(h, m, R):
+    # Lemma 4.7 \ref{lemma:num-sigma-matrix-pools}
     if h == 1 or h == (R-1)**m:
         return 1
     
@@ -83,3 +84,48 @@ def num_admissible_poolings(h, m, R):
         N = N + N_f
         
     return N
+
+
+def sum_product_k(arr):
+    # Adapted from https://www.geeksforgeeks.org/sum-of-products-of-all-possible-k-size-subsets-of-the-given-array/
+
+    n = len(arr)
+    cache = [0] * (n+1)
+    k_sum = [0] * (n+1)
+    
+    k_sum[0] = 1
+    # Case k = 1
+    for i in range(1, n+1):
+        cache[i] = arr[i - 1]
+        k_sum[1] += arr[i - 1]
+ 
+    # Case k = 2 through n
+    for k in range(2, n + 1):
+        
+        prev_sum = k_sum[k-1]
+        
+        for i in range(1, n + 1):
+ 
+            # Sum of (i+1)-th to n-th elements in the (k-1)-th row
+            prev_sum -= cache[i]
+            cache[i] = arr[i - 1] * prev_sum
+        
+        k_sum[k] = np.sum(cache)
+ 
+    return k_sum
+
+
+def num_pools(sigma):
+    # Lemma 4.5 \ref{lemma:sigma-ones-pools}
+    m, n = sigma.shape
+    R = n + 2
+    
+    z = np.sum(sigma, axis=1)
+    z_sums = sum_product_k(z)
+    
+    H = 0
+    for i in range(m+1):
+        sign = (-1)**i
+        H += sign * z_sums[i] * (R-1)**(m-i)
+        
+    return H
