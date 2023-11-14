@@ -70,17 +70,19 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     return B
 
 
-def compute_Q(D, y, mu_pools, pi_policies, reg=1):
+def compute_Q(D, y, sigma, policies, policy_means, reg=1):
     """
     Compute the loss Q
     """
     
-    H = mu_pools.shape[0]
 
+    pi_pools, pi_policies = extract_pools(policies, sigma)
+    mu_pools = compute_pool_means(policy_means, pi_pools)
     D_pool = [pi_policies[pol_id] for pol_id in D[:,0]]
     mu_D = mu_pools[D_pool]
     sqrd_diff = (y[:, 0] - mu_D)**2
     
-    Q = np.mean(sqrd_diff) + reg*H
+    h = mu_pools.shape[0]
+    Q = np.mean(sqrd_diff) + reg*h
     
     return Q
