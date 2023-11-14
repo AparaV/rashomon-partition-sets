@@ -63,9 +63,9 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     # The least number of pools
     # The number of pools when the splittable policies are pooled maximally
     sigma_fix[i, (j+1):] = 1
-    H = count_pools.num_pools(sigma_fix)
+    h = count_pools.num_pools(sigma_fix)
 
-    B += reg*H
+    B += reg*h
     
     return B
 
