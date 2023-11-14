@@ -55,6 +55,17 @@ def connected_components(n, edges):
 
 
 def extract_pools(policies, sigma):
+    """
+    Returns: (pi_pools, pi_policies)
+    pi_pools is a dictionary. Key = pool_id, Value = List of policy_id
+    pi_policies is a dictionary. Key = policy_id, Value = pool_id
+    """
     relations = lattice_adjacencies(sigma, policies)
     pools = connected_components(len(policies), relations)
-    return pools
+    pi_pools = {}
+    pi_policies = {}
+    for i, pool in enumerate(pools):
+        pi_pools[i] = pool
+        for policy in pool:
+            pi_policies[policy] = i
+    return (pi_pools, pi_policies)
