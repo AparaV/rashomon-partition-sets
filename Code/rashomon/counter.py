@@ -3,6 +3,7 @@ import itertools
 import numpy as np
 
 from functools import reduce
+from itertools import chain, combinations
 
 
 def prime_factors(n):
@@ -88,6 +89,18 @@ def num_admissible_poolings(h, m, R):
     return N
 
 
+def find_R(sigma):
+    R = np.sum(~np.isinf(sigma), axis=1) + 2
+    if np.all(R == R[0]):
+        return int(R[0])
+    return R
+
+
+def powerset(arr):
+    s = list(arr)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
+
+
 def sum_product_k(arr):
     # Adapted from https://www.geeksforgeeks.org/sum-of-products-of-all-possible-k-size-subsets-of-the-given-array/
 
@@ -115,11 +128,8 @@ def sum_product_k(arr):
     return k_sum
 
 
-def num_pools(sigma):
-    # Lemma 4.5 \ref{lemma:sigma-ones-pools}
-    m, n = sigma.shape
-    R = n + 2
-
+def __num_pools_classic__(sigma, R):
+    m, _ = sigma.shape
     z = np.sum(sigma, axis=1)
     z_sums = sum_product_k(z)
 
@@ -128,4 +138,33 @@ def num_pools(sigma):
         sign = (-1) ** i
         H += sign * z_sums[i] * (R - 1) ** (m - i)
 
+    return H
+
+
+def __num_pools_complex__(sigma, R):
+    m, _ = sigma.shape
+    R = R - 1
+    R_prod = np.prod(R)
+
+    z = np.sum(sigma, axis=1, where=~np.isinf(sigma))
+    indices = np.arange(m)
+    z_combs = [list(x) for x in powerset(indices)]
+
+    H = 0
+    for comb in z_combs:
+        sign = (-1) ** len(comb)
+        z_sum = np.prod(z[comb])
+        splits = R_prod / np.prod(R[comb])
+        H += sign * z_sum * splits
+
+    return H
+
+
+def num_pools(sigma):
+    # Lemma 4.5 \ref{lemma:sigma-ones-pools}
+    R = find_R(sigma)
+    if isinstance(R, int):
+        H = __num_pools_classic__(sigma, R)
+    else:
+        H = __num_pools_complex__(sigma, R)
     return H
