@@ -1,9 +1,9 @@
 import numpy as np
 
 
-class RashomonCache:
+class RashomonSubproblemCache:
     """
-    Caching object to keep track of fixed sigma matrices
+    Caching object to keep track of subproblems
     Some discussion on how to hash a numpy array
     https://stackoverflow.com/questions/16589791/most-efficient-property-to-hash-for-numpy-array
     """
@@ -22,10 +22,15 @@ class RashomonCache:
         sigma_ij = self.__process__(sigma, i, j)
         return sigma_ij in self.C
 
+    @property
+    def size(self):
+        return len(self.C)
+
     def __process__(self, sigma: np.ndarray, i: int, j: int):
         sigma_ij = np.copy(sigma)
         sigma_ij[i, j:] = np.nan
-        return sigma_ij.tobytes()
+        byte_rep = sigma_ij.tobytes()
+        return hash(byte_rep)
 
     def __verify_shape__(self, sigma: np.ndarray):
         # Distinct arrays of different shapes may have same byte representation
@@ -40,7 +45,7 @@ if __name__ == "__init__":
     i = 0
     j = 0
 
-    seen_sigma = RashomonCache(shape=(2, 3))
+    seen_sigma = RashomonSubproblemCache(shape=(2, 3))
     seen_sigma.insert(sigma, i, j)
 
     # Should be True
