@@ -1,6 +1,6 @@
 import numpy as np
 
-from rashomon import count_pools
+from rashomon import counter
 from rashomon.extract_pools import extract_pools
 
 
@@ -65,7 +65,7 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     # The least number of pools
     # The number of pools when the splittable policies are pooled maximally
     sigma_fix[i, (j + 1):] = 1
-    h = count_pools.num_pools(sigma_fix)
+    h = counter.num_pools(sigma_fix)
 
     B += reg * h
 
