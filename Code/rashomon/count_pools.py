@@ -5,29 +5,27 @@ import numpy as np
 from functools import reduce
 
 
-def prime_factors(n): 
-    
+def prime_factors(n):
     factors = []
-    
+
     while n % 2 == 0:
         factors.append(2)
         n = n // 2
-          
+
     sqrt_n = int(np.sqrt(n))
-    for i in range(3, sqrt_n+1, 2):
+    for i in range(3, sqrt_n + 1, 2):
         print(i)
-        while n % i == 0: 
+        while n % i == 0:
             factors.append(i)
-            n = n // i 
-              
-    if n > 2: 
+            n = n // i
+
+    if n > 2:
         factors.append(n)
-    
+
     return factors
 
 
 def generate_all_factorizations(factors):
-
     def prod(x):
         res = 1
         for xi in x:
@@ -38,7 +36,7 @@ def generate_all_factorizations(factors):
         yield factors
         return
 
-    for f in range(1, len(factors)+1):
+    for f in range(1, len(factors) + 1):
         for which_is in itertools.combinations(range(len(factors)), f):
             this_prod = prod(factors[i] for i in which_is)
             rest = [factors[i] for i in range(len(factors)) if i not in which_is]
@@ -57,18 +55,22 @@ def factorizations(factors):
         seen.add(f)
         yield f
 
-# taken from https://stackoverflow.com/a/6800214
-def factors(n):    
-    return set(reduce(list.__add__, 
-                ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
 
+# taken from https://stackoverflow.com/a/6800214
+def factors(n):
+    return set(
+        reduce(
+            list.__add__,
+            ([i, n // i] for i in range(1, int(n**0.5) + 1) if n % i == 0),
+        )
+    )
 
 
 def num_admissible_poolings(h, m, R):
     # Lemma 4.7 \ref{lemma:num-sigma-matrix-pools}
-    if h == 1 or h == (R-1)**m:
+    if h == 1 or h == (R - 1) ** m:
         return 1
-    
+
     N = 0
     primes = prime_factors(h)
     for f in factorizations(primes):
@@ -80,9 +82,9 @@ def num_admissible_poolings(h, m, R):
             if fi > R - 2:
                 N_f = 0
                 break
-            N_f = N_f * math.comb(R-2, fi-1)
+            N_f = N_f * math.comb(R - 2, fi - 1)
         N = N + N_f
-        
+
     return N
 
 
@@ -90,28 +92,26 @@ def sum_product_k(arr):
     # Adapted from https://www.geeksforgeeks.org/sum-of-products-of-all-possible-k-size-subsets-of-the-given-array/
 
     n = len(arr)
-    cache = [0] * (n+1)
-    k_sum = [0] * (n+1)
-    
+    cache = [0] * (n + 1)
+    k_sum = [0] * (n + 1)
+
     k_sum[0] = 1
     # Case k = 1
-    for i in range(1, n+1):
+    for i in range(1, n + 1):
         cache[i] = arr[i - 1]
         k_sum[1] += arr[i - 1]
- 
+
     # Case k = 2 through n
     for k in range(2, n + 1):
-        
-        prev_sum = k_sum[k-1]
-        
+        prev_sum = k_sum[k - 1]
+
         for i in range(1, n + 1):
- 
             # Sum of (i+1)-th to n-th elements in the (k-1)-th row
             prev_sum -= cache[i]
             cache[i] = arr[i - 1] * prev_sum
-        
+
         k_sum[k] = np.sum(cache)
- 
+
     return k_sum
 
 
@@ -119,13 +119,13 @@ def num_pools(sigma):
     # Lemma 4.5 \ref{lemma:sigma-ones-pools}
     m, n = sigma.shape
     R = n + 2
-    
+
     z = np.sum(sigma, axis=1)
     z_sums = sum_product_k(z)
-    
+
     H = 0
-    for i in range(m+1):
-        sign = (-1)**i
-        H += sign * z_sums[i] * (R-1)**(m-i)
-        
+    for i in range(m + 1):
+        sign = (-1) ** i
+        H += sign * z_sums[i] * (R - 1) ** (m - i)
+
     return H
