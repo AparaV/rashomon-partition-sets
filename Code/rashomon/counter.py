@@ -1,9 +1,8 @@
 import math
-import itertools
 import numpy as np
+import itertools as it
 
 from functools import reduce
-from itertools import chain, combinations
 
 
 def prime_factors(n):
@@ -15,7 +14,6 @@ def prime_factors(n):
 
     sqrt_n = int(np.sqrt(n))
     for i in range(3, sqrt_n + 1, 2):
-        print(i)
         while n % i == 0:
             factors.append(i)
             n = n // i
@@ -38,7 +36,7 @@ def generate_all_factorizations(factors):
         return
 
     for f in range(1, len(factors) + 1):
-        for which_is in itertools.combinations(range(len(factors)), f):
+        for which_is in it.combinations(range(len(factors)), f):
             this_prod = prod(factors[i] for i in which_is)
             rest = [factors[i] for i in range(len(factors)) if i not in which_is]
 
@@ -48,7 +46,6 @@ def generate_all_factorizations(factors):
 
 def factorizations(factors):
     seen = set()
-    # res = []
     for f in generate_all_factorizations(factors):
         f = tuple(sorted(f))
         if f in seen:
@@ -57,8 +54,8 @@ def factorizations(factors):
         yield f
 
 
-# taken from https://stackoverflow.com/a/6800214
 def factors(n):
+    # From https://stackoverflow.com/a/6800214
     return set(
         reduce(
             list.__add__,
@@ -67,8 +64,7 @@ def factors(n):
     )
 
 
-def num_admissible_poolings(h, m, R):
-    # Lemma 4.7 \ref{lemma:num-sigma-matrix-pools}
+def __num_admissible_poolings_classic__(h, m, R: int):
     if h == 1 or h == (R - 1) ** m:
         return 1
 
@@ -89,6 +85,39 @@ def num_admissible_poolings(h, m, R):
     return N
 
 
+def __num_admissible_poolings_complex__(h, m, R: np.array):
+    if h == 1 or h == np.prod(R - 1):
+        return 1
+
+    N = 0
+    arm_indices = np.arange(m)
+    primes = prime_factors(h)
+    for f in factorizations(primes):
+        k = len(f)
+        if k > m:
+            continue
+        for arm_perm in it.combinations(arm_indices, k):
+            N_f = 1
+            for idx in range(k):
+                arm_idx = arm_perm[idx]
+                if f[idx] > R[arm_idx] - 2:
+                    N_f = 0
+                    break
+                N_f = N_f * math.comb(R[arm_idx] - 2, f[idx]-1)
+            N += N_f
+
+    return N
+
+
+def num_admissible_poolings(h, m, R):
+    # Lemma 4.7 \ref{lemma:num-sigma-matrix-pools}
+    if isinstance(R, int):
+        N = __num_admissible_poolings_classic__(h, m, R)
+    else:
+        N = __num_admissible_poolings_complex__(h, m, R)
+    return N
+
+
 def find_R(sigma):
     R = np.sum(~np.isinf(sigma), axis=1) + 2
     if np.all(R == R[0]):
@@ -98,7 +127,7 @@ def find_R(sigma):
 
 def powerset(arr):
     s = list(arr)
-    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
+    return it.chain.from_iterable(it.combinations(s, r) for r in range(len(s)+1))
 
 
 def sum_product_k(arr):
@@ -128,7 +157,7 @@ def sum_product_k(arr):
     return k_sum
 
 
-def __num_pools_classic__(sigma, R):
+def __num_pools_classic__(sigma, R: int):
     m, _ = sigma.shape
     z = np.sum(sigma, axis=1)
     z_sums = sum_product_k(z)
@@ -141,7 +170,7 @@ def __num_pools_classic__(sigma, R):
     return H
 
 
-def __num_pools_complex__(sigma, R):
+def __num_pools_complex__(sigma, R: np.array):
     m, _ = sigma.shape
     R = R - 1
     R_prod = np.prod(R)
@@ -160,9 +189,10 @@ def __num_pools_complex__(sigma, R):
     return H
 
 
-def num_pools(sigma):
+def num_pools(sigma, R=None):
     # Lemma 4.5 \ref{lemma:sigma-ones-pools}
-    R = find_R(sigma)
+    if R is None:
+        R = find_R(sigma)
     if isinstance(R, int):
         H = __num_pools_classic__(sigma, R)
     else:
