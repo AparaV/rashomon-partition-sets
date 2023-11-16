@@ -41,6 +41,7 @@ def partition_sigma(sigma, i, j):
     """
     sigma_fix = np.copy(sigma)
     sigma_fix[i, j:] = 0
+    sigma_fix[np.isinf(sigma)] = np.inf
     return sigma_fix
 
 
@@ -65,6 +66,7 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     # The least number of pools
     # The number of pools when the splittable policies are pooled maximally
     sigma_fix[i, (j + 1):] = 1
+    sigma_fix[np.isinf(sigma)] = np.inf
     h = counter.num_pools(sigma_fix)
 
     B += reg * h
