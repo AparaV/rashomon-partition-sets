@@ -8,6 +8,18 @@ from rashomon.tva import enumerate_policies
 from rashomon.sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 
 
+def initialize_sigma(M, R):
+    if isinstance(R, int):
+        sigma = np.ndarray(shape=(M, R - 2))
+        sigma[:, :] = 1
+    else:
+        sigma = np.ndarray(shape=(M, np.max(R) - 2))
+        sigma[:, :] = np.inf
+        for idx, R_idx in enumerate(R):
+            sigma[idx, :(R_idx-2)] = 1
+    return sigma
+
+
 def RAggregate(M, R, H, D, y, theta, reg=1):
     """
     Aggregation algorithm
@@ -15,9 +27,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
     policies = enumerate_policies(M, R)
     policy_means = loss.compute_policy_means(D, y, len(policies))
-
-    sigma = np.ndarray(shape=(M, R - 2))
-    sigma[:, :] = 1
+    sigma = initialize_sigma(M, R)
 
     P_qe = RashomonSet(sigma.shape)
     Q_seen = RashomonProblemCache(sigma.shape)
@@ -58,7 +68,11 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
                 P_qe.insert(sigma_0)
 
         # Add children problems to the queue
-        if j < R - 3:  # j < R - 2 in math notation
+        if isinstance(R, int):
+            R_i = R
+        else:
+            R_i = R[i]
+        if j < R_i - 3:  # j < R_i - 2 in math notation
             if not problems.seen(sigma, i, j + 1):
                 queue.append((sigma, i, j + 1))
             if not problems.seen(sigma_0, i, j + 1):

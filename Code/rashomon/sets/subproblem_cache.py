@@ -29,6 +29,7 @@ class RashomonSubproblemCache:
     def __process__(self, sigma: np.ndarray, i: int, j: int):
         sigma_ij = np.copy(sigma)
         sigma_ij[i, j:] = np.nan
+        sigma_ij[np.isinf(sigma)] = np.inf
         byte_rep = sigma_ij.tobytes()
         return hash(byte_rep)
 
