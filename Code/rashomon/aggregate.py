@@ -36,7 +36,11 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     queue = deque([(sigma, 0, 0)])
 
     while len(queue) > 0:
+
+        # print(P_qe)
+
         (sigma, i, j) = queue.popleft()
+        sigma = np.copy(sigma)
 
         # Cache problem
         if problems.seen(sigma, i, j):
@@ -47,25 +51,38 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             continue
 
         B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg)
-        if B > theta:
-            continue
+        # print(sigma, B, theta)
 
         sigma_0 = np.copy(sigma)
         sigma[i, j] = 1
         sigma_0[i, j] = 0
+
+        for m in range(M):
+            # if m == i:
+            #     continue
+            if not problems.seen(sigma, m, 0):
+                queue.append((sigma, m, 0))
+            if not problems.seen(sigma_0, m, 0):
+                queue.append((sigma_0, m, 0))
+
+        if B > theta:
+            continue
 
         # Check if the pooling already satisfies the Rashomon threshold
         if not Q_seen.seen(sigma):
             Q_seen.insert(sigma)
             Q = loss.compute_Q(D, y, sigma, policies, policy_means, reg)
             if Q <= theta:
+                # print(sigma)
                 P_qe.insert(sigma)
 
-        if not Q_seen.seen(sigma_0):
+        if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
             Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg)
             if Q <= theta:
+                # print(sigma_0)
                 P_qe.insert(sigma_0)
+                # print(P_qe)
 
         # Add children problems to the queue
         if isinstance(R, int):
@@ -77,14 +94,6 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
                 queue.append((sigma, i, j + 1))
             if not problems.seen(sigma_0, i, j + 1):
                 queue.append((sigma_0, i, j + 1))
-
-        for m in range(M):
-            # if m == i:
-            #     continue
-            if not problems.seen(sigma, m, 0):
-                queue.append((sigma, m, 0))
-            if not problems.seen(sigma_0, m, 0):
-                queue.append((sigma_0, m, 0))
 
     return P_qe
 
