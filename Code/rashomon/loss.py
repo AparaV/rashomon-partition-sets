@@ -1,5 +1,7 @@
 import numpy as np
 
+from sklearn.metrics import mean_squared_error
+
 from rashomon import counter
 from rashomon.extract_pools import extract_pools
 
@@ -59,9 +61,7 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     mu_fixed_pools = compute_pool_means(policy_means, pi_fixed_pools)
     D_pool = [pi_fixed_policies[pol_id] for pol_id in D[:, 0]]
     mu_D = mu_fixed_pools[D_pool]
-    sqrd_diff = (y[:, 0] - mu_D) ** 2
-
-    B = np.mean(sqrd_diff)
+    mse = mean_squared_error(y[:, 0], mu_D)
 
     # The least number of pools
     # The number of pools when the splittable policies are pooled maximally
@@ -69,7 +69,7 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     sigma_fix[np.isinf(sigma)] = np.inf
     h = counter.num_pools(sigma_fix)
 
-    B += reg * h
+    B = mse + reg * h
 
     return B
 
@@ -83,10 +83,10 @@ def compute_Q(D, y, sigma, policies, policy_means, reg=1):
     mu_pools = compute_pool_means(policy_means, pi_pools)
     D_pool = [pi_policies[pol_id] for pol_id in D[:, 0]]
     mu_D = mu_pools[D_pool]
-    sqrd_diff = (y[:, 0] - mu_D) ** 2
+    mse = mean_squared_error(y[:, 0], mu_D)
 
     h = mu_pools.shape[0]
-    Q = np.mean(sqrd_diff) + reg * h
+    Q = mse + reg * h
 
     return Q
 
