@@ -28,6 +28,9 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     policies = enumerate_policies(M, R)
     policy_means = loss.compute_policy_means(D, y, len(policies))
     sigma = initialize_sigma(M, R)
+    
+    if isinstance(R, int):
+        R = [R] * M
 
     P_qe = RashomonSet(sigma.shape)
     Q_seen = RashomonProblemCache(sigma.shape)
@@ -51,30 +54,41 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             continue
 
         B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg)
-        # print(sigma, B, theta)
+        # print(sigma, "\n", B, theta, "\n---")
 
         sigma_0 = np.copy(sigma)
-        sigma[i, j] = 1
+        sigma_1 = np.copy(sigma)
+        sigma_1[i, j] = 1
         sigma_0[i, j] = 0
 
         for m in range(M):
-            # if m == i:
-            #     continue
-            if not problems.seen(sigma, m, 0):
-                queue.append((sigma, m, 0))
-            if not problems.seen(sigma_0, m, 0):
-                queue.append((sigma_0, m, 0))
+            # # if m == i:
+            # #     continue
+            # if not problems.seen(sigma_1, m, 0):
+            #     queue.append((sigma_1, m, 0))
+            # if not problems.seen(sigma_0, m, 0):
+            #     queue.append((sigma_0, m, 0))
+            j1 = 0
+            while problems.seen(sigma_1, m, j1) and j1 < R[m] - 3:
+                j1 += 1
+            if j1 <= R[m] - 3:
+                queue.append((sigma_1, m, j1))
+            j0 = 0
+            while problems.seen(sigma_0, m, j0) and j0 < R[m] - 3:
+                j0 += 1
+            if j0 <= R[m] - 3:
+                queue.append((sigma_0, m, j0))
 
         if B > theta:
             continue
 
         # Check if the pooling already satisfies the Rashomon threshold
-        if not Q_seen.seen(sigma):
-            Q_seen.insert(sigma)
-            Q = loss.compute_Q(D, y, sigma, policies, policy_means, reg)
+        if not Q_seen.seen(sigma_1):
+            Q_seen.insert(sigma_1)
+            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg)
             if Q <= theta:
                 # print(sigma)
-                P_qe.insert(sigma)
+                P_qe.insert(sigma_1)
 
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
@@ -85,13 +99,13 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
                 # print(P_qe)
 
         # Add children problems to the queue
-        if isinstance(R, int):
-            R_i = R
-        else:
-            R_i = R[i]
-        if j < R_i - 3:  # j < R_i - 2 in math notation
-            if not problems.seen(sigma, i, j + 1):
-                queue.append((sigma, i, j + 1))
+        # if isinstance(R, int):
+        #     R_i = R
+        # else:
+        #     R_i = R[i]
+        if j < R[i] - 3:  # j < R_i - 2 in math notation
+            if not problems.seen(sigma_1, i, j + 1):
+                queue.append((sigma_1, i, j + 1))
             if not problems.seen(sigma_0, i, j + 1):
                 queue.append((sigma_0, i, j + 1))
 
