@@ -89,25 +89,3 @@ def compute_Q(D, y, sigma, policies, policy_means, reg=1):
     Q = mse + reg * h
 
     return Q
-
-
-def make_predictions(D, pi_policies, pool_means):
-    n, _ = D.shape
-    y_pred = np.ndarray(shape=(n,))
-    for i in range(n):
-        policy_id = D[i, 0]
-        pool_id = pi_policies[policy_id]
-        y_pred[i] = pool_means[pool_id]
-    return y_pred
-
-
-def intersect_over_union(X, Y):
-    XandY = X.intersection(Y)
-    XorY = X.union(Y)
-    return len(XandY) / len(XorY)
-
-
-def find_best_policies(D, y_pred):
-    y_max = np.max(y_pred)
-    pol_max = np.unique(D[np.where(y_pred == y_max), ])
-    return pol_max
