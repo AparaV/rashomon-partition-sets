@@ -28,7 +28,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     policies = enumerate_policies(M, R)
     policy_means = loss.compute_policy_means(D, y, len(policies))
     sigma = initialize_sigma(M, R)
-    
+
+    # If R is fixed across, make it a list for compatbility later on
     if isinstance(R, int):
         R = [R] * M
 
@@ -53,32 +54,27 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
         if counter.num_pools(sigma) > H:
             continue
 
-        B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg)
-        # print(sigma, "\n", B, theta, "\n---")
-
         sigma_0 = np.copy(sigma)
         sigma_1 = np.copy(sigma)
         sigma_1[i, j] = 1
         sigma_0[i, j] = 0
 
+        # Add problem variants to queue
         for m in range(M):
-            # # if m == i:
-            # #     continue
-            # if not problems.seen(sigma_1, m, 0):
-            #     queue.append((sigma_1, m, 0))
-            # if not problems.seen(sigma_0, m, 0):
-            #     queue.append((sigma_0, m, 0))
+            R_m = R[m]
             j1 = 0
-            while problems.seen(sigma_1, m, j1) and j1 < R[m] - 3:
+            while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
                 j1 += 1
-            if j1 <= R[m] - 3:
+            if j1 <= R_m - 3:
                 queue.append((sigma_1, m, j1))
             j0 = 0
-            while problems.seen(sigma_0, m, j0) and j0 < R[m] - 3:
+            while problems.seen(sigma_0, m, j0) and j0 < R_m - 3:
                 j0 += 1
-            if j0 <= R[m] - 3:
+            if j0 <= R_m - 3:
                 queue.append((sigma_0, m, j0))
 
+        # Check if further splits in arm i is feasible
+        B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg)
         if B > theta:
             continue
 
@@ -87,22 +83,15 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             Q_seen.insert(sigma_1)
             Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg)
             if Q <= theta:
-                # print(sigma)
                 P_qe.insert(sigma_1)
 
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
             Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg)
             if Q <= theta:
-                # print(sigma_0)
                 P_qe.insert(sigma_0)
-                # print(P_qe)
 
         # Add children problems to the queue
-        # if isinstance(R, int):
-        #     R_i = R
-        # else:
-        #     R_i = R[i]
         if j < R[i] - 3:  # j < R_i - 2 in math notation
             if not problems.seen(sigma_1, i, j + 1):
                 queue.append((sigma_1, i, j + 1))
