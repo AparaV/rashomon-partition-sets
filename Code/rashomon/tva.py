@@ -64,15 +64,17 @@ def weakly_dominates(x, y):
     return dominates
 
 
-def alpha_matrix(M, R, policies):
+def alpha_matrix(policies):
     n = len(policies)
     G = np.ndarray(shape=(n, n))
     G[:, :] = 0
 
     for i, pol_i in enumerate(policies):
         j_list = []
+        profile_i = policy_to_profile(pol_i)
         for j, pol_j in enumerate(policies):
-            if weakly_dominates(pol_i, pol_j):
+            profile_j = policy_to_profile(pol_i)
+            if profile_j == profile_i and weakly_dominates(pol_i, pol_j):
                 j_list.append(j)
         G[i, j_list] = 1
     return G

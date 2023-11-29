@@ -56,7 +56,7 @@ if __name__ == "__main__":
     num_pools = len(pi_pools)
 
     # The transformation matrix for Lasso
-    G = tva.alpha_matrix(M, R, policies)
+    G = tva.alpha_matrix(policies)
 
     # Set data parameters
     mu = np.array([0, 1.5, 3, 3, 6, 4.5])
