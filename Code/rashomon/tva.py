@@ -9,7 +9,7 @@ import numpy as np
 
 def __enumerate_policies_classic__(M, R):
     # All arms have the same intensities
-    intensities = np.arange(R - 1) + 1
+    intensities = np.arange(R)
     policies = []
     for pol in itertools.product(intensities, repeat=M):
         policies.append(pol)
@@ -20,7 +20,7 @@ def __enumerate_policies_complex__(R):
     # Each arm may have different intensities
     intensities = []
     for Ri in R:
-        intensities.append(np.arange(Ri - 1) + 1)
+        intensities.append(np.arange(Ri))
     policies = []
     for pol in itertools.product(*intensities, repeat=1):
         policies.append(pol)
@@ -35,6 +35,20 @@ def enumerate_policies(M, R):
     else:
         policies = __enumerate_policies_complex__(R)
     return policies
+
+
+def enumerate_profiles(M):
+    profiles = itertools.product([0, 1], repeat=M)
+    profiles = [x for x in profiles]
+    profile_map = {}
+    for i, x in enumerate(profiles):
+        profile_map[x] = i
+    return profiles, profile_map
+
+
+def policy_to_profile(policy):
+    profile = tuple([int(x > 0) for x in policy])
+    return profile
 
 
 def weakly_dominates(x, y):

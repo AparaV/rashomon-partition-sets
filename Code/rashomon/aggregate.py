@@ -4,7 +4,7 @@ from collections import deque
 
 from rashomon import loss
 from rashomon import counter
-from rashomon.tva import enumerate_policies
+from rashomon.tva import enumerate_policies, policy_to_profile
 from rashomon.sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 
 
@@ -20,12 +20,13 @@ def initialize_sigma(M, R):
     return sigma
 
 
-def RAggregate(M, R, H, D, y, theta, reg=1):
+def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1):
     """
     Aggregation algorithm
     """
 
-    policies = enumerate_policies(M, R)
+    all_policies = enumerate_policies(M, R)
+    policies = [x for x in all_policies if policy_to_profile(x) == profile]
     policy_means = loss.compute_policy_means(D, y, len(policies))
     sigma = initialize_sigma(M, R)
 
@@ -113,11 +114,13 @@ if __name__ == "__init__":
     # Setup matrix
     #
     sigma = np.array([[1, 1, 0], [0, 1, 1]], dtype="float64")
+    sigma_profile = (1, 1)
 
     M, n = sigma.shape
     R = n + 2
     num_policies = (R - 1) ** M
-    policies = enumerate_policies(M, R)
+    all_policies = enumerate_policies(M, R)
+    policies = [x for x in all_policies if policy_to_profile(x) == sigma_profile]
     pi_pools, pi_policies = extract_pools(policies, sigma)
 
     #
@@ -150,7 +153,7 @@ if __name__ == "__init__":
     #
     # Aggregate
     #
-    P_set = RAggregate(2, 5, 4, D, y, 5, reg=1)
+    P_set = RAggregate_profile(2, 5, 4, D, y, 5, sigma_profile, reg=1)
     print(f"There are {P_set.size} poolings in the Rashomon set.")
     print(f"Original matrix in P_set: {P_set.seen(sigma)}.")
 

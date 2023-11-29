@@ -7,7 +7,7 @@ from sklearn.metrics import mean_squared_error
 from rashomon import loss
 from rashomon import tva
 from rashomon import metrics
-from rashomon.aggregate import RAggregate
+from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
 
 
@@ -42,13 +42,16 @@ if __name__ == "__main__":
     #
     sigma = np.array([[1, 1, 0],
                       [0, 1, 0]], dtype='float64')
+    sigma_profile = (1, 1)
 
     M, _ = sigma.shape
     R = np.array([5, 5])
 
     # Enumerate policies and find pools
     num_policies = np.prod(R-1)
-    policies = tva.enumerate_policies(M, R)
+    profiles, profile_map = tva.enumerate_profiles(M)
+    all_policies = tva.enumerate_policies(M, R)
+    policies = [x for x in all_policies if tva.policy_to_profile(x) == sigma_profile]
     pi_pools, pi_policies = extract_pools(policies, sigma)
     num_pools = len(pi_pools)
 
@@ -92,7 +95,7 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            P_set = RAggregate(M, R, H, D, y, theta, reg)
+            P_set = RAggregate_profile(M, R, H, D, y, theta, sigma_profile, reg)
             if not P_set.seen(sigma):
                 print("P_set missing true sigma")
 
