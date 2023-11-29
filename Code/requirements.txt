@@ -1,4 +1,3 @@
 numpy==1.26.2
 pandas==2.1.3
 scikit_learn==1.3.2
-causal-tree-learn==2.43
