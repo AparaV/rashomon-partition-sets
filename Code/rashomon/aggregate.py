@@ -20,14 +20,15 @@ def initialize_sigma(M, R):
     return sigma
 
 
-def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1):
+def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, policy_means=None):
     """
     Aggregation algorithm
     """
 
-    all_policies = enumerate_policies(M, R)
-    policies = [x for x in all_policies if policy_to_profile(x) == profile]
-    policy_means = loss.compute_policy_means(D, y, len(policies))
+    if policies is None or policy_means is None:
+        all_policies = enumerate_policies(M, R)
+        policies = [x for x in all_policies if policy_to_profile(x) == profile]
+        policy_means = loss.compute_policy_means(D, y, len(policies))
     sigma = initialize_sigma(M, R)
 
     # If R is fixed across, make it a list for compatbility later on
