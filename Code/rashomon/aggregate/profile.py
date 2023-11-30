@@ -2,10 +2,10 @@ import numpy as np
 
 from collections import deque
 
-from rashomon import loss
-from rashomon import counter
-from rashomon.tva import enumerate_policies, policy_to_profile
-from rashomon.sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
+from .. import loss
+from .. import counter
+from ..tva import enumerate_policies, policy_to_profile
+from ..sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 
 
 def initialize_sigma(M, R):
@@ -22,7 +22,16 @@ def initialize_sigma(M, R):
 
 def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, policy_means=None):
     """
-    Aggregation algorithm
+    Aggregation algorithm for a single profile
+    M: int - number of arms
+    R: int or list of integers - number of dosage levels per arm (not max dosage)
+    H: int - maximum number of pools in this profile
+    D - Data i.e., policy integers
+    y - Data i.e., outcomes
+    theta: float - Rashomon threshold
+    profile: tuple - the profile we are considering
+    reg: float - regularization parameter
+    policies, policy_means - Optional precomputed values when repeatedly calling RAggregate_profile
     """
 
     if policies is None or policy_means is None:
