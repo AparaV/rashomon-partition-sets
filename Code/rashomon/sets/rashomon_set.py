@@ -70,3 +70,6 @@ class RashomonSet:
 
     def __repr__(self):
         return repr(self.P_qe)
+
+    def __len__(self):
+        return len(self.P_qe)

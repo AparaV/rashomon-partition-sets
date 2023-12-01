@@ -54,7 +54,20 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, sort
     return feasible_combinations
 
 
+def remove_unused_poolings(R_set, rashomon_profiles):
+    R_set_np = np.array(R_set)
+    sigma_max_id = np.max(R_set_np, axis=0)
+
+    for k, max_id in enumerate(sigma_max_id):
+        rashomon_profiles[k].P_qe = rashomon_profiles[k].P_qe[:(max_id+1)]
+        rashomon_profiles[k].Q = rashomon_profiles[k].Q[:(max_id+1)]
+    return rashomon_profiles
+
+
 def RAggregate(M, R, H, D, y, theta, reg=1):
+
+    # TODO: Edge case when dosage in one arm is binary
+    #       This will fail currently
 
     num_profiles = 2**M
     profiles, profile_map = enumerate_profiles(M)
@@ -90,6 +103,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     # Now solve each profile independently
     # This step can be parallelized
     rashomon_profiles = [None]*num_profiles
+    feasible = True
     for k, profile in enumerate(profiles):
         theta_k = eq_lb_sum - eq_lb_profiles[k]
         D_k = D_profiles[k]
@@ -118,10 +132,14 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
         rashomon_k.sort()
         rashomon_profiles[k] = rashomon_k
+        if len(rashomon_k) == 0:
+            feasible = False
 
     # Combine solutions in a feasible way
-    R_set = find_feasible_combinations(rashomon_profiles, theta, sorted=True)
-
-    # TODO: remove sigma matrices absent in R_set from rashomon_profiles
+    if feasible:
+        R_set = find_feasible_combinations(rashomon_profiles, theta, sorted=True)
+        rashomon_profiles = remove_unused_poolings(R_set, rashomon_profiles)
+    else:
+        R_set = []
 
     return R_set, rashomon_profiles
