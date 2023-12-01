@@ -46,9 +46,10 @@ def find_profile_lower_bound(D_k, y_k, policy_means_k):
 def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, sorted=False):
 
     if not sorted:
-        rashomon_profiles = [r.sort() for r in rashomon_profiles]
+        for idx, r in enumerate(rashomon_profiles):
+            rashomon_profiles[idx].sort()
 
-    S = [r.Q for r in rashomon_profiles]
+    S = [r.loss for r in rashomon_profiles]
     feasible_combinations = find_feasible_sum_subsets(S, theta)
     return feasible_combinations
 
@@ -56,7 +57,7 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, sort
 def RAggregate(M, R, H, D, y, theta, reg=1):
 
     num_profiles = 2**M
-    profiles = enumerate_profiles(M)
+    profiles, profile_map = enumerate_profiles(M)
     all_policies = enumerate_policies(M, R)
 
     # In the best case, every other profile becomes a single pool
@@ -72,7 +73,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     for k, profile in enumerate(profiles):
 
         policies_temp = [(i, x) for i, x in enumerate(all_policies) if policy_to_profile(x) == profile]
-        unzipped_temp = zip(*policies_temp)
+        unzipped_temp = list(zip(*policies_temp))
         policy_profiles_idx_k = list(unzipped_temp[0])
         policies_profiles[k] = list(unzipped_temp[1])
 
@@ -88,7 +89,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
     # Now solve each profile independently
     # This step can be parallelized
-    rashomon_profiles = {}
+    rashomon_profiles = [None]*num_profiles
     for k, profile in enumerate(profiles):
         theta_k = eq_lb_sum - eq_lb_profiles[k]
         D_k = D_profiles[k]
@@ -96,14 +97,31 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
         policies_k = policies_profiles[k]
         policy_means_k = policy_means_profiles[k]
+        profile_mask = list(map(bool, profile))
 
-        rashomon_k = RAggregate_profile(M, R, H_profile, D_k, y_k, theta_k, profile, reg, policies_k, policy_means_k)
-        rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg)
+        # Mask the empty arms
+        for idx, pol in enumerate(policies_k):
+            policies_k[idx] = tuple([pol[i] for i in range(M) if profile_mask[i]])
+        R_k = R[profile_mask]
+        M_k = np.sum(profile)
+
+        # Control group is just one policy
+        if M_k == 0:
+            rashomon_k = RashomonSet(shape=None)
+            control_loss = eq_lb_profiles[k] + reg
+            rashomon_k.P_qe = [None]
+            rashomon_k.Q = np.array([control_loss])
+        else:
+            rashomon_k = RAggregate_profile(M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
+                                            policies_k, policy_means_k)
+            rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg)
+
         rashomon_k.sort()
-
         rashomon_profiles[k] = rashomon_k
 
     # Combine solutions in a feasible way
     R_set = find_feasible_combinations(rashomon_profiles, theta, sorted=True)
 
-    return R_set
+    # TODO: remove sigma matrices absent in R_set from rashomon_profiles
+
+    return R_set, rashomon_profiles

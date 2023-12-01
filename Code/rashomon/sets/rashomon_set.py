@@ -49,9 +49,9 @@ class RashomonSet:
         return self.P_qe
 
     @property
-    def Q(self):
+    def loss(self):
         if len(self.Q) != len(self.P_qe):
-            raise RuntimeError("Call RashomonSet.calculate_loss before using RashomonSet.Q")
+            raise RuntimeError("Call RashomonSet.calculate_loss before accessing RashomonSet.loss")
         return self.Q
 
     def __process__(self, sigma: np.ndarray):
