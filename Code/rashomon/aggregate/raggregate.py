@@ -31,7 +31,11 @@ def subset_data(D, y, policy_profiles_idx):
     # Now remap policies from overall indicies to the indicies within that profile
     range_list = list(np.arange(len(policy_profiles_idx)))
     policy_map = {i: x for i, x in zip(policy_profiles_idx, range_list)}
-    D_profile = np.vectorize(policy_map.get)(D_profile)
+    if len(D_profile) == 0:
+        D_profile = None
+        y_profile = None
+    else:
+        D_profile = np.vectorize(policy_map.get)(D_profile)
 
     return D_profile, y_profile
 
@@ -94,9 +98,14 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
         D_profiles[k] = D_k
         y_profiles[k] = y_k
 
-        policy_means_k = loss.compute_policy_means(D_k, y_k, len(policies_profiles[k]))
-        policy_means_profiles[k] = policy_means_k
-        eq_lb_profiles[k] = find_profile_lower_bound(D_k, y_k, policy_means_k)
+        if D_k is None:
+            # print("Here")
+            policy_means_profiles[k] = None
+            eq_lb_profiles[k] = 0
+        else:
+            policy_means_k = loss.compute_policy_means(D_k, y_k, len(policies_profiles[k]))
+            policy_means_profiles[k] = policy_means_k
+            eq_lb_profiles[k] = find_profile_lower_bound(D_k, y_k, policy_means_k)
 
     eq_lb_sum = np.sum(eq_lb_profiles)
 
@@ -105,6 +114,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     rashomon_profiles = [None]*num_profiles
     feasible = True
     for k, profile in enumerate(profiles):
+        # print(theta, eq_lb_sum, eq_lb_profiles)
         theta_k = eq_lb_sum - eq_lb_profiles[k]
         D_k = D_profiles[k]
         y_k = y_profiles[k]
@@ -118,6 +128,11 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             policies_k[idx] = tuple([pol[i] for i in range(M) if profile_mask[i]])
         R_k = R[profile_mask]
         M_k = np.sum(profile)
+
+        if D_k is None:
+            # TODO: Put all possible sigma matrices here and set loss to 0
+            rashomon_profiles[k] = RashomonSet(shape=None)
+            continue
 
         # Control group is just one policy
         if M_k == 0:
@@ -138,8 +153,9 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     # Combine solutions in a feasible way
     if feasible:
         R_set = find_feasible_combinations(rashomon_profiles, theta, sorted=True)
-        rashomon_profiles = remove_unused_poolings(R_set, rashomon_profiles)
     else:
         R_set = []
+    if len(R_set) > 0:
+        rashomon_profiles = remove_unused_poolings(R_set, rashomon_profiles)
 
     return R_set, rashomon_profiles
