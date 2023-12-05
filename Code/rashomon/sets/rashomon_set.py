@@ -1,6 +1,7 @@
 import numpy as np
 
 from ..loss import compute_Q
+from ..counter import num_pools
 
 
 class RashomonSet:
@@ -13,6 +14,7 @@ class RashomonSet:
         self.P_hash = set()
         self.P_qe = []
         self.Q = np.array([])
+        self.H = np.array([])
 
     def insert(self, sigma: np.ndarray) -> None:
         if self.seen(sigma):
@@ -53,6 +55,18 @@ class RashomonSet:
         if len(self.Q) != len(self.P_qe):
             raise RuntimeError("Call RashomonSet.calculate_loss before accessing RashomonSet.loss")
         return self.Q
+
+    @property
+    def pools(self):
+        if len(self.H) != len(self.P_qe):
+            self.H = []
+            for sigma_i in self.P_qe:
+                if sigma_i is None:
+                    self.H.append(1)
+                else:
+                    self.H.append(num_pools(sigma_i))
+            self.H = np.array(self.H)
+        return self.H
 
     def __process__(self, sigma: np.ndarray):
         byte_rep = sigma.tobytes()
