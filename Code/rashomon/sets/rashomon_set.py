@@ -28,10 +28,10 @@ class RashomonSet:
         sigma_hash = self.__process__(sigma)
         return sigma_hash in self.P_hash
 
-    def calculate_loss(self, D, y, policies, policy_means, reg):
+    def calculate_loss(self, D, y, policies, policy_means, reg, normalize=0):
         Q_list = []
         for sigma in self.P_qe:
-            Q_sigma = compute_Q(D, y, sigma, policies, policy_means, reg)
+            Q_sigma = compute_Q(D, y, sigma, policies, policy_means, reg, normalize)
             Q_list.append(Q_sigma)
         self.Q = np.array(Q_list)
 

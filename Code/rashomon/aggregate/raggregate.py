@@ -42,9 +42,10 @@ def subset_data(D, y, policy_profiles_idx):
 
 
 def find_profile_lower_bound(D_k, y_k, policy_means_k):
+    n_k = D_k.shape[0]
     mu = np.float64(policy_means_k[:, 0]) / policy_means_k[:, 1]
     mu_D = mu[list(D_k.reshape((-1,)))]
-    mse = mean_squared_error(y_k[:, 0], mu_D)
+    mse = mean_squared_error(y_k[:, 0], mu_D) * n_k
     return mse
 
 
@@ -90,6 +91,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     num_profiles = 2**M
     profiles, profile_map = enumerate_profiles(M)
     all_policies = enumerate_policies(M, R)
+    num_data = D.shape[0]
 
     # In the best case, every other profile becomes a single pool
     # So max number of pools per profile is adjusted accordingly
@@ -100,7 +102,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     y_profiles = {}
     policies_profiles = {}
     policy_means_profiles = {}
-    eq_lb_profiles = [0] * num_profiles
+    eq_lb_profiles = np.zeros(shape=(num_profiles,))
     for k, profile in enumerate(profiles):
 
         policies_temp = [(i, x) for i, x in enumerate(all_policies) if policy_to_profile(x) == profile]
@@ -121,6 +123,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             policy_means_profiles[k] = policy_means_k
             eq_lb_profiles[k] = find_profile_lower_bound(D_k, y_k, policy_means_k)
 
+    eq_lb_profiles /= num_data
     eq_lb_sum = np.sum(eq_lb_profiles)
 
     # Now solve each profile independently
@@ -156,14 +159,13 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             rashomon_k.Q = np.array([control_loss])
         else:
             rashomon_k = RAggregate_profile(M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
-                                            policies_k, policy_means_k)
-            rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg)
+                                            policies_k, policy_means_k, normalize=num_data)
+            rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg, normalize=num_data)
 
         rashomon_k.sort()
         rashomon_profiles[k] = rashomon_k
         if len(rashomon_k) == 0:
             feasible = False
-            # print(k, theta_k, policy_means_k, H_profile, eq_lb_profiles[k])
 
     # Combine solutions in a feasible way
     if feasible:

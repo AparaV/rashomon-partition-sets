@@ -47,7 +47,7 @@ def partition_sigma(sigma, i, j):
     return sigma_fix
 
 
-def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
+def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0):
     """
     The B function in Theorem 6.3 \ref{thm:rashomon-equivalent-bound}
     """
@@ -63,6 +63,9 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     mu_D = mu_fixed_pools[D_pool]
     mse = mean_squared_error(y[:, 0], mu_D)
 
+    if normalize > 0:
+        mse = mse * D.shape[0] / normalize
+
     # The least number of pools
     # The number of pools when the splittable policies are pooled maximally
     sigma_fix[i, (j + 1):] = 1
@@ -74,7 +77,7 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1):
     return B
 
 
-def compute_Q(D, y, sigma, policies, policy_means, reg=1):
+def compute_Q(D, y, sigma, policies, policy_means, reg=1, normalize=0):
     """
     Compute the loss Q
     """
@@ -84,6 +87,9 @@ def compute_Q(D, y, sigma, policies, policy_means, reg=1):
     D_pool = [pi_policies[pol_id] for pol_id in D[:, 0]]
     mu_D = mu_pools[D_pool]
     mse = mean_squared_error(y[:, 0], mu_D)
+
+    if normalize > 0:
+        mse = mse * D.shape[0] / normalize
 
     h = mu_pools.shape[0]
     Q = mse + reg * h

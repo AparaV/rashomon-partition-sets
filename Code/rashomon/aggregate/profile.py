@@ -20,7 +20,7 @@ def initialize_sigma(M, R):
     return sigma
 
 
-def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, policy_means=None):
+def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, policy_means=None, normalize=0):
     """
     Aggregation algorithm for a single profile
     M: int - number of arms
@@ -85,20 +85,20 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
                 queue.append((sigma_0, m, j0))
 
         # Check if further splits in arm i is feasible
-        B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg)
+        B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg, normalize)
         if B > theta:
             continue
 
         # Check if the pooling already satisfies the Rashomon threshold
         if not Q_seen.seen(sigma_1):
             Q_seen.insert(sigma_1)
-            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg)
+            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize)
             if Q <= theta:
                 P_qe.insert(sigma_1)
 
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
-            Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg)
+            Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize)
             if Q <= theta:
                 P_qe.insert(sigma_0)
 
