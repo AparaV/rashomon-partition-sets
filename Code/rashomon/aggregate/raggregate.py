@@ -129,7 +129,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     feasible = True
     for k, profile in enumerate(profiles):
         # print(theta, eq_lb_sum, eq_lb_profiles)
-        theta_k = eq_lb_sum - eq_lb_profiles[k]
+        theta_k = theta - (eq_lb_sum - eq_lb_profiles[k])
         D_k = D_profiles[k]
         y_k = y_profiles[k]
 
@@ -163,6 +163,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
         rashomon_profiles[k] = rashomon_k
         if len(rashomon_k) == 0:
             feasible = False
+            # print(k, theta_k, policy_means_k, H_profile, eq_lb_profiles[k])
 
     # Combine solutions in a feasible way
     if feasible:
