@@ -1,5 +1,7 @@
 import numpy as np
 
+from rashomon import tva
+
 
 def make_predictions(D, pi_policies, pool_means):
     n, _ = D.shape
@@ -9,6 +11,18 @@ def make_predictions(D, pi_policies, pool_means):
         pool_id = pi_policies[policy_id]
         y_pred[i] = pool_means[pool_id]
     return y_pred
+
+
+def find_profiles(subset_policies, all_policies, profile_map):
+    """
+    Return a list of indicators denoting which profiles are present in subset_policies
+    """
+    subset_profiles = [tva.policy_to_profile(all_policies[x]) for x in subset_policies]
+    subset_profile_ids = [profile_map[x] for x in subset_profiles]
+    profile_indicator = [0] * len(profile_map)
+    for prof_id in subset_profile_ids:
+        profile_indicator[prof_id] = 1
+    return profile_indicator
 
 
 def intersect_over_union(X, Y):
