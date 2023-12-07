@@ -149,10 +149,10 @@ if __name__ == "__main__":
             this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_error_tva]
             lasso_list.append(this_list)
 
-    rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_MSE"]
+    rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
 
-    lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_MSE"]
+    lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
     lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
 
     rashomon_df.to_csv("../Results/worst_case_rashomon.csv")
