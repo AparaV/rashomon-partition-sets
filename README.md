@@ -19,7 +19,7 @@ $ source venv/bin/activate
 (venv) $ pip install requirements.txt
 ```
 
-3. Install the CTL package. The [original package](https://github.com/edgeslab/CTL) is outdated and pip install will fail with most recent Python/numpy versions. So download the [fork](https://github.com/AparaV/CTL/tree/cython-typing) inside `rashomon-tva/Code` and build it locally.
+3. Install the CTL package. The [original package](https://github.com/edgeslab/CTL) is outdated and pip install will fail with most recent Python/numpy versions. So download the [fork](https://github.com/AparaV/CTL/tree/outcome-effect) inside `rashomon-tva/Code` and build it locally. This fork also has a fix that allows for causal trees when there is no control group and the outcome variable is the treatment effect.
 ```
 (venv) $ cd CTL
 (venv) $ python setup.py build_ext --inplace
