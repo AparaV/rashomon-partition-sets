@@ -27,7 +27,37 @@ def subset_data(D, D_matrix, y, policy_profiles_idx):
     return D_profile, D_matrix_k, y_profile, mask
 
 
+def ctl_single_profile(D, y, D_matrix):
+    """
+    Run causal tree for a single profile
+    """
+
+    y_1d = y.reshape((-1,))
+    T_1d = 1 + np.zeros(y_1d.shape)
+    ct = CausalTree(weight=0.0, split_size=0.0, cont=False,
+                    min_size=0)
+    ct.fit(D_matrix, y_1d, T_1d)
+    ct.prune()
+    y_est = ct.predict(D_matrix)
+
+    # Pool policies
+    pool_means_k = np.unique(y_est)
+    pi_policies = {}
+    pi_pools = {}
+    for pool_id, pool_means_k_i in enumerate(pool_means_k):
+        D_matrix_ids = np.where(y_est == pool_means_k_i)
+        policies_ct_i = [x for x in np.unique(D[D_matrix_ids])]
+        pi_pools[pool_id] = policies_ct_i
+        for policy in policies_ct_i:
+            pi_policies[policy] = pool_id
+
+    return pi_pools, pi_policies, y_est
+
+
 def ctl(M, R, D, y, D_matrix):
+    """
+    Run causal trees for multiple profiles
+    """
 
     # TODO: Edge case when dosage in one arm is binary
     #       This will fail currently
