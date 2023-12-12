@@ -62,13 +62,19 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
     feasible_combinations = []
     for comb in loss_combinations:
         pools = 0
+        loss_comb = 0
         for k, idx in enumerate(comb):
             if rashomon_profiles[k].sigma[idx] is None:
                 pools += 1
+                loss_comb += rashomon_profiles[k].Q[idx]
             else:
                 pools += num_pools(rashomon_profiles[k].sigma[idx])
+                loss_comb += rashomon_profiles[k].Q[idx]
         if pools <= H:
+            # print(loss_comb, pools, theta)
             feasible_combinations.append(comb)
+        # else:
+        #     print("Too much H:", loss_comb, pools)
 
     return feasible_combinations
 
@@ -125,14 +131,16 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
     eq_lb_profiles /= num_data
     eq_lb_sum = np.sum(eq_lb_profiles)
+    # print(eq_lb_profiles)
 
     # Now solve each profile independently
     # This step can be parallelized
-    rashomon_profiles = [None]*num_profiles
+    rashomon_profiles: list[RashomonSet] = [None]*num_profiles
     feasible = True
     for k, profile in enumerate(profiles):
         # print(theta, eq_lb_sum, eq_lb_profiles)
         theta_k = theta - (eq_lb_sum - eq_lb_profiles[k])
+        # print(theta_k)
         D_k = D_profiles[k]
         y_k = y_profiles[k]
 
@@ -149,6 +157,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
         if D_k is None:
             # TODO: Put all possible sigma matrices here and set loss to 0
             rashomon_profiles[k] = RashomonSet(shape=None)
+            rashomon_profiles[k].P_qe = [None]
+            rashomon_profiles[k].Q = [reg]
             continue
 
         # Control group is just one policy
@@ -169,6 +179,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
     # Combine solutions in a feasible way
     if feasible:
+        # print(theta)
         R_set = find_feasible_combinations(rashomon_profiles, theta, H, sorted=True)
     else:
         R_set = []
