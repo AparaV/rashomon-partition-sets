@@ -62,10 +62,9 @@ def ctl(M, R, D, y, D_matrix):
     # TODO: Edge case when dosage in one arm is binary
     #       This will fail currently
 
-    # num_profiles = 2**M
     profiles, _ = enumerate_profiles(M)
     all_policies = enumerate_policies(M, R)
-    # num_data = D.shape[0]
+    trees = {}
 
     # Subset data by profiles and solve each tree independently
     policies_profiles = {}
@@ -82,6 +81,8 @@ def ctl(M, R, D, y, D_matrix):
 
         # Subset data
         D_k, D_matrix_k, y_k, mask_k = subset_data(D, D_matrix, y, policies_ids_k)
+        if D_k is None:
+            continue
 
         # Solve for tree
         y_k_1d = y_k.reshape((-1,))
@@ -92,6 +93,7 @@ def ctl(M, R, D, y, D_matrix):
         ct.prune()
         y_est_k = ct.predict(D_matrix_k)
         y_est[mask_k] = y_est_k
+        trees[k] = ct
 
         # Pool policies
         pool_means_k = np.unique(y_est_k)
@@ -105,4 +107,4 @@ def ctl(M, R, D, y, D_matrix):
 
     pi_pools, pi_policies = extract_pools.aggregate_pools(pi_policies_profiles, policies_ids_profiles)
 
-    return pi_pools, pi_policies, y_est
+    return pi_pools, pi_policies, trees, y_est,
