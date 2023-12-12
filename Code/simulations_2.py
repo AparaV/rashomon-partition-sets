@@ -1,13 +1,14 @@
+import warnings
 import numpy as np
 import pandas as pd
 
 from copy import deepcopy
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error
 
 from rashomon import tva
 from rashomon import loss
 from rashomon import metrics
+from rashomon import causal_trees
 from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 
@@ -53,8 +54,8 @@ if __name__ == "__main__":
     #
     # Fix ground truth
     #
-    M = 2
-    R = np.array([5, 5])
+    M = 3
+    R = np.array([4, 4, 4])
 
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
@@ -65,24 +66,51 @@ if __name__ == "__main__":
     # Profile 0: (0, 0)
     sigma_0 = None
     mu_0 = np.array([0])
+    var_0 = np.array([1])
 
-    # Profile 1: (0, 1)
-    sigma_1 = np.array([[1, 1, 0]])
-    mu_1 = np.array([0.5, 3.8])
+    # Profile 1: (0, 0, 1)
+    sigma_1 = np.array([[1, 1]])
+    mu_1 = np.array([1])
+    var_1 = np.array([1])
 
-    # Profile 2: (1, 0)
-    sigma_2 = np.array([[1, 1, 1]])
-    mu_2 = np.array([2])
+    # Profile 2: (0, 1, 0)
+    sigma_2 = np.array([[1, 0]])
+    mu_2 = np.array([0.5, 3.8])
+    var_2 = np.array([1, 1])
 
-    # Profile 3: (1, 1)
-    sigma_3 = np.array([[1, 1, 1],
-                        [1, 1, 0]])
-    mu_3 = np.array([3, 4])
+    # Profile 3: (0, 1, 1)
+    sigma_3 = np.array([[1, 1],
+                        [1, 1]])
+    mu_3 = np.array([1.5])
+    var_3 = np.array([1])
 
-    # Set data parameters
-    sigma = [sigma_0, sigma_1, sigma_2, sigma_3]
-    mu = [mu_0, mu_1, mu_2, mu_3]
-    var = [[1], [1, 1], [1], [1, 1]]
+    # Profile 4: (1, 0, 0)
+    sigma_4 = np.array([[1, 1]])
+    mu_4 = np.array([1])
+    var_4 = np.array([1])
+
+    # Profile 5: (1, 0, 1)
+    sigma_5 = np.array([[0, 1],
+                        [1, 1]])
+    mu_5 = np.array([2, 3])
+    var_5 = np.array([1, 1])
+
+    # Profile 6: (1, 1, 0)
+    sigma_6 = np.array([[1, 1],
+                        [1, 1]])
+    mu_6 = np.array([2.5])
+    var_6 = np.array([1])
+
+    # Profile 1: (1, 1, 1)
+    sigma_7 = np.array([[1, 1],
+                        [1, 1],
+                        [1, 0]])
+    mu_7 = np.array([3, 4])
+    var_7 = np.array([1, 1])
+
+    sigma = [sigma_0, sigma_1, sigma_2, sigma_3, sigma_4, sigma_5, sigma_6, sigma_7]
+    mu = [mu_0, mu_1, mu_2, mu_3, mu_4, mu_5, mu_6, mu_7]
+    var = [var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7]
 
     # Identify the pools
     policies_profiles = {}
@@ -135,13 +163,14 @@ if __name__ == "__main__":
     samples_per_pol = [10, 100, 1000, 5000]
     num_sims = 100
 
-    H = 10
-    theta = 1.9
+    H = 15
+    theta = 2.3
     reg = 1e-1
 
     # Simulation results data structure
     rashomon_list = []
     lasso_list = []
+    ct_list = []
 
     #
     # Simulations
@@ -179,24 +208,17 @@ if __name__ == "__main__":
 
                 pi_pools_r, pi_policies_r = extract_pools.aggregate_pools(pi_policies_profiles_r, policies_ids_profiles)
                 pool_means_r = loss.compute_pool_means(policy_means, pi_pools_r)
-                y_pred = metrics.make_predictions(D, pi_policies_r, pool_means_r)
+                y_r_est = metrics.make_predictions(D, pi_policies_r, pool_means_r)
 
-                sqrd_err = mean_squared_error(y, y_pred)
+                r_set_results = metrics.compute_all_metrics(
+                    y, y_r_est, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+                sqrd_err = r_set_results["sqrd_err"]
+                iou_r = r_set_results["iou"]
+                best_profile_indicator = r_set_results["best_prof"]
+                min_dosage_present = r_set_results["min_dos_inc"]
+                best_pol_diff = r_set_results["best_pol_diff"]
 
-                # IOU
-                rash_max = metrics.find_best_policies(D, y_pred)
-                iou = metrics.intersect_over_union(set(true_best), set(rash_max))
-
-                # Profiles
-                best_profile_indicator = metrics.find_profiles(rash_max, all_policies, profile_map)
-
-                # Min dosage membership
-                min_dosage_present = metrics.check_membership(min_dosage_best_policy, rash_max)
-
-                # Best policy difference
-                best_pol_diff = true_best_effect - np.max(pool_means_r)
-
-                this_list = [n_per_pol, sim_i, len(pi_pools_r), sqrd_err, iou, min_dosage_present, best_pol_diff]
+                this_list = [n_per_pol, sim_i, len(pi_pools_r), sqrd_err, iou_r, min_dosage_present, best_pol_diff]
                 this_list += best_profile_indicator
                 rashomon_list.append(this_list)
 
@@ -208,34 +230,54 @@ if __name__ == "__main__":
             alpha_est = lasso.coef_
             y_tva = lasso.predict(D_matrix)
 
-            # MSE
-            sqrd_err = mean_squared_error(y_tva, y)
+            tva_results = metrics.compute_all_metrics(
+                y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            sqrd_err = tva_results["sqrd_err"]
+            iou_tva = tva_results["iou"]
+            best_profile_indicator_tva = tva_results["best_prof"]
+            min_dosage_present_tva = tva_results["min_dos_inc"]
+            best_policy_diff_tva = tva_results["best_pol_diff"]
             L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
 
-            # IOU
-            tva_best = metrics.find_best_policies(D, y_tva)
-            iou_tva = metrics.intersect_over_union(set(true_best), set(tva_best))
-
-            # Profiles
-            best_profile_indicator_tva = metrics.find_profiles(tva_best, all_policies, profile_map)
-
-            # Min dosage inclusion
-            min_dosage_present_tva = metrics.check_membership(min_dosage_best_policy, tva_best)
-
-            # Best policy MSE
-            best_policy_error_tva = true_best_effect - np.max(y_tva)
-
-            this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_error_tva]
+            this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_diff_tva]
             this_list += best_profile_indicator_tva
             lasso_list.append(this_list)
 
+            #
+            # Causal trees
+            #
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Mean of empty slice.")
+                warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
+                ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
+            y_ct = ct_res[3]
+
+            ct_results = metrics.compute_all_metrics(
+                y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            sqrd_err = ct_results["sqrd_err"]
+            iou_ct = ct_results["iou"]
+            best_profile_indicator_ct = ct_results["best_prof"]
+            min_dosage_present_ct = ct_results["min_dos_inc"]
+            best_policy_diff_ct = ct_results["best_pol_diff"]
+
+            this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
+            this_list += best_profile_indicator_ct
+            ct_list.append(this_list)
+
+    profiles_str = [str(prof) for prof in profiles]
+
     rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-    rashomon_cols += [str(prof) for prof in profiles]
+    rashomon_cols += profiles_str
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
 
     lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
-    lasso_cols += [str(prof) for prof in profiles]
+    lasso_cols += profiles_str
     lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+
+    ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+    ct_cols += profiles_str
+    ct_df = pd.DataFrame(ct_list, columns=ct_cols)
 
     rashomon_df.to_csv("../Results/simulation_2_rashomon.csv")
     lasso_df.to_csv("../Results/simulation_2_lasso.csv")
+    ct_df.to_csv("../Results/simulation_2_causal_trees.csv")

@@ -1,5 +1,7 @@
 import numpy as np
 
+from sklearn.metrics import mean_squared_error
+
 from rashomon import tva
 
 
@@ -66,3 +68,33 @@ def check_membership(true_x, est_x):
 
 def find_best_policy_diff(y_true, y_est):
     return np.max(y_true) - np.max(y_est)
+
+
+def compute_all_metrics(y_true, y_est, D, true_best_policies,
+                        all_policies, profile_map, min_dosage_best_policy,
+                        true_best_effect):
+    # MSE
+    sqrd_err = mean_squared_error(y_est, y_true)
+
+    # IOU
+    est_best_policies = find_best_policies(D, y_est)
+    iou = intersect_over_union(set(true_best_policies), set(est_best_policies))
+
+    # Profiles
+    best_profile_indicator = find_profiles(est_best_policies, all_policies, profile_map)
+
+    # Min dosage inclusion
+    min_dosage_present = check_membership(min_dosage_best_policy, est_best_policies)
+
+    # Best policy MSE
+    best_policy_diff = true_best_effect - np.max(y_est)
+
+    results = {
+        "sqrd_err": sqrd_err,
+        "iou": iou,
+        "best_prof": best_profile_indicator,
+        "min_dos_inc": min_dosage_present,
+        "best_pol_diff": best_policy_diff
+    }
+
+    return results
