@@ -65,8 +65,9 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
         loss_comb = 0
         for k, idx in enumerate(comb):
             if rashomon_profiles[k].sigma[idx] is None:
-                pools += 1
-                loss_comb += rashomon_profiles[k].Q[idx]
+                if rashomon_profiles[k].Q[idx] > 0:
+                    pools += 1
+                    loss_comb += rashomon_profiles[k].Q[idx]
             else:
                 pools += num_pools(rashomon_profiles[k].sigma[idx])
                 loss_comb += rashomon_profiles[k].Q[idx]
@@ -124,6 +125,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             # print("Here")
             policy_means_profiles[k] = None
             eq_lb_profiles[k] = 0
+            H_profile += 1
         else:
             policy_means_k = loss.compute_policy_means(D_k, y_k, len(policies_profiles[k]))
             policy_means_profiles[k] = policy_means_k
@@ -158,7 +160,7 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             # TODO: Put all possible sigma matrices here and set loss to 0
             rashomon_profiles[k] = RashomonSet(shape=None)
             rashomon_profiles[k].P_qe = [None]
-            rashomon_profiles[k].Q = [reg]
+            rashomon_profiles[k].Q = np.array([0])
             continue
 
         # Control group is just one policy

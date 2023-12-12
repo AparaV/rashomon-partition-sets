@@ -85,6 +85,8 @@ def aggregate_pools(pi_policies: dict[int, dict[int, int]], policies_ids_profile
         policies_ids_k = policies_ids_profiles[k]
         pool_id_map = {}
         for pol_id, pool_id in pi_policies_k.items():
+            if pool_id is None:
+                continue
             try:
                 agg_pool_id = pool_id_map[pool_id]
             except KeyError:
