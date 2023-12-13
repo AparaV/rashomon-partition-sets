@@ -164,7 +164,7 @@ if __name__ == "__main__":
     num_sims = 100
 
     H = 15
-    theta = 2.3
+    theta = 2.2
     reg = 1e-1
 
     # Simulation results data structure
