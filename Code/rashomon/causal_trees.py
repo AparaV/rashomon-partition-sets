@@ -51,7 +51,7 @@ def ctl_single_profile(D, y, D_matrix):
         for policy in policies_ct_i:
             pi_policies[policy] = pool_id
 
-    return pi_pools, pi_policies, y_est
+    return pi_pools, pi_policies, ct, y_est
 
 
 def ctl(M, R, D, y, D_matrix):

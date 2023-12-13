@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 
@@ -7,6 +8,7 @@ from sklearn.metrics import mean_squared_error
 from rashomon import loss
 from rashomon import tva
 from rashomon import metrics
+from rashomon import causal_trees
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
 
@@ -74,6 +76,7 @@ if __name__ == "__main__":
     # Simulation results data structure
     rashomon_list = []
     lasso_list = []
+    ct_list = []
 
     #
     # Simulations
@@ -101,6 +104,7 @@ if __name__ == "__main__":
 
             pol_means = loss.compute_policy_means(D, y, num_policies)
             true_best = pi_pools[np.argmax(mu)]
+            true_best_effect = np.argmax(mu)
             min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
 
             for s_i in P_set:
@@ -149,11 +153,36 @@ if __name__ == "__main__":
             this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_error_tva]
             lasso_list.append(this_list)
 
+            #
+            # Causal trees
+            #
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Mean of empty slice.")
+                warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
+                ct_res = causal_trees.ctl_single_profile(D, y, D_matrix)
+            y_ct = ct_res[3]
+
+            ct_results = metrics.compute_all_metrics(
+                y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            sqrd_err = ct_results["sqrd_err"]
+            iou_ct = ct_results["iou"]
+            # best_profile_indicator_ct = ct_results["best_prof"]
+            min_dosage_present_ct = ct_results["min_dos_inc"]
+            best_policy_diff_ct = ct_results["best_pol_diff"]
+
+            this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
+            # this_list += best_profile_indicator_ct
+            ct_list.append(this_list)
+
     rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
 
     lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
     lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
 
+    ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+    ct_df = pd.DataFrame(ct_list, columns=ct_cols)
+
     rashomon_df.to_csv("../Results/worst_case_rashomon.csv")
     lasso_df.to_csv("../Results/worst_case_lasso.csv")
+    ct_df.to_csv("../Results/worst_case_causal_trees.csv")
