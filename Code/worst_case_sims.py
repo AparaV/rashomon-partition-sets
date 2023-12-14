@@ -65,6 +65,10 @@ if __name__ == "__main__":
     se = 1
     var = se * np.ones_like(mu)
 
+    true_best = pi_pools[np.argmax(mu)]
+    true_best_effect = np.max(mu)
+    min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
+
     # Simulation parameters and variables
     samples_per_pol = [10, 100, 1000, 5000]
     num_sims = 100
@@ -94,6 +98,7 @@ if __name__ == "__main__":
             X, D, y = generate_data(mu, var, n_per_pol, policies, pi_policies, M)
             # The dummy matrix for Lasso
             D_matrix = tva.get_dummy_matrix(D, G, num_policies)
+            pol_means = loss.compute_policy_means(D, y, num_policies)
 
             #
             # Run Rashomon
@@ -101,11 +106,6 @@ if __name__ == "__main__":
             P_set = RAggregate_profile(M, R, H, D, y, theta, sigma_profile, reg)
             if not P_set.seen(sigma):
                 print("P_set missing true sigma")
-
-            pol_means = loss.compute_policy_means(D, y, num_policies)
-            true_best = pi_pools[np.argmax(mu)]
-            true_best_effect = np.argmax(mu)
-            min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
 
             for s_i in P_set:
                 pi_pools_i, pi_policies_i = extract_pools(policies, s_i)
@@ -166,12 +166,10 @@ if __name__ == "__main__":
                 y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
             sqrd_err = ct_results["sqrd_err"]
             iou_ct = ct_results["iou"]
-            # best_profile_indicator_ct = ct_results["best_prof"]
             min_dosage_present_ct = ct_results["min_dos_inc"]
             best_policy_diff_ct = ct_results["best_pol_diff"]
 
             this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
-            # this_list += best_profile_indicator_ct
             ct_list.append(this_list)
 
     rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
