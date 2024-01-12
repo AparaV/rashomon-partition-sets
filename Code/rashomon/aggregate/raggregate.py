@@ -99,6 +99,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     profiles, profile_map = enumerate_profiles(M)
     all_policies = enumerate_policies(M, R)
     num_data = D.shape[0]
+    if isinstance(R, int):
+        R = np.array([R]*M)
 
     # In the best case, every other profile becomes a single pool
     # So max number of pools per profile is adjusted accordingly
