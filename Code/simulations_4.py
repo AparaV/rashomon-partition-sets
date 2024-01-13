@@ -106,11 +106,12 @@ if __name__ == "__main__":
     G = tva.alpha_matrix(all_policies)
 
     # Simulation parameters and variables
-    samples_per_pol = [10, 100, 500, 1000, 5000]
+    # samples_per_pol = [10, 100, 500, 1000, 5000]
+    samples_per_pol = [5, 10, 25, 50, 100, 250, 500, 1000]
     num_sims = 100
 
-    H = 20
-    theta = 2.6
+    H = 15
+    theta = 4.2
     reg = 1e-1
 
     # Simulation results data structure
@@ -139,6 +140,14 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
+            if n_per_pol == 5:
+                theta = 4.7
+            elif n_per_pol == 10:
+                theta = 3.9
+            elif n_per_pol == 25:
+                theta = 4.4
+            else:
+                theta = 4.2
             R_set, rashomon_profiles = RAggregate(M, R, H, D, y, theta, reg)
 
             for r_set in R_set:
@@ -168,47 +177,47 @@ if __name__ == "__main__":
                 this_list += best_profile_indicator
                 rashomon_list.append(this_list)
 
-            #
-            # Run Lasso
-            #
-            lasso = linear_model.Lasso(reg, fit_intercept=False)
-            lasso.fit(D_matrix, y)
-            alpha_est = lasso.coef_
-            y_tva = lasso.predict(D_matrix)
+            # #
+            # # Run Lasso
+            # #
+            # lasso = linear_model.Lasso(reg, fit_intercept=False)
+            # lasso.fit(D_matrix, y)
+            # alpha_est = lasso.coef_
+            # y_tva = lasso.predict(D_matrix)
 
-            tva_results = metrics.compute_all_metrics(
-                y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-            sqrd_err = tva_results["sqrd_err"]
-            iou_tva = tva_results["iou"]
-            best_profile_indicator_tva = tva_results["best_prof"]
-            min_dosage_present_tva = tva_results["min_dos_inc"]
-            best_policy_diff_tva = tva_results["best_pol_diff"]
-            L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
+            # tva_results = metrics.compute_all_metrics(
+            #     y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            # sqrd_err = tva_results["sqrd_err"]
+            # iou_tva = tva_results["iou"]
+            # best_profile_indicator_tva = tva_results["best_prof"]
+            # min_dosage_present_tva = tva_results["min_dos_inc"]
+            # best_policy_diff_tva = tva_results["best_pol_diff"]
+            # L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
 
-            this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_diff_tva]
-            this_list += best_profile_indicator_tva
-            lasso_list.append(this_list)
+            # this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_diff_tva]
+            # this_list += best_profile_indicator_tva
+            # lasso_list.append(this_list)
 
-            #
-            # Causal trees
-            #
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message="Mean of empty slice.")
-                warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
-                ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
-            y_ct = ct_res[3]
+            # #
+            # # Causal trees
+            # #
+            # with warnings.catch_warnings():
+            #     warnings.filterwarnings("ignore", message="Mean of empty slice.")
+            #     warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
+            #     ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
+            # y_ct = ct_res[3]
 
-            ct_results = metrics.compute_all_metrics(
-                y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-            sqrd_err = ct_results["sqrd_err"]
-            iou_ct = ct_results["iou"]
-            best_profile_indicator_ct = ct_results["best_prof"]
-            min_dosage_present_ct = ct_results["min_dos_inc"]
-            best_policy_diff_ct = ct_results["best_pol_diff"]
+            # ct_results = metrics.compute_all_metrics(
+            #     y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            # sqrd_err = ct_results["sqrd_err"]
+            # iou_ct = ct_results["iou"]
+            # best_profile_indicator_ct = ct_results["best_prof"]
+            # min_dosage_present_ct = ct_results["min_dos_inc"]
+            # best_policy_diff_ct = ct_results["best_pol_diff"]
 
-            this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
-            this_list += best_profile_indicator_ct
-            ct_list.append(this_list)
+            # this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
+            # this_list += best_profile_indicator_ct
+            # ct_list.append(this_list)
 
     profiles_str = [str(prof) for prof in profiles]
 
@@ -216,14 +225,14 @@ if __name__ == "__main__":
     rashomon_cols += profiles_str
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
 
-    lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
-    lasso_cols += profiles_str
-    lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+    # lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
+    # lasso_cols += profiles_str
+    # lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
 
-    ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-    ct_cols += profiles_str
-    ct_df = pd.DataFrame(ct_list, columns=ct_cols)
+    # ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+    # ct_cols += profiles_str
+    # ct_df = pd.DataFrame(ct_list, columns=ct_cols)
 
     rashomon_df.to_csv("../Results/simulation_4_rashomon.csv")
-    lasso_df.to_csv("../Results/simulation_4_lasso.csv")
-    ct_df.to_csv("../Results/simulation_4_causal_trees.csv")
+    # lasso_df.to_csv("../Results/simulation_4_lasso.csv")
+    # ct_df.to_csv("../Results/simulation_4_causal_trees.csv")

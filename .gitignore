@@ -1,6 +1,9 @@
 # Manual package installs
 Code/CTL
 
+# Large datasets
+Results/simulation_4_rashomon.csv
+
 # VS Code
 .vscode/
 
