@@ -8,7 +8,6 @@ from .utils import find_feasible_sum_subsets
 from .. import loss
 from ..tva import enumerate_profiles, enumerate_policies, policy_to_profile
 from ..sets import RashomonSet
-from ..counter import num_pools
 
 
 # rashomon aggregation across profiles
@@ -55,27 +54,29 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
         for idx, r in enumerate(rashomon_profiles):
             rashomon_profiles[idx].sort()
 
+    for idx, r in enumerate(rashomon_profiles):
+        _ = rashomon_profiles[idx].pools
+
+    # print("here")
     losses = [r.loss for r in rashomon_profiles]
     loss_combinations = find_feasible_sum_subsets(losses, theta)
+    # print(f"Found {len(loss_combinations)}")
 
     # Filter based on pools
     feasible_combinations = []
-    for comb in loss_combinations:
+    for ctr, comb in enumerate(loss_combinations):
+        if (ctr + 1) % 1000 == 0:
+            print(ctr)
         pools = 0
-        loss_comb = 0
         for k, idx in enumerate(comb):
             if rashomon_profiles[k].sigma[idx] is None:
                 if rashomon_profiles[k].Q[idx] > 0:
                     pools += 1
-                    loss_comb += rashomon_profiles[k].Q[idx]
             else:
-                pools += num_pools(rashomon_profiles[k].sigma[idx])
-                loss_comb += rashomon_profiles[k].Q[idx]
+                pools += rashomon_profiles[k].H[idx]
         if pools <= H:
-            # print(loss_comb, pools, theta)
             feasible_combinations.append(comb)
-        # else:
-        #     print("Too much H:", loss_comb, pools)
+    # print("here")
 
     return feasible_combinations
 
