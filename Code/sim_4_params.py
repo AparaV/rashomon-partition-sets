@@ -7,7 +7,7 @@ M = 3
 R = np.array([4, 4, 4])
 
 # Fix the partitions
-# Profile 0: (0, 0)
+# Profile 0: (0, 0, 0)
 sigma_0 = None
 mu_0 = np.array([0])
 var_0 = np.array([1])
