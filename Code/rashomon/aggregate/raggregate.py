@@ -65,8 +65,8 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
     # Filter based on pools
     feasible_combinations = []
     for ctr, comb in enumerate(loss_combinations):
-        if (ctr + 1) % 1000 == 0:
-            print(ctr)
+        # if (ctr + 1) % 1000 == 0:
+        #     print(ctr)
         pools = 0
         for k, idx in enumerate(comb):
             if rashomon_profiles[k].sigma[idx] is None:
