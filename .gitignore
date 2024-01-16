@@ -2,7 +2,7 @@
 Code/CTL
 
 # Large datasets
-Results/simulation_4_rashomon.csv
+Results/simulation_4_rashomon*.csv
 
 # VS Code
 .vscode/
