@@ -1,17 +1,17 @@
 import os
 import argparse
 import importlib
-# import warnings
+import warnings
 import numpy as np
 import pandas as pd
 
 from copy import deepcopy
-# from sklearn import linear_model
+from sklearn import linear_model
 
 from rashomon import tva
 from rashomon import loss
 from rashomon import metrics
-# from rashomon import causal_trees
+from rashomon import causal_trees
 from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 
@@ -166,7 +166,7 @@ if __name__ == "__main__":
             X, D, y = generate_data(mu, var, n_per_pol, all_policies, pi_policies, M)
             policy_means = loss.compute_policy_means(D, y, num_policies)
             # The dummy matrix for Lasso
-            # D_matrix = tva.get_dummy_matrix(D, G, num_policies)
+            D_matrix = tva.get_dummy_matrix(D, G, num_policies)
 
             #
             # Run Rashomon
@@ -238,10 +238,62 @@ if __name__ == "__main__":
 
             rashomon_list += current_results
 
+            #
+            # Run Lasso
+            #
+            lasso = linear_model.Lasso(reg, fit_intercept=False)
+            lasso.fit(D_matrix, y)
+            alpha_est = lasso.coef_
+            y_tva = lasso.predict(D_matrix)
+
+            tva_results = metrics.compute_all_metrics(
+                y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            sqrd_err = tva_results["sqrd_err"]
+            iou_tva = tva_results["iou"]
+            best_profile_indicator_tva = tva_results["best_prof"]
+            min_dosage_present_tva = tva_results["min_dos_inc"]
+            best_policy_diff_tva = tva_results["best_pol_diff"]
+            L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
+
+            this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_diff_tva]
+            this_list += best_profile_indicator_tva
+            lasso_list.append(this_list)
+
+            #
+            # Causal trees
+            #
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Mean of empty slice.")
+                warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
+                ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
+            y_ct = ct_res[3]
+
+            ct_results = metrics.compute_all_metrics(
+                y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+            sqrd_err = ct_results["sqrd_err"]
+            iou_ct = ct_results["iou"]
+            best_profile_indicator_ct = ct_results["best_prof"]
+            min_dosage_present_ct = ct_results["min_dos_inc"]
+            best_policy_diff_ct = ct_results["best_pol_diff"]
+
+            this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
+            this_list += best_profile_indicator_ct
+            ct_list.append(this_list)
+
     profiles_str = [str(prof) for prof in profiles]
 
     rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
     rashomon_cols += profiles_str
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
 
+    lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
+    lasso_cols += profiles_str
+    lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+
+    ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+    ct_cols += profiles_str
+    ct_df = pd.DataFrame(ct_list, columns=ct_cols)
+
     rashomon_df.to_csv(os.path.join(output_dir, rashomon_fname))
+    lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
+    ct_df.to_csv(os.path.join(output_dir, ct_fname))
