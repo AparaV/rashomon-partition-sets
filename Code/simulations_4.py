@@ -1,3 +1,6 @@
+import os
+import argparse
+import importlib
 # import warnings
 import numpy as np
 import pandas as pd
@@ -13,6 +16,22 @@ from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Parse command line arguments")
+    parser.add_argument("--params", type=str,
+                        help=".py file where parameters are stored")
+    parser.add_argument("--sample_size", type=int,
+                        help="Number of samples per feature combination")
+    parser.add_argument("--iters", type=int,
+                        help="Number of iterations")
+    # parser.add_argument("--output_dir", type=str,
+    #                     help="Where should output be saved")
+    parser.add_argument("--output_prefix", type=str,
+                        help="Prefix for output file name")
+    args = parser.parse_args()
+    return args
+
+
 def generate_data(mu, var, n_per_pol, all_policies, pi_policies, M):
     num_data = num_policies * n_per_pol
     X = np.zeros(shape=(num_data, M))
@@ -26,11 +45,8 @@ def generate_data(mu, var, n_per_pol, all_policies, pi_policies, M):
         for idx, policy in enumerate(policies_k):
             policy_idx = [i for i, x in enumerate(all_policies) if x == policy]
 
-            # profile_id = tva.policy_to_profile(policy)
             pool_id = pi_policies[k][idx]
-            # pool_i = pi_policies[idx]
             mu_i = mu[k][pool_id]
-            # var_i = var[policy_idx[0]]
             var_i = var[k][pool_id]
             y_i = np.random.normal(mu_i, var_i, size=(n_per_pol, 1))
 
@@ -38,7 +54,6 @@ def generate_data(mu, var, n_per_pol, all_policies, pi_policies, M):
             end_idx = (idx_ctr + 1) * n_per_pol
 
             X[start_idx:end_idx, ] = policy
-            # D[start_idx:end_idx, ] = idx
             D[start_idx:end_idx, ] = policy_idx[0]
             y[start_idx:end_idx, ] = y_i
 
@@ -49,14 +64,31 @@ def generate_data(mu, var, n_per_pol, all_policies, pi_policies, M):
 
 if __name__ == "__main__":
 
-    from sim_4_params import M, R, sigma, mu, var
+    args = parse_arguments()
+
+    # from sim_4_params import M, R, sigma, mu, var
+    params_module_name = args.params
+    params = importlib.import_module(params_module_name, package=None)
+    M = params.M
+    R = params.R
+    sigma = params.sigma
+    mu = params.mu
+    var = params.var
 
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
     all_policies = tva.enumerate_policies(M, R)
     num_policies = len(all_policies)
 
-    np.random.seed(3)
+    # Simulation parameters and variables
+    samples_per_pol = [args.sample_size]
+    num_sims = args.iters
+
+    output_dir = "../Results/"
+    output_suffix = f"_{args.sample_size}_{args.iters}.csv"
+    rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
+    lasso_fname = args.output_prefix + "_lasso" + output_suffix
+    ct_fname = args.output_prefix + "_ct" + output_suffix
 
     # Identify the pools
     policies_profiles = {}
@@ -106,12 +138,6 @@ if __name__ == "__main__":
     # The transformation matrix for Lasso
     G = tva.alpha_matrix(all_policies)
 
-    # Simulation parameters and variables
-    # samples_per_pol = [10, 100, 500, 1000, 5000]
-    samples_per_pol = [5, 10, 25, 50, 100, 250, 500, 1000]
-    # samples_per_pol = [5]
-    num_sims = 100
-
     H = 15
     theta = 3.9
     reg = 1e-1
@@ -120,6 +146,8 @@ if __name__ == "__main__":
     rashomon_list = []
     lasso_list = []
     ct_list = []
+
+    np.random.seed(3)
 
     #
     # Simulations
@@ -216,4 +244,4 @@ if __name__ == "__main__":
     rashomon_cols += profiles_str
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
 
-    rashomon_df.to_csv("../Results/simulation_4_rashomon.csv")
+    rashomon_df.to_csv(os.path.join(output_dir, rashomon_fname))
