@@ -28,6 +28,8 @@ def parse_arguments():
     #                     help="Where should output be saved")
     parser.add_argument("--output_prefix", type=str,
                         help="Prefix for output file name")
+    parser.add_argument("--theta", type=float,
+                        help="Rashomon threshold")
     args = parser.parse_args()
     return args
 
@@ -74,6 +76,9 @@ if __name__ == "__main__":
     sigma = params.sigma
     mu = params.mu
     var = params.var
+    H = params.H
+    theta = params.theta
+    reg = params.reg
 
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
@@ -84,6 +89,7 @@ if __name__ == "__main__":
     samples_per_pol = [args.sample_size]
     num_sims = args.iters
 
+    # Output file names
     output_dir = "../Results/"
     output_suffix = f"_{args.sample_size}_{args.iters}.csv"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
@@ -138,10 +144,6 @@ if __name__ == "__main__":
     # The transformation matrix for Lasso
     G = tva.alpha_matrix(all_policies)
 
-    H = 15
-    theta = 3.9
-    reg = 1e-1
-
     # Simulation results data structure
     rashomon_list = []
     lasso_list = []
@@ -171,19 +173,19 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            if n_per_pol == 5:
-                if sim_i == 0 or sim_i == 3:
-                    theta = 6.5
-                else:
-                    theta = 6.5
-            elif n_per_pol == 10:
-                theta = 4.2
-            elif n_per_pol <= 50:
-                theta = 4.4
-            elif n_per_pol <= 250:
-                theta = 4.3
-            else:
-                theta = 4.2
+            # if n_per_pol == 5:
+            #     if sim_i == 0 or sim_i == 3:
+            #         theta = 6.5
+            #     else:
+            #         theta = 6.5
+            # elif n_per_pol == 10:
+            #     theta = 4.2
+            # elif n_per_pol <= 50:
+            #     theta = 4.4
+            # elif n_per_pol <= 250:
+            #     theta = 4.3
+            # else:
+            #     theta = 4.2
 
             # Adaptive expand R set threshold until we find a model that
             # identifies the true best profile

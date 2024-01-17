@@ -55,3 +55,7 @@ var_7 = np.array([1, 2])
 sigma = [sigma_0, sigma_1, sigma_2, sigma_3, sigma_4, sigma_5, sigma_6, sigma_7]
 mu = [mu_0, mu_1, mu_2, mu_3, mu_4, mu_5, mu_6, mu_7]
 var = [var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7]
+
+H = 15
+theta = 3.9
+reg = 1e-1
