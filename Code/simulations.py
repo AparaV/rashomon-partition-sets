@@ -28,8 +28,10 @@ def parse_arguments():
     #                     help="Where should output be saved")
     parser.add_argument("--output_prefix", type=str,
                         help="Prefix for output file name")
-    parser.add_argument("--theta", type=float,
-                        help="Rashomon threshold")
+    # parser.add_argument("--theta", type=float,
+    #                     help="Rashomon threshold")
+    parser.add_argument("--method", type=str,
+                        help="One of {r, lasso, ct}")
     args = parser.parse_args()
     return args
 
@@ -145,6 +147,10 @@ if __name__ == "__main__":
     G = tva.alpha_matrix(all_policies)
 
     # Simulation results data structure
+    method = args.method
+    if method not in ["r", "lasso", "ct"]:
+        print(f"method should be one of [r, lasso, ct]. Received {method}. Defaulting to r")
+        method = "r"
     rashomon_list = []
     lasso_list = []
     ct_list = []
@@ -173,129 +179,139 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            # if n_per_pol == 5:
-            #     if sim_i == 0 or sim_i == 3:
-            #         theta = 6.5
-            #     else:
-            #         theta = 6.5
-            # elif n_per_pol == 10:
-            #     theta = 4.2
-            # elif n_per_pol <= 50:
-            #     theta = 4.4
-            # elif n_per_pol <= 250:
-            #     theta = 4.3
-            # else:
-            #     theta = 4.2
+            if method == "r":
+                # if n_per_pol == 5:
+                #     if sim_i == 0 or sim_i == 3:
+                #         theta = 6.5
+                #     else:
+                #         theta = 6.5
+                # elif n_per_pol == 10:
+                #     theta = 4.2
+                # elif n_per_pol <= 50:
+                #     theta = 4.4
+                # elif n_per_pol <= 250:
+                #     theta = 4.3
+                # else:
+                #     theta = 4.2
 
-            # Adaptive expand R set threshold until we find a model that
-            # identifies the true best profile
-            found_best_profile = False
-            counter = 0
-            this_theta = theta
+                # Adaptive expand R set threshold until we find a model that
+                # identifies the true best profile
+                found_best_profile = False
+                counter = 0
+                this_theta = theta
 
-            while not found_best_profile:
-                if (counter + 1) % 10 == 0:
-                    print(f"\tSimulation {sim_i}. Tried {counter} times. Theta = {this_theta}")
+                while not found_best_profile:
+                    if (counter + 1) % 10 == 0:
+                        print(f"\tSimulation {sim_i}. Tried {counter} times. Theta = {this_theta}")
 
-                current_results = []
-                R_set, rashomon_profiles = RAggregate(M, R, H, D, y, this_theta, reg)
-                print(f"\t\t{this_theta},{len(R_set)}")
+                    current_results = []
+                    R_set, rashomon_profiles = RAggregate(M, R, H, D, y, this_theta, reg)
+                    print(f"\t\t{this_theta},{len(R_set)}")
 
-                for r_set in R_set:
+                    for r_set in R_set:
 
-                    # MSE
-                    pi_policies_profiles_r = {}
-                    for k, profile in enumerate(profiles):
-                        _, pi_policies_r_k = extract_pools.extract_pools(
-                            policies_profiles_masked[k],
-                            rashomon_profiles[k].sigma[r_set[k]]
-                        )
-                        pi_policies_profiles_r[k] = pi_policies_r_k
+                        # MSE
+                        pi_policies_profiles_r = {}
+                        for k, profile in enumerate(profiles):
+                            _, pi_policies_r_k = extract_pools.extract_pools(
+                                policies_profiles_masked[k],
+                                rashomon_profiles[k].sigma[r_set[k]]
+                            )
+                            pi_policies_profiles_r[k] = pi_policies_r_k
 
-                    pi_pools_r, pi_policies_r = extract_pools.aggregate_pools(
-                        pi_policies_profiles_r, policies_ids_profiles)
-                    pool_means_r = loss.compute_pool_means(policy_means, pi_pools_r)
-                    y_r_est = metrics.make_predictions(D, pi_policies_r, pool_means_r)
+                        pi_pools_r, pi_policies_r = extract_pools.aggregate_pools(
+                            pi_policies_profiles_r, policies_ids_profiles)
+                        pool_means_r = loss.compute_pool_means(policy_means, pi_pools_r)
+                        y_r_est = metrics.make_predictions(D, pi_policies_r, pool_means_r)
 
-                    r_set_results = metrics.compute_all_metrics(
-                        y, y_r_est, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-                    sqrd_err = r_set_results["sqrd_err"]
-                    iou_r = r_set_results["iou"]
-                    best_profile_indicator = r_set_results["best_prof"]
-                    min_dosage_present = r_set_results["min_dos_inc"]
-                    best_pol_diff = r_set_results["best_pol_diff"]
+                        r_set_results = metrics.compute_all_metrics(
+                            y, y_r_est, D, true_best, all_policies, profile_map,
+                            min_dosage_best_policy, true_best_effect)
+                        sqrd_err = r_set_results["sqrd_err"]
+                        iou_r = r_set_results["iou"]
+                        best_profile_indicator = r_set_results["best_prof"]
+                        min_dosage_present = r_set_results["min_dos_inc"]
+                        best_pol_diff = r_set_results["best_pol_diff"]
 
-                    this_list = [n_per_pol, sim_i, len(pi_pools_r), sqrd_err, iou_r, min_dosage_present, best_pol_diff]
-                    this_list += best_profile_indicator
-                    current_results.append(this_list)
+                        this_list = [
+                            n_per_pol, sim_i, len(pi_pools_r), sqrd_err, iou_r, min_dosage_present, best_pol_diff
+                            ]
+                        this_list += best_profile_indicator
+                        current_results.append(this_list)
 
-                    if best_profile_indicator[true_best_profile_idx] == 1:
+                        if best_profile_indicator[true_best_profile_idx] == 1:
+                            found_best_profile = True
+                    # if this_theta >= 6.5:
+                    #     found_best_profile = True
+                    # if len(R_set) > 1e5:
+                    if len(R_set) >= 8377:
                         found_best_profile = True
-                if this_theta >= 6.5:
-                    found_best_profile = True
-                if len(R_set) > 1e5:
-                    found_best_profile = True
-                this_theta += 0.5
-                counter += 1
+                    this_theta += 0.5
+                    counter += 1
+                    # break
 
-            rashomon_list += current_results
+                rashomon_list += current_results
 
             #
             # Run Lasso
             #
-            lasso = linear_model.Lasso(reg, fit_intercept=False)
-            lasso.fit(D_matrix, y)
-            alpha_est = lasso.coef_
-            y_tva = lasso.predict(D_matrix)
+            if method == "lasso":
+                lasso = linear_model.Lasso(reg, fit_intercept=False)
+                lasso.fit(D_matrix, y)
+                alpha_est = lasso.coef_
+                y_tva = lasso.predict(D_matrix)
 
-            tva_results = metrics.compute_all_metrics(
-                y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-            sqrd_err = tva_results["sqrd_err"]
-            iou_tva = tva_results["iou"]
-            best_profile_indicator_tva = tva_results["best_prof"]
-            min_dosage_present_tva = tva_results["min_dos_inc"]
-            best_policy_diff_tva = tva_results["best_pol_diff"]
-            L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
+                tva_results = metrics.compute_all_metrics(
+                    y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+                sqrd_err = tva_results["sqrd_err"]
+                iou_tva = tva_results["iou"]
+                best_profile_indicator_tva = tva_results["best_prof"]
+                min_dosage_present_tva = tva_results["min_dos_inc"]
+                best_policy_diff_tva = tva_results["best_pol_diff"]
+                L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
 
-            this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_diff_tva]
-            this_list += best_profile_indicator_tva
-            lasso_list.append(this_list)
+                this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_diff_tva]
+                this_list += best_profile_indicator_tva
+                lasso_list.append(this_list)
 
             #
             # Causal trees
             #
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", message="Mean of empty slice.")
-                warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
-                ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
-            y_ct = ct_res[3]
+            if method == "ct":
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", message="Mean of empty slice.")
+                    warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
+                    ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
+                y_ct = ct_res[3]
 
-            ct_results = metrics.compute_all_metrics(
-                y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-            sqrd_err = ct_results["sqrd_err"]
-            iou_ct = ct_results["iou"]
-            best_profile_indicator_ct = ct_results["best_prof"]
-            min_dosage_present_ct = ct_results["min_dos_inc"]
-            best_policy_diff_ct = ct_results["best_pol_diff"]
+                ct_results = metrics.compute_all_metrics(
+                    y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
+                sqrd_err = ct_results["sqrd_err"]
+                iou_ct = ct_results["iou"]
+                best_profile_indicator_ct = ct_results["best_prof"]
+                min_dosage_present_ct = ct_results["min_dos_inc"]
+                best_policy_diff_ct = ct_results["best_pol_diff"]
 
-            this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
-            this_list += best_profile_indicator_ct
-            ct_list.append(this_list)
+                this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
+                this_list += best_profile_indicator_ct
+                ct_list.append(this_list)
 
     profiles_str = [str(prof) for prof in profiles]
 
-    rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-    rashomon_cols += profiles_str
-    rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
+    if method == "r":
+        rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+        rashomon_cols += profiles_str
+        rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
+        rashomon_df.to_csv(os.path.join(output_dir, rashomon_fname))
 
-    lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
-    lasso_cols += profiles_str
-    lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+    if method == "lasso":
+        lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
+        lasso_cols += profiles_str
+        lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+        lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
 
-    ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-    ct_cols += profiles_str
-    ct_df = pd.DataFrame(ct_list, columns=ct_cols)
-
-    rashomon_df.to_csv(os.path.join(output_dir, rashomon_fname))
-    lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
-    ct_df.to_csv(os.path.join(output_dir, ct_fname))
+    if method == "ct":
+        ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+        ct_cols += profiles_str
+        ct_df = pd.DataFrame(ct_list, columns=ct_cols)
+        ct_df.to_csv(os.path.join(output_dir, ct_fname))
