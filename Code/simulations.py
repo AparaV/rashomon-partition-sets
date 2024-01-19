@@ -248,7 +248,7 @@ if __name__ == "__main__":
                         found_best_profile = True
                     this_theta += 0.5
                     counter += 1
-                    # break
+                    break
 
                 rashomon_list += current_results
 
