@@ -15,12 +15,12 @@ var_0 = np.array([1])
 # Profile 1: (0, 0, 1)
 sigma_1 = np.array([[1, 1]])
 mu_1 = np.array([3.8])
-var_1 = np.array([2])
+var_1 = np.array([1])
 
 # Profile 2: (0, 1, 0)
 sigma_2 = np.array([[1, 1]])
 mu_2 = np.array([3.8])
-var_2 = np.array([2])
+var_2 = np.array([1])
 
 # Profile 3: (0, 1, 1)
 sigma_3 = np.array([[1, 1],
@@ -37,19 +37,19 @@ var_4 = np.array([1])
 sigma_5 = np.array([[1, 1],
                     [1, 0]])
 mu_5 = np.array([0, 4])
-var_5 = np.array([0.5, 1])
+var_5 = np.array([1, 2])
 
 # Profile 6: (1, 1, 0)
 sigma_6 = np.array([[1, 1],
                     [1, 0]])
 mu_6 = np.array([0, 3.8])
-var_6 = np.array([1, 1])
+var_6 = np.array([1, 2])
 
 # Profile 1: (1, 1, 1)
 sigma_7 = np.array([[1, 1],
                     [1, 1],
                     [1, 0]])
-mu_7 = np.array([0, 3.8])
+mu_7 = np.array([0, 1])
 var_7 = np.array([1, 1])
 
 sigma = [sigma_0, sigma_1, sigma_2, sigma_3, sigma_4, sigma_5, sigma_6, sigma_7]
