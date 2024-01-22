@@ -43,7 +43,7 @@ var_5 = np.array([1, 2])
 sigma_6 = np.array([[1, 1],
                     [1, 0]])
 mu_6 = np.array([0, 3.8])
-var_6 = np.array([1, 2])
+var_6 = np.array([1, 1])
 
 # Profile 1: (1, 1, 1)
 sigma_7 = np.array([[1, 1],
@@ -57,5 +57,5 @@ mu = [mu_0, mu_1, mu_2, mu_3, mu_4, mu_5, mu_6, mu_7]
 var = [var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7]
 
 H = 16
-theta = 3
+theta = 2.7
 reg = 1e-1
