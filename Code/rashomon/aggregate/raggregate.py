@@ -9,6 +9,8 @@ from .. import loss
 from ..tva import enumerate_profiles, enumerate_policies, policy_to_profile
 from ..sets import RashomonSet
 
+from tqdm import tqdm
+
 
 # rashomon aggregation across profiles
 # Need to keep track of seen problems and their lower bounds
@@ -91,7 +93,7 @@ def remove_unused_poolings(R_set, rashomon_profiles):
     return rashomon_profiles
 
 
-def RAggregate(M, R, H, D, y, theta, reg=1):
+def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False):
 
     # TODO: Edge case when dosage in one arm is binary
     #       This will fail currently
@@ -113,7 +115,9 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     policies_profiles = {}
     policy_means_profiles = {}
     eq_lb_profiles = np.zeros(shape=(num_profiles,))
-    for k, profile in enumerate(profiles):
+    
+    if verbose: print("Subset data by profiles and find equiv policy lower bound")
+    for k, profile in (tqdm(enumerate(profiles)) if verbose else enumerate(profiles)):
 
         policies_temp = [(i, x) for i, x in enumerate(all_policies) if policy_to_profile(x) == profile]
         unzipped_temp = list(zip(*policies_temp))
@@ -142,7 +146,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
     # This step can be parallelized
     rashomon_profiles: list[RashomonSet] = [None]*num_profiles
     feasible = True
-    for k, profile in enumerate(profiles):
+    if verbose: print("Solve Each Profile Independently")
+    for k, profile in (tqdm(enumerate(profiles)) if verbose else enumerate(profiles)):
         # print(theta, eq_lb_sum, eq_lb_profiles)
         theta_k = theta - (eq_lb_sum - eq_lb_profiles[k])
         # print(theta_k)
