@@ -59,3 +59,5 @@ var = [var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7]
 H = 16
 theta = 4.2
 reg = 1e-1
+# # Lasso
+# reg = 1e-3
