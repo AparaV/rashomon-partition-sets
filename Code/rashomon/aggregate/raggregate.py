@@ -42,7 +42,9 @@ def subset_data(D, y, policy_profiles_idx):
 
 def find_profile_lower_bound(D_k, y_k, policy_means_k):
     n_k = D_k.shape[0]
+    nodata_idx = np.where(policy_means_k[:, 1] == 0)[0]
     mu = np.float64(policy_means_k[:, 0]) / policy_means_k[:, 1]
+    mu[nodata_idx] = 0
     mu_D = mu[list(D_k.reshape((-1,)))]
     mse = mean_squared_error(y_k[:, 0], mu_D) * n_k
     return mse

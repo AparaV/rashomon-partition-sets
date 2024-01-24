@@ -31,11 +31,14 @@ def compute_pool_means(policy_means, pi_pools):
     mu_pools_temp = np.ndarray(shape=(H, 2))
     for pool_id, pool in pi_pools.items():
         policy_subset = policy_means[pool, :]
+        nodata_idx = np.where(policy_subset[:, 1] == 0)[0]
+        policy_subset[:, 0][nodata_idx] = 0
         mu_pools_temp[pool_id, :] = np.sum(policy_subset, axis=0)
-    # mu_pools = np.float64(mu_pools_temp[:, 0]) / mu_pools_temp[:, 1]
     sums = mu_pools_temp[:, 0]
     counts = mu_pools_temp[:, 1]
-    out_format = np.nan + np.zeros_like(sums)
+    nodata_idx = np.where(counts == 0)[0]
+    sums[nodata_idx] = 0
+    out_format = np.zeros_like(sums)
     mu_pools = np.divide(sums, counts, out=out_format, where=counts != 0)
     return mu_pools
 
