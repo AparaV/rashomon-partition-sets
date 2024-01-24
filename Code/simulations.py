@@ -208,6 +208,8 @@ if __name__ == "__main__":
                     R_set, rashomon_profiles = RAggregate(M, R, H, D, y, this_theta, reg)
                     print(f"\t\t{this_theta},{len(R_set)}")
 
+                    best_loss = np.inf
+
                     for r_set in R_set:
 
                         # MSE
@@ -232,6 +234,7 @@ if __name__ == "__main__":
                         best_profile_indicator = r_set_results["best_prof"]
                         min_dosage_present = r_set_results["min_dos_inc"]
                         best_pol_diff = r_set_results["best_pol_diff"]
+                        this_loss = sqrd_err + reg * len(pi_pools_r)
 
                         this_list = [
                             n_per_pol, sim_i, len(pi_pools_r), sqrd_err, iou_r, min_dosage_present, best_pol_diff
@@ -239,16 +242,29 @@ if __name__ == "__main__":
                         this_list += best_profile_indicator
                         current_results.append(this_list)
 
-                        if best_profile_indicator[true_best_profile_idx] == 1:
-                            found_best_profile = True
+                        if this_loss < best_loss:
+                            best_loss = this_loss
+
+                        # if best_profile_indicator[true_best_profile_idx] == 1:
+                        #     found_best_profile = True
+
+                    eps = 1
+                    if np.isinf(best_loss):
+                        best_loss = this_theta
+                    if this_theta >= (eps * best_loss):
+                        found_best_profile = True
+                    else:
+                        this_theta = eps * best_loss
+                        # found_best_profile = False
+                    counter += 1
+
                     # if this_theta >= 6.5:
                     #     found_best_profile = True
                     # if len(R_set) > 1e5:
-                    if len(R_set) >= 8377:
-                        found_best_profile = True
-                    this_theta += 0.5
-                    counter += 1
-                    break
+                    # if len(R_set) >= 8377:
+                    #     found_best_profile = True
+                    # this_theta += 0.5
+                    # break
 
                 rashomon_list += current_results
 
