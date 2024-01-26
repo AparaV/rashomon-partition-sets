@@ -58,7 +58,7 @@ var = [var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7]
 
 H = 16
 # theta = 4.2
-theta = 2.8
+theta = 2.9
 reg = 1e-1
 # # Lasso
 lasso_reg = 1e-2

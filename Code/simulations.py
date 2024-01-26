@@ -246,8 +246,8 @@ if __name__ == "__main__":
                         if this_loss < best_loss:
                             best_loss = this_loss
 
-                        # if best_profile_indicator[true_best_profile_idx] == 1:
-                        #     found_best_profile = True
+                        if best_profile_indicator[true_best_profile_idx] == 1:
+                            found_best_profile = True
 
                     eps = 0
                     eps_factor = 1 + eps
@@ -256,8 +256,8 @@ if __name__ == "__main__":
                     if this_theta >= (eps_factor * best_loss):
                         found_best_profile = True
                     else:
-                        this_theta = eps * best_loss
-                        # found_best_profile = False
+                        this_theta = eps_factor * best_loss
+                        found_best_profile = False
                     counter += 1
 
                     # if this_theta >= 6.5:
@@ -301,6 +301,11 @@ if __name__ == "__main__":
                     warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
                     ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
                 y_ct = ct_res[3]
+                y_ct = np.reshape(y, (-1,))
+                # depth = 0
+                # for prof, tree in ct_res[2].items():
+                #     depth += tree.tree_depth
+                # print(depth)
 
                 ct_results = metrics.compute_all_metrics(
                     y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
