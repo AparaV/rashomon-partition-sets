@@ -272,6 +272,7 @@ if __name__ == "__main__":
             # Run Lasso
             #
             if method == "lasso":
+                reg = 1e-2
                 lasso = linear_model.Lasso(reg, fit_intercept=False)
                 lasso.fit(D_matrix, y)
                 alpha_est = lasso.coef_
