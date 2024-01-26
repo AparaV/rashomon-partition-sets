@@ -81,6 +81,7 @@ if __name__ == "__main__":
     H = params.H
     theta = params.theta
     reg = params.reg
+    lasso_reg = params.lasso_reg
 
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
@@ -248,10 +249,11 @@ if __name__ == "__main__":
                         # if best_profile_indicator[true_best_profile_idx] == 1:
                         #     found_best_profile = True
 
-                    eps = 1
+                    eps = 0
+                    eps_factor = 1 + eps
                     if np.isinf(best_loss):
                         best_loss = this_theta
-                    if this_theta >= (eps * best_loss):
+                    if this_theta >= (eps_factor * best_loss):
                         found_best_profile = True
                     else:
                         this_theta = eps * best_loss
@@ -272,8 +274,7 @@ if __name__ == "__main__":
             # Run Lasso
             #
             if method == "lasso":
-                reg = 1e-2
-                lasso = linear_model.Lasso(reg, fit_intercept=False)
+                lasso = linear_model.Lasso(lasso_reg, fit_intercept=False)
                 lasso.fit(D_matrix, y)
                 alpha_est = lasso.coef_
                 y_tva = lasso.predict(D_matrix)
