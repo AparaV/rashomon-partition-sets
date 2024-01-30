@@ -4,6 +4,7 @@ Code/CTL
 # Large datasets
 Results/simulation_4_rashomon*.csv
 Results/reff*
+Results/nhanes*
 
 # VS Code
 .vscode/
