@@ -7,7 +7,7 @@ occ_df_1999_fname = "../../datasets/ICPSR_25501/DS0228/25501-0228-Data.dta"
 occ_df_2001_fname = "../../datasets/ICPSR_25502/DS0229/25502-0229-Data.dta"
 telo_a_fname = "../../datasets/telomere/TELO_A.XPT"
 telo_b_fname = "../../datasets/telomere/TELO_B.XPT"
-output_fname = "../Data/NHANES_telomere.csv"
+output_fname = "../Data/NHANES_telomere_std.csv"
 
 # Read occuptation databases
 occ_df_1999 = pd.read_stata(occ_df_1999_fname)
@@ -149,8 +149,8 @@ telo_b_df = pd.read_sas(telo_b_fname)
 telo_df = pd.concat([telo_a_df, telo_b_df], axis=0)
 
 telo_df = telo_df.dropna()
-telo_df = telo_df.drop(["TELOSTD"], axis=1)
-telo_df = telo_df.rename(columns={"TELOMEAN": "Telomean"})
+# telo_df = telo_df.drop(["TELOSTD"], axis=1)
+telo_df = telo_df.rename(columns={"TELOMEAN": "Telomean", "TELOSTD": "Telostd"})
 
 
 # Join dataframes
