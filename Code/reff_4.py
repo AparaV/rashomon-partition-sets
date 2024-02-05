@@ -47,7 +47,7 @@ for i, profile in enumerate(profiles):
         # sigma_i[1, 1] = 0
         # mu_i = np.array([0, 3.8])
         # var_i = np.array([1, 1])
-        mu_i = np.array([4.4])
+        mu_i = np.array([4.45])
         var_i = np.array([var_fixed * var_scale_i])
     # (0, 1, 0, 0)
     elif i == 4:
@@ -66,7 +66,7 @@ for i, profile in enumerate(profiles):
         # sigma_i[3, 1] = 0
         # mu_i = np.array([0, 3.8])
         # var_i = np.array([1, 1])
-        mu_i = np.array([4.3])
+        mu_i = np.array([4.35])
         var_i = np.array([var_fixed * var_scale_i])
     else:
         # mu_i = np.array([1])
