@@ -5,6 +5,7 @@ Code/CTL
 Results/simulation_4_rashomon*.csv
 Results/reff*
 Results/nhanes*
+Results/4arms*
 
 # VS Code
 .vscode/
