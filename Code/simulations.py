@@ -93,7 +93,9 @@ if __name__ == "__main__":
     num_sims = args.iters
 
     # Output file names
+    start_sim = 0
     output_dir = "../Results/"
+    # output_suffix = f"_{args.sample_size}_{args.iters}_{start_sim}.csv"
     output_suffix = f"_{args.sample_size}_{args.iters}.csv"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
@@ -139,7 +141,8 @@ if __name__ == "__main__":
 
     best_per_profile = [np.max(mu_k) for mu_k in mu]
     true_best_profile = np.argmax(best_per_profile)
-    true_best_profile_idx = 5
+    # print(true_best_profile)
+    true_best_profile_idx = int(true_best_profile)
     true_best_effect = np.max(mu[true_best_profile])
     true_best = pi_pools[true_best_profile][np.argmax(mu[true_best_profile])]
     min_dosage_best_policy = metrics.find_min_dosage(true_best, all_policies)
@@ -165,8 +168,9 @@ if __name__ == "__main__":
 
         print(f"Number of samples: {n_per_pol}")
 
-        for sim_i in range(num_sims):
+        for sim_i in range(start_sim, start_sim + num_sims):
             print(sim_i)
+            np.random.seed(sim_i)
 
             if (sim_i + 1) % 20 == 0:
                 print(f"\tSimulation {sim_i+1}")
@@ -211,7 +215,8 @@ if __name__ == "__main__":
 
                     best_loss = np.inf
 
-                    for r_set in R_set:
+                    for idx, r_set in enumerate(R_set):
+                        # print(idx)
 
                         # MSE
                         pi_policies_profiles_r = {}
@@ -248,15 +253,20 @@ if __name__ == "__main__":
 
                         if best_profile_indicator[true_best_profile_idx] == 1:
                             found_best_profile = True
+                            # print("Found", this_loss)
 
-                    eps = 0
+                    if found_best_profile:
+                        print("\tFound best profile")
+
+                    eps = 0.2
                     eps_factor = 1 + eps
                     if np.isinf(best_loss):
                         best_loss = this_theta
-                    if this_theta >= (eps_factor * best_loss):
+                    if found_best_profile or this_theta >= (eps_factor * best_loss):
                         found_best_profile = True
                     else:
-                        this_theta = eps_factor * best_loss
+                        # this_theta = eps_factor * best_loss
+                        this_theta += 0.1
                         found_best_profile = False
                     counter += 1
 
