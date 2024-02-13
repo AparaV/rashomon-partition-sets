@@ -127,7 +127,6 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
         y_profiles[k] = y_k
 
         if D_k is None:
-            # print("Here")
             policy_means_profiles[k] = None
             eq_lb_profiles[k] = 0
             H_profile += 1
@@ -138,16 +137,13 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
     eq_lb_profiles /= num_data
     eq_lb_sum = np.sum(eq_lb_profiles)
-    # print(eq_lb_profiles)
 
     # Now solve each profile independently
     # This step can be parallelized
     rashomon_profiles: list[RashomonSet] = [None]*num_profiles
     feasible = True
     for k, profile in enumerate(profiles):
-        # print(theta, eq_lb_sum, eq_lb_profiles)
         theta_k = theta - (eq_lb_sum - eq_lb_profiles[k])
-        # print(theta_k)
         D_k = D_profiles[k]
         y_k = y_profiles[k]
 

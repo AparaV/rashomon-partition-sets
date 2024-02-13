@@ -52,8 +52,6 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
 
     while len(queue) > 0:
 
-        # print(P_qe)
-
         (sigma, i, j) = queue.popleft()
         sigma = np.copy(sigma)
 
