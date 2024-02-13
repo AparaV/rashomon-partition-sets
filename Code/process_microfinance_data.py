@@ -26,35 +26,41 @@ baseline_df["bizexpense"] = pd.qcut(
     baseline_df["bizexpense"],
     q=4,
     duplicates="drop",
-    labels=[1, 2, 3, 4]
+    labels=[0, 1, 2, 3]
     )
-baseline_df["bizexpense"] = baseline_df["bizexpense"].fillna(1)
-
-baseline_df[baseline_df["female_biz_pct"] > 0] = 2
-baseline_df[baseline_df["female_biz_pct"] == 0] = 1
-baseline_df["female_biz_pct"] = baseline_df["female_biz_pct"].fillna(1)
+baseline_df["bizexpense"] = baseline_df["bizexpense"].fillna(0)
 
 baseline_df["home_durable_index"] = pd.qcut(
     baseline_df["home_durable_index"],
     q=4,
     duplicates="drop",
-    labels=[1, 2, 3, 4]
+    labels=[0, 1, 2, 3]
     )
+baseline_df["home_durable_index"] = baseline_df["home_durable_index"].fillna(0)
 
 baseline_df["anyloan_amt"] = pd.qcut(
     baseline_df["anyloan_amt"],
     q=5,
     duplicates="drop",
-    labels=[1, 2, 3, 4]
+    labels=[0, 1, 2, 3]
     )
+baseline_df["anyloan_amt"] = baseline_df["anyloan_amt"].fillna(0)
 
 baseline_df["total_exp_mo"] = pd.qcut(
     baseline_df["total_exp_mo"],
     q=4,
     duplicates="drop",
-    labels=[1, 2, 3, 4]
+    labels=[0, 1, 2, 3]
     )
-baseline_df["total_exp_mo"] = baseline_df["total_exp_mo"].fillna(1)
+baseline_df["total_exp_mo"] = baseline_df["total_exp_mo"].fillna(0)
+
+baseline_df[baseline_df["male_head"] == 1] = 2
+baseline_df[baseline_df["male_head"] == 0] = 1
+baseline_df["male_head"] = baseline_df["male_head"].fillna(1)
+
+baseline_df[baseline_df["female_biz_pct"] > 0] = 2
+baseline_df[baseline_df["female_biz_pct"] == 0] = 1
+baseline_df["female_biz_pct"] = baseline_df["female_biz_pct"].fillna(1)
 
 
 endline_cols = raw_endlines.columns
