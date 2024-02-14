@@ -64,11 +64,17 @@ baseline_df["female_biz_pct"] = baseline_df["female_biz_pct"].fillna(1)
 
 
 endline_cols = raw_endlines.columns
-endline2_cols = [x for x in endline_cols if x[-1] == "2"] + ["hhid"]
-endline2_df = raw_endlines[endline2_cols]
+endline2_cols = [x for x in endline_cols if x[-1] == "2"] + ["hhid", "treatment"]
+endline2_df = raw_endlines[endline2_cols].copy()
+
+endline2_df["treatment"] = endline2_df["treatment"].replace({
+    "Treatment": 1,
+    "Control": 0
+})
 
 endline2_cols_to_keep = [
     "hhid",
+    "treatment",
     "anyloan_amt_2",
     "informal_amt_2",
     "female_biz_pct_2",   # Number of women owned business
