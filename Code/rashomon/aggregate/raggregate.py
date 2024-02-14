@@ -165,7 +165,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             continue
 
         # Control group is just one policy
-        if M_k == 0:
+        # print(profile, theta_k)
+        if M_k == 0 or (len(R_k) == 1 and R_k[0] == 2):
             rashomon_k = RashomonSet(shape=None)
             control_loss = eq_lb_profiles[k] + reg
             rashomon_k.P_qe = [None]
@@ -177,10 +178,12 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
         rashomon_k.sort()
         rashomon_profiles[k] = rashomon_k
+        # print(len(rashomon_k))
         if len(rashomon_k) == 0:
             feasible = False
 
     # Combine solutions in a feasible way
+    # print("Finding feasible combinations")
     if feasible:
         # print(theta)
         R_set = find_feasible_combinations(rashomon_profiles, theta, H, sorted=True)
