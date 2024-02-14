@@ -10,15 +10,15 @@ raw_endlines = pd.read_stata(raw_endlines_fname)
 # Subset dataframe
 #
 regional_cols = [
-    "hhid", 
-    "treatment", 
-    "areaid", 
+    "hhid",
+    "treatment",
+    "areaid",
     "old_biz",
     "area_pop_base",
     "area_debt_total_base",
     "area_business_total_base",
-    "area_exp_pc_mean_base", 
-    "area_literate_head_base", 
+    "area_exp_pc_mean_base",
+    "area_literate_head_base",
     "area_literate_base"
 ]
 
