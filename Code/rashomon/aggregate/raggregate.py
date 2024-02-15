@@ -43,7 +43,9 @@ def subset_data(D, y, policy_profiles_idx):
 def find_profile_lower_bound(D_k, y_k, policy_means_k):
     n_k = D_k.shape[0]
     nodata_idx = np.where(policy_means_k[:, 1] == 0)[0]
+    policy_means_k[nodata_idx, 1] = 1
     mu = np.float64(policy_means_k[:, 0]) / policy_means_k[:, 1]
+    policy_means_k[nodata_idx, 1] = 0
     mu[nodata_idx] = 0
     mu_D = mu[list(D_k.reshape((-1,)))]
     mse = mean_squared_error(y_k[:, 0], mu_D) * n_k
@@ -162,10 +164,11 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             rashomon_profiles[k] = RashomonSet(shape=None)
             rashomon_profiles[k].P_qe = [None]
             rashomon_profiles[k].Q = np.array([0])
+            print(f"Skipping profile {profile}")
             continue
 
         # Control group is just one policy
-        # print(profile, theta_k)
+        print(profile, theta_k)
         if M_k == 0 or (len(R_k) == 1 and R_k[0] == 2):
             rashomon_k = RashomonSet(shape=None)
             control_loss = eq_lb_profiles[k] + reg
@@ -178,12 +181,12 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
         rashomon_k.sort()
         rashomon_profiles[k] = rashomon_k
-        # print(len(rashomon_k))
+        print(len(rashomon_k))
         if len(rashomon_k) == 0:
             feasible = False
 
     # Combine solutions in a feasible way
-    # print("Finding feasible combinations")
+    print("Finding feasible combinations")
     if feasible:
         # print(theta)
         R_set = find_feasible_combinations(rashomon_profiles, theta, H, sorted=True)
