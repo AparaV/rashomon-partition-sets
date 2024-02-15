@@ -150,11 +150,15 @@ if __name__ == "__main__":
         model_losses.append(loss_r)
         model_sizes.append(size_r)
 
-    q0 = np.min(model_losses)
-    eps = (np.max(model_losses) - np.min(model_losses)) / q0
+    if len(R_set) > 0:
+        q0 = np.min(model_losses)
+        eps = (np.max(model_losses) - np.min(model_losses)) / q0
 
-    print(f"Best model loss {q0} and epsilon {eps}")
-    print(f"Smallest model {np.min(model_sizes)}, largest model {np.max(model_sizes)}")
+        print(f"Best model loss {q0} and epsilon {eps}")
+        print(f"Smallest model {np.min(model_sizes)}, largest model {np.max(model_sizes)}")
+    else:
+        q0 = -np.inf
+        eps = np.inf
 
     #
     # Pickle the results
