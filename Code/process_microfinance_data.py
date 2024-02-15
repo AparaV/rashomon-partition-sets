@@ -34,7 +34,7 @@ endline2_cols = [
     "girl1620_school_2",
     "bizprofit_2",
     "bizrev_2",
-    "bizemployees_2"
+    "bizemployees_2",
 ]
 
 cols_to_keep = endline2_cols + regional_cols
@@ -44,13 +44,19 @@ endline2_df = raw_endlines[cols_to_keep].copy()
 #
 # Clean up the columns
 #
-endline2_df["girls_school"] = endline2_df.loc[:, ("girl515_school_2", "girl1620_school_2")].mean(axis=1)
+endline2_df["girls_school_2"] = endline2_df.loc[:, ("girl515_school_2", "girl1620_school_2")].mean(axis=1)
 endline2_df = endline2_df.drop(["girl515_school_2", "girl1620_school_2"], axis=1)
 
 endline2_df["treatment"] = endline2_df["treatment"].replace({
     "Treatment": 1,
     "Control": 0
 })
+
+endline2_df["hh_edu"] = raw_endlines[["head_noeduc_1", "head_noeduc_2"]].max(axis=1, skipna=True)
+endline2_df["hh_edu"] = endline2_df["hh_edu"].fillna(0)
+
+endline2_df["hh_gender"] = raw_endlines["male_head_1"]
+endline2_df["hh_gender"] = endline2_df["hh_gender"].fillna(1)
 
 # Discretize continuous covariates
 endline2_df["old_biz"] = endline2_df["old_biz"].fillna(0)
@@ -90,6 +96,8 @@ reordered_cols = [
     "hhid",
     "areaid",
     "treatment",
+    "hh_edu",
+    "hh_gender",
     "old_biz",
     "area_pop_base",
     "area_debt_total_base",
@@ -106,7 +114,8 @@ reordered_cols = [
     "total_exp_mo_2",
     "bizprofit_2",
     "bizrev_2",
-    "bizemployees_2"
+    "bizemployees_2",
+    "girls_school_2"
 ]
 
 endline2_df = endline2_df[reordered_cols]
