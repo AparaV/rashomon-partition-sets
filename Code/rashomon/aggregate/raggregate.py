@@ -164,7 +164,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False):
             rashomon_profiles[k] = RashomonSet(shape=None)
             rashomon_profiles[k].P_qe = [None]
             rashomon_profiles[k].Q = np.array([0])
-            print(f"Skipping profile {profile}")
+            if verbose:
+                print(f"Skipping profile {profile}")
             continue
 
         # Control group is just one policy
