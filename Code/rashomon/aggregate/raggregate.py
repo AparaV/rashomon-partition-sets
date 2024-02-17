@@ -43,7 +43,9 @@ def subset_data(D, y, policy_profiles_idx):
 def find_profile_lower_bound(D_k, y_k, policy_means_k):
     n_k = D_k.shape[0]
     nodata_idx = np.where(policy_means_k[:, 1] == 0)[0]
+    policy_means_k[nodata_idx, 1] = 1
     mu = np.float64(policy_means_k[:, 0]) / policy_means_k[:, 1]
+    policy_means_k[nodata_idx, 1] = 0
     mu[nodata_idx] = 0
     mu_D = mu[list(D_k.reshape((-1,)))]
     mse = mean_squared_error(y_k[:, 0], mu_D) * n_k
@@ -93,7 +95,7 @@ def remove_unused_poolings(R_set, rashomon_profiles):
     return rashomon_profiles
 
 
-def RAggregate(M, R, H, D, y, theta, reg=1):
+def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False):
 
     # TODO: Edge case when dosage in one arm is binary
     #       This will fail currently
@@ -127,7 +129,6 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
         y_profiles[k] = y_k
 
         if D_k is None:
-            # print("Here")
             policy_means_profiles[k] = None
             eq_lb_profiles[k] = 0
             H_profile += 1
@@ -138,16 +139,13 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
     eq_lb_profiles /= num_data
     eq_lb_sum = np.sum(eq_lb_profiles)
-    # print(eq_lb_profiles)
 
     # Now solve each profile independently
     # This step can be parallelized
     rashomon_profiles: list[RashomonSet] = [None]*num_profiles
     feasible = True
     for k, profile in enumerate(profiles):
-        # print(theta, eq_lb_sum, eq_lb_profiles)
         theta_k = theta - (eq_lb_sum - eq_lb_profiles[k])
-        # print(theta_k)
         D_k = D_profiles[k]
         y_k = y_profiles[k]
 
@@ -166,10 +164,14 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
             rashomon_profiles[k] = RashomonSet(shape=None)
             rashomon_profiles[k].P_qe = [None]
             rashomon_profiles[k].Q = np.array([0])
+            if verbose:
+                print(f"Skipping profile {profile}")
             continue
 
         # Control group is just one policy
-        if M_k == 0:
+        if verbose:
+            print(profile, theta_k)
+        if M_k == 0 or (len(R_k) == 1 and R_k[0] == 2):
             rashomon_k = RashomonSet(shape=None)
             control_loss = eq_lb_profiles[k] + reg
             rashomon_k.P_qe = [None]
@@ -181,10 +183,14 @@ def RAggregate(M, R, H, D, y, theta, reg=1):
 
         rashomon_k.sort()
         rashomon_profiles[k] = rashomon_k
+        if verbose:
+            print(len(rashomon_k))
         if len(rashomon_k) == 0:
             feasible = False
 
     # Combine solutions in a feasible way
+    if verbose:
+        print("Finding feasible combinations")
     if feasible:
         # print(theta)
         R_set = find_feasible_combinations(rashomon_profiles, theta, H, sorted=True)
