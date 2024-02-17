@@ -48,7 +48,10 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
     Q_seen = RashomonProblemCache(sigma.shape)
     problems = RashomonSubproblemCache(sigma.shape)
 
-    queue = deque([(sigma, 0, 0)])
+    for i in range(M):
+        if not np.isinf(sigma[i, 0]):
+            queue = deque([(sigma, i, 0)])
+            break
 
     while len(queue) > 0:
 
