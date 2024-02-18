@@ -28,16 +28,22 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
+    trt_het = False
+    edu_het = False
+    gen_het = True
+
+    output_fname_suffix = ""
+    if trt_het:
+        output_fname_suffix += "_trt"
+    if edu_het:
+        output_fname_suffix += "_edu"
+    if gen_het:
+        output_fname_suffix += "_gen"
+
     args = parse_arguments()
 
     outcome_col_id = args.outcome_col
 
-    # With q = 4.6e-3, we got
-    # Best model loss 0.004299737679159057 and epsilon 0.06977152970196171
-    # Smallest model 64.0, largest model 67.0
-    # And there were 13333 models
-    # reg = 1e-4
-    # q = 4.6e-3
     reg = args.reg
     q = args.q
     H = np.inf
@@ -48,13 +54,16 @@ if __name__ == "__main__":
 
     df = pd.read_csv(data_fname)
 
-    # outcome_cols = cols[10:]
-    # covariate_cols_id = [2, 3, 4, 5, 6, 7, 8, 9]
-    # covariate_cols = [cols[x] for x in covariate_cols_id]
+    if not trt_het:
+        df["treatment"] = df["treatment"] + 1
+    if not edu_het:
+        df["hh_edu"] = df["hh_edu"] + 1
+    if not gen_het:
+        df["hh_gender"] = df["hh_gender"] + 1
 
-    df["treatment"] = df["treatment"] + 1
-    df["hh_edu"] = df["hh_edu"] + 1
-    df["hh_gender"] = df["hh_gender"] + 1
+    trt_max_dosage = int(np.max(df["treatment"]) + 1)
+    edu_max_dosage = int(np.max(df["hh_edu"]) + 1)
+    gen_max_dosage = int(np.max(df["hh_gender"]) + 1)
 
     cols = df.columns
     outcome_col = cols[outcome_col_id]
@@ -80,7 +89,7 @@ if __name__ == "__main__":
     # Setup policy means
     #
     M = 6
-    R = np.array([3, 3, 3, 4, 4, 4])
+    R = np.array([trt_max_dosage, edu_max_dosage, gen_max_dosage, 4, 4, 4])
 
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
@@ -108,23 +117,10 @@ if __name__ == "__main__":
         policies_profiles_masked[k] = policies_k
 
     D = np.zeros(shape=y.shape, dtype=np.int64)
-    # profiles_in_data = []
     for i in range(num_data):
         policy_i = tuple([int(x) for x in X[i, :]])
         policy_idx = [idx for idx in range(num_policies) if all_policies[idx] == policy_i]
-        # profiles_in_data.append(tva.policy_to_profile(policy_i))
         D[i, 0] = int(policy_idx[0])
-
-    # policy_means = loss.compute_policy_means(D, y, num_policies)
-
-    # nodata_idx = np.where(policy_means[:, 1] == 0)[0]
-    # policy_means[nodata_idx, 0] = -np.inf
-    # policy_means[nodata_idx, 1] = 1
-    # mu_policies = policy_means[:, 0] / policy_means[:, 1]
-
-    # true_best_eff = np.max(mu_policies)
-    # print(true_best_eff)
-    # np.where(mu_policies == true_best_eff)
 
     #
     # Find the Rashomon set
@@ -174,7 +170,9 @@ if __name__ == "__main__":
         "R_profiles": R_profiles
     }
 
-    pkl_fname = results_dir + outcome_col + ".pkl"
+    results_subdir = results_dir + outcome_col + "/"
+    pkl_fname = results_subdir + outcome_col + output_fname_suffix + ".pkl"
+    print(f"Pickling to {pkl_fname}")
 
     with open(pkl_fname, "wb") as f:
         pickle.dump(res_dict, f, pickle.HIGHEST_PROTOCOL)
