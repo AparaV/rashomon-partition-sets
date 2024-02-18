@@ -63,6 +63,8 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
 
     # print("here")
     losses = [r.loss for r in rashomon_profiles]
+    # first_loss = [x[-1] for x in losses]
+    # print(np.sum(first_loss))
     loss_combinations = find_feasible_sum_subsets(losses, theta)
     # print(f"Found {len(loss_combinations)}")
 
@@ -77,7 +79,7 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
                 if rashomon_profiles[k].Q[idx] > 0:
                     pools += 1
             else:
-                pools += rashomon_profiles[k].H[idx]
+                pools += rashomon_profiles[k].pools[idx]
         if pools <= H:
             feasible_combinations.append(comb)
     # print("here")

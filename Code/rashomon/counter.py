@@ -191,6 +191,10 @@ def __num_pools_complex__(sigma, R: np.array):
 
 def num_pools(sigma, R=None):
     # Lemma 4.5 \ref{lemma:sigma-ones-pools}
+
+    if np.all(np.isinf(sigma)):
+        return 1
+
     if R is None:
         R = find_R(sigma)
     if isinstance(R, int):
