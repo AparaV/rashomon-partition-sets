@@ -6,12 +6,7 @@ import pandas as pd
 from copy import deepcopy
 
 from rashomon import tva
-# from rashomon import loss
-# from rashomon import counter
-# from rashomon import metrics
-# from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
-# from rashomon.sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 
 
 def parse_arguments():
