@@ -28,7 +28,7 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
-    trt_het = True
+    trt_het = False
     edu_het = True
     gen_het = True
 
