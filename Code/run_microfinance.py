@@ -29,7 +29,7 @@ def parse_arguments():
 if __name__ == "__main__":
 
     trt_het = False
-    edu_het = True
+    edu_het = False
     gen_het = False
 
     output_fname_suffix = ""
