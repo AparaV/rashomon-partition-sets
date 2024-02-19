@@ -52,7 +52,8 @@ def find_profile_lower_bound(D_k, y_k, policy_means_k):
     return mse
 
 
-def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, sorted=False):
+def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H,
+                               sorted=False, verbose=False):
 
     if not sorted:
         for idx, r in enumerate(rashomon_profiles):
@@ -61,8 +62,13 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
     for idx, r in enumerate(rashomon_profiles):
         _ = rashomon_profiles[idx].pools
 
-    # print("here")
     losses = [r.loss for r in rashomon_profiles]
+
+    if verbose:
+        first_loss = [x[0] for x in losses]
+        last_loss = [x[-1] for x in losses]
+        print(f"Min = {np.sum(first_loss)}, Max = {np.sum(last_loss)}")
+
     loss_combinations = find_feasible_sum_subsets(losses, theta)
     # print(f"Found {len(loss_combinations)}")
 
@@ -77,10 +83,9 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H, s
                 if rashomon_profiles[k].Q[idx] > 0:
                     pools += 1
             else:
-                pools += rashomon_profiles[k].H[idx]
+                pools += rashomon_profiles[k].pools[idx]
         if pools <= H:
             feasible_combinations.append(comb)
-    # print("here")
 
     return feasible_combinations
 
@@ -192,8 +197,8 @@ def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False):
     if verbose:
         print("Finding feasible combinations")
     if feasible:
-        # print(theta)
-        R_set = find_feasible_combinations(rashomon_profiles, theta, H, sorted=True)
+        R_set = find_feasible_combinations(
+            rashomon_profiles, theta, H, sorted=True, verbose=verbose)
     else:
         R_set = []
     if len(R_set) > 0:

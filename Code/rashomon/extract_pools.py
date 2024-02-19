@@ -74,9 +74,14 @@ def extract_pools(policies, sigma):
 def aggregate_pools(pi_policies: dict[int, dict[int, int]], policies_ids_profiles) -> tuple[dict, dict]:
     """
     Aggregate partitions across multiple profiles into a unified ID numbering system
+    The unified ID numbering system is given by policies_ids_profiles
     pi_policies: key = profile_id, value = dictionary
         pi_policies[k]: key = policy_id within that profile
                         value = pool_id
+    policies_ids_profiles: key = profile_id, value is list of policy IDs
+        These policy IDs are unique even across profiles
+        The i-th policy in profile k aoccroding to pi_policies[k]
+        gets mapped to policies_ids_profiles[k][i]
     """
     agg_pi_policies: dict[int, int] = {}
     agg_pi_pools: dict[int, list[int]] = {}
