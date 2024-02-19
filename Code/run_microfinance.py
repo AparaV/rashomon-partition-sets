@@ -28,9 +28,9 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
-    trt_het = True
+    trt_het = False
     edu_het = True
-    gen_het = True
+    gen_het = False
 
     output_fname_suffix = ""
     if trt_het:
