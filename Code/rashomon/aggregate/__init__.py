@@ -4,6 +4,7 @@ from .raggregate import find_profile_lower_bound
 from .raggregate import find_feasible_combinations
 from .raggregate import remove_unused_poolings
 from .raggregate import subset_data
+from .profile_slopes import RAggregate_profile_slopes
 
 __all__ = [
     "RAggregate_profile",
@@ -11,5 +12,6 @@ __all__ = [
     "find_profile_lower_bound",
     "find_feasible_combinations",
     "remove_unused_poolings",
-    "subset_data"
+    "subset_data",
+    "RAggregate_profile_slopes"
 ]

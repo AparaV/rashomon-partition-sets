@@ -1,6 +1,7 @@
 import numpy as np
 
 from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
 
 from rashomon import counter
 from rashomon.extract_pools import extract_pools
@@ -99,6 +100,76 @@ def compute_Q(D, y, sigma, policies, policy_means, reg=1, normalize=0):
         mse = mse * D.shape[0] / normalize
 
     h = mu_pools.shape[0]
+    Q = mse + reg * h
+
+    return Q
+
+
+def compute_B_slopes(D, X, y, sigma, i, j, policies, reg=1, normalize=0):
+    """
+    The B function in Theorem 6.3 \ref{thm:rashomon-equivalent-bound}
+    """
+
+    # Split maximally in arm i from dosage j
+    sigma_fix = partition_sigma(sigma, i, j)
+    pi_fixed_pools, pi_fixed_policies = extract_pools(policies, sigma_fix)
+
+    # Compute squared loss for this maximal split
+    y_est = np.zeros(shape=D.shape) + np.inf
+    for pi_k, pol_list_k in pi_fixed_pools.items():
+
+        # Extract the X matrix
+        k_idx = [i for i, p in enumerate(D[:, 0]) if p in pol_list_k]
+        X_k = X[k_idx, :]
+        y_k = y[k_idx, :]
+
+        # Run regression and estimate outcomes
+        model_k = LinearRegression().fit(X_k, y_k)
+        y_est_k = model_k.predict(X_k)
+        y_est[k_idx, :] = y_est_k
+
+    mse = mean_squared_error(y[:, 0], y_est)
+
+    if normalize > 0:
+        mse = mse * D.shape[0] / normalize
+
+    # The least number of pools
+    # The number of pools when the splittable policies are pooled maximally
+    sigma_fix[i, (j + 1):] = 1
+    sigma_fix[np.isinf(sigma)] = np.inf
+    h = counter.num_pools(sigma_fix)
+
+    B = mse + reg * h
+
+    return B
+
+
+def compute_Q_slopes(D, X, y, sigma, policies, reg=1, normalize=0):
+    """
+    Compute the loss Q
+    """
+
+    pi_pools, pi_policies = extract_pools(policies, sigma)
+
+    y_est = np.zeros(shape=D.shape) + np.inf
+    for pi_k, pol_list_k in pi_pools.items():
+
+        # Extract the X matrix
+        k_idx = [i for i, p in enumerate(D[:, 0]) if p in pol_list_k]
+        X_k = X[k_idx, :]
+        y_k = y[k_idx, :]
+
+        # Run regression and estimate outcomes
+        model_k = LinearRegression().fit(X_k, y_k)
+        y_est_k = model_k.predict(X_k)
+        y_est[k_idx, :] = y_est_k
+
+    mse = mean_squared_error(y[:, 0], y_est)
+
+    if normalize > 0:
+        mse = mse * D.shape[0] / normalize
+
+    h = len(pi_pools.keys())
     Q = mse + reg * h
 
     return Q
