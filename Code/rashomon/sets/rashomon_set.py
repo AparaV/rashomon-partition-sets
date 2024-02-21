@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..loss import compute_Q
+from ..loss import compute_Q, compute_Q_slopes
 from ..counter import num_pools
 
 
@@ -28,11 +28,25 @@ class RashomonSet:
         sigma_hash = self.__process__(sigma)
         return sigma_hash in self.P_hash
 
-    def calculate_loss(self, D, y, policies, policy_means, reg, normalize=0):
+    def __calculate_loss_stepwise(self, D, y, policies, policy_means, reg, normalize):
         Q_list = []
         for sigma in self.P_qe:
             Q_sigma = compute_Q(D, y, sigma, policies, policy_means, reg, normalize)
             Q_list.append(Q_sigma)
+        return Q_list
+
+    def __calculate_loss_slopes(self, D, X, y, policies, reg, normalize):
+        Q_list = []
+        for sigma in self.P_qe:
+            Q_sigma = compute_Q_slopes(D, X, y, sigma, policies, reg, normalize)
+            Q_list.append(Q_sigma)
+        return Q_list
+
+    def calculate_loss(self, D, y, policies, policy_means, reg, normalize=0, slopes=False, X=None):
+        if not slopes:
+            Q_list = self.__calculate_loss_stepwise(D, y, policies, policy_means, reg, normalize)
+        else:
+            Q_list = self.__calculate_loss_slopes(D, X, y, policies, reg, normalize)
         self.Q = np.array(Q_list)
 
     def sort(self):
