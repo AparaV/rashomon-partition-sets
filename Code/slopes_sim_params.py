@@ -49,9 +49,9 @@ sigma_7 = np.array([[0, np.inf, np.inf, np.inf],
                     [0, 0, np.inf, np.inf],
                     [1, 0, 1, 1]])
 beta_7 = np.array([[0, -1, 0, 1],   # 1
-                   [3, -4, 0, 1],   # 2
+                   [1.5, -4, 0, 1.5],   # 2
                    [0, -1, 0, 1],   # 3
-                   [2, 0, 0, 0],  # 4
+                   [4.5, -4, 0, 0.5],  # 4
                    [4, -2, -1, 1],  # 5
                    [1, 1, 1, -1],   # 6
                    [-3, 2, -3, 1],   # 7
@@ -60,7 +60,7 @@ beta_7 = np.array([[0, -1, 0, 1],   # 1
                    [0, 0, 0, 0],  # 10
                    [5, 2, -3, 0],
                    [5, -1, 0, -1]])
-var_7 = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]) * 0.01
+var_7 = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 
 sigma = [sigma_0, sigma_1, sigma_2, sigma_3, sigma_4, sigma_5, sigma_6, sigma_7]
 beta = [beta_0, beta_1, beta_2, beta_3, beta_4, beta_5, beta_6, beta_7]
@@ -68,5 +68,5 @@ var = [var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7]
 
 H = np.inf
 # theta = 0.58
-theta = 0.022
-reg = 1e-3
+theta = 0.46
+reg = 4e-3
