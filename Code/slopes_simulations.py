@@ -75,6 +75,9 @@ if __name__ == "__main__":
     theta = params.theta
     reg = params.reg
 
+    print(sigma[7])
+    print(beta[7])
+
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
     all_policies = tva.enumerate_policies(M, R)
@@ -153,7 +156,7 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            R_set, rashomon_profiles = RAggregate_slopes(M, R, np.inf, D, X, y, theta, reg=reg, verbose=True)
+            R_set, rashomon_profiles = RAggregate_slopes(M, R, H, D, X, y, theta, reg=reg, verbose=True)
             print(f"\t\t{theta},{len(R_set)}")
 
             result = {

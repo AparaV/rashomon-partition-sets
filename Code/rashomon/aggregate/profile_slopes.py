@@ -25,6 +25,10 @@ def RAggregate_profile_slopes(M, R, H, D, X, y, theta, profile, reg=1, policies=
     policies, policy_means - Optional precomputed values when repeatedly calling RAggregate_profile
     """
 
+    # sigma_7 = np.array([[0, np.inf, np.inf, np.inf],
+    #             [0, 0, np.inf, np.inf],
+    #             [1, 0, 1, 1]])
+
     if policies is None:
         all_policies = enumerate_policies(M, R)
         policies = [x for x in all_policies if policy_to_profile(x) == profile]
@@ -85,6 +89,11 @@ def RAggregate_profile_slopes(M, R, H, D, X, y, theta, profile, reg=1, policies=
 
         # Check if further splits in arm i is feasible
         B = loss.compute_B_slopes(D, X, y, sigma, i, j, policies, reg, normalize)
+        # if profile == (1, 1, 1):
+        #     if np.all(sigma_7 == sigma_0):
+        #         print(B)
+        #     if np.all(sigma_7 == sigma_1):
+        #         print(B)
         if B > theta:
             continue
 
@@ -92,12 +101,22 @@ def RAggregate_profile_slopes(M, R, H, D, X, y, theta, profile, reg=1, policies=
         if not Q_seen.seen(sigma_1):
             Q_seen.insert(sigma_1)
             Q = loss.compute_Q_slopes(D, X, y, sigma_1, policies, reg, normalize)
+            # if profile == (1, 1, 1):
+            #     if np.all(sigma_7 == sigma_1):
+            #         print("True:", Q)
+            #     else:
+            #         print("Something else:", Q)
             if Q <= theta:
                 P_qe.insert(sigma_1)
 
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
             Q = loss.compute_Q_slopes(D, X, y, sigma_0, policies, reg, normalize)
+            # if profile == (1, 1, 1):
+            #     if np.all(sigma_7 == sigma_0):
+            #         print("True:", Q)
+            #     else:
+            #         print("Something else:", Q)
             if Q <= theta:
                 P_qe.insert(sigma_0)
 
