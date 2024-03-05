@@ -153,7 +153,7 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            R_set, rashomon_profiles = RAggregate_slopes(M, R, np.inf, D, X, y, theta, reg=reg, verbose=True)
+            R_set, rashomon_profiles = RAggregate_slopes(M, R, H, D, X, y, theta, reg=reg, verbose=True)
             print(f"\t\t{theta},{len(R_set)}")
 
             result = {
