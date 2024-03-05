@@ -75,9 +75,6 @@ if __name__ == "__main__":
     theta = params.theta
     reg = params.reg
 
-    print(sigma[7])
-    print(beta[7])
-
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
     all_policies = tva.enumerate_policies(M, R)
