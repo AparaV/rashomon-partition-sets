@@ -1,6 +1,6 @@
 import numpy as np
 
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, confusion_matrix
 
 from rashomon import tva
 
@@ -98,3 +98,37 @@ def compute_all_metrics(y_true, y_est, D, true_best_policies,
     }
 
     return results
+
+
+def compute_te_het_metrics(te_true, te_est, max_te, max_te_policies,
+                           D_trt, univ_pol_id_list):
+
+    # Find MSE in TE
+    mse_te = mean_squared_error(te_est, te_true)
+
+    # Find highest TE and error
+    max_te_est = np.max(te_est)
+    max_te_err = max_te - max_te_est
+
+    # Find IOU of set with highest TE
+    max_te_pol = np.unique(D_trt[np.where(te_est == max_te_est), ])
+    max_te_pol = [univ_pol_id_list[x] for x in max_te_pol]
+    iou = intersect_over_union(set(max_te_policies), set(max_te_pol))
+
+    # Count policies with +, 0, - effects
+    te_true_sign = np.sign(te_true)
+    te_est_sign = np.sign(te_est)
+    conf_mat = confusion_matrix(te_true_sign, te_est_sign, labels=[-1, 0, 1])
+
+    # # Compute overall MSE
+    # mse_i = mean_squared_error(y_tc[:, 0], mu_D)
+
+    metrics_results = {
+        "mse_te": mse_te,
+        "max_te_est": max_te_est,
+        "max_te_err": max_te_err,
+        "iou": iou,
+        "conf_matrix": conf_mat
+    }
+
+    return metrics_results
