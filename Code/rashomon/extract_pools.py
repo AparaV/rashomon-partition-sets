@@ -104,3 +104,32 @@ def aggregate_pools(pi_policies: dict[int, dict[int, int]], policies_ids_profile
             agg_pi_pools[agg_pool_id].append(agg_pol_id)
 
     return (agg_pi_pools, agg_pi_policies)
+
+
+def get_trt_ctl_pooled_partition(trt_pools, ctl_pools, sigma_int):
+    pools_tmp = {
+        "trt": trt_pools.copy(),
+        "ctl": ctl_pools.copy(),
+        "mix": {}
+    }
+
+    mixed_indices = np.where(sigma_int == 1)
+
+    for ctl_i, trt_i in zip(mixed_indices[0], mixed_indices[1]):
+        mix_trt_i_pols = pools_tmp["trt"].pop(trt_i)
+        mix_ctl_i_pols = pools_tmp["ctl"].pop(ctl_i)
+        mix_i_pols = list(set(mix_trt_i_pols + mix_ctl_i_pols))
+        mix_id = len(pools_tmp["mix"])
+        pools_tmp["mix"][mix_id] = mix_i_pols
+
+    sigma_pools = {}
+    sigma_policies = {}
+    pool_counter = 0
+    for _, dict_i in pools_tmp.items():
+        for _, policies_ij in dict_i.items():
+            sigma_pools[pool_counter] = policies_ij
+            for p in policies_ij:
+                sigma_policies[p] = pool_counter
+            pool_counter += 1
+
+    return sigma_pools, sigma_policies

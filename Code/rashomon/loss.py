@@ -4,7 +4,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LinearRegression
 
 from rashomon import counter
-from rashomon.extract_pools import extract_pools
+from rashomon.extract_pools import extract_pools, get_trt_ctl_pooled_partition
 
 
 def compute_policy_means(D, y, num_policies):
@@ -170,6 +170,28 @@ def compute_Q_slopes(D, X, y, sigma, policies, reg=1, normalize=0):
         mse = mse * D.shape[0] / normalize
 
     h = len(pi_pools.keys())
+    Q = mse + reg * h
+
+    return Q
+
+
+def compute_het_Q(D_tc, y_tc, sigma_int, trt_pools, ctl_pools, policy_means, reg=1, normalize=0):
+    """
+    Compute the loss after pooling across treatment and control as per sigma_int
+    D_tc indices need not be re-indexed. The indicies should match policy_means
+    policy_means is for the entire dataset
+    """
+
+    sigma_pools, sigma_policies = get_trt_ctl_pooled_partition(trt_pools, ctl_pools, sigma_int)
+    mu_pools = compute_pool_means(policy_means, sigma_pools)
+    D_tc_pool = [sigma_policies[pol_id] for pol_id in D_tc[:, 0]]
+    mu_D = mu_pools[D_tc_pool]
+    mse = mean_squared_error(y_tc[:, 0], mu_D)
+
+    if normalize > 0:
+        mse = mse * D_tc.shape[0] / normalize
+
+    h = mu_pools.shape[0]
     Q = mse + reg * h
 
     return Q

@@ -88,3 +88,34 @@ def get_dummy_matrix(D, G, num_policies):
         pol_i = D[i, 0]
         D_matrix[i, :] = G[pol_i, :]
     return D_matrix
+
+
+def profile_ids_to_univ_ids(pi_pools_0, univ_pol_id_list):
+    """
+    pi_pools_0: Dictionary. key is pool ID, value is list of policy IDs within that profile
+    univ_pol_id_list: List of global policy IDs for profile corresponding to pi_pools_0
+        Policy with profile ID `i` has global ID `univ_pol_id_list[i]`
+
+    Returns:
+        pi_pools: Dictionary identical to pi_pools_0.
+            Policy IDs for each pool now correspond to global policy ID
+    """
+    pi_pools = {}
+    for pi_id, pol_idx_list in pi_pools_0.items():
+        pol_univ_list = [univ_pol_id_list[idx] for idx in pol_idx_list]
+        pi_pools[pi_id] = pol_univ_list
+    return pi_pools
+
+
+def remove_arm(policies_list, arm_idx):
+    """
+    Removes dosage corresponding to arm_idx in policies_list
+
+    policies_list: List of tuples corresponding to policy dosages
+
+    Returns:
+        policies_list: List of tuples corresponding to policy dosages where arm_idx
+            is removed
+    """
+    policies_list = [tuple(pol[:arm_idx] + pol[(arm_idx+1):]) for pol in policies_list]
+    return policies_list
