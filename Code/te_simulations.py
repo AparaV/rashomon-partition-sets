@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from copy import deepcopy
-# from sklearn import linear_model
+from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 from econml.grf import CausalForest
 
@@ -136,6 +136,7 @@ if __name__ == "__main__":
     cf_fname = args.output_prefix + "_cf" + output_suffix + ".csv"
     rashomon_conf_matrix_fname = args.output_prefix + "_rashomon" + output_suffix + "_conf_mat.pkl"
     cf_conf_matrix_fname = args.output_prefix + "_cf" + output_suffix + "_conf_mat.pkl"
+    lasso_conf_matrix_fname = args.output_prefix + "_lasso" + output_suffix + "_conf_mat.pkl"
 
     # Simulation results data structure
     method = args.method
@@ -282,6 +283,11 @@ if __name__ == "__main__":
             D_trt_subset = D[X[:, trt_arm_idx] > 0]
             D_matrix_trt_subset = D_matrix[X[:, trt_arm_idx] > 0, :]
 
+            D_trt_univ = np.array([policies_ids_profiles[trt_profile_idx][x] for x in D_trt]).reshape((-1, 1))
+            D_ctl_univ = np.array([policies_ids_profiles[ctl_profile_idx][x] for x in D_ctl]).reshape((-1, 1))
+            D_matrix_trt = tva.get_dummy_matrix(D_trt_univ, G, num_policies)
+            D_matrix_ctl = tva.get_dummy_matrix(D_ctl_univ, G, num_policies)
+
             mask = np.isin(D, tc_policies_ids)
             D_tc = D[mask].reshape((-1, 1))
             y_tc = y[mask].reshape((-1, 1))
@@ -384,25 +390,29 @@ if __name__ == "__main__":
             # Run Lasso
             #
             if method == "lasso":
-                # lasso = linear_model.Lasso(lasso_reg, fit_intercept=False)
-                # lasso.fit(D_matrix, y)
-                # alpha_est = lasso.coef_
-                # y_tva = lasso.predict(D_matrix)
+                lasso = linear_model.Lasso(lasso_reg, fit_intercept=False)
+                lasso.fit(D_matrix, y)
+                alpha_est = lasso.coef_
+                y_trt_lasso = lasso.predict(D_matrix_trt)
+                y_ctl_lasso = lasso.predict(D_matrix_ctl)
 
-                # tva_results = metrics.compute_all_metrics(
-                #     y, y_tva, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-                # sqrd_err = tva_results["sqrd_err"]
-                # iou_tva = tva_results["iou"]
-                # best_profile_indicator_tva = tva_results["best_prof"]
-                # min_dosage_present_tva = tva_results["min_dos_inc"]
-                # best_policy_diff_tva = tva_results["best_pol_diff"]
-                # L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
+                te_lasso = y_trt_lasso - y_ctl_lasso
 
-                # this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva,
-                # min_dosage_present_tva, best_policy_diff_tva]
-                # this_list += best_profile_indicator_tva
-                # lasso_list.append(this_list)
-                pass
+                tva_results = metrics.compute_te_het_metrics(
+                    te_true, te_lasso,
+                    max_te, max_te_policies,
+                    D_trt, policies_ids_profiles[trt_profile_idx]
+                    )
+
+                mse_te_i = tva_results["mse_te"]
+                max_te_err_i = tva_results["max_te_err"]
+                iou_i = tva_results["iou"]
+                conf_mat_i = tva_results["conf_matrix"]
+
+                this_list = [n_per_pol, sim_i, mse_te_i, max_te_err_i, iou_i]
+                lasso_list.append(this_list)
+
+                conf_matrices.append(conf_mat_i)
 
             #
             # Causal forest
@@ -448,9 +458,12 @@ if __name__ == "__main__":
             pickle.dump(conf_matrices, f, pickle.HIGHEST_PROTOCOL)
 
     if method == "lasso":
-        lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
+        lasso_cols = ["n_per_pol", "sim_num", "MSE_TE", "max_te_diff", "IOU"]
         lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
         lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
+
+        with open(os.path.join(output_dir, lasso_conf_matrix_fname), "wb") as f:
+            pickle.dump(conf_matrices, f, pickle.HIGHEST_PROTOCOL)
 
     if method == "cf":
         cf_cols = ["n_per_pol", "sim_num", "MSE_TE", "max_te_diff", "IOU"]

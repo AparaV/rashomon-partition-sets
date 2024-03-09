@@ -39,5 +39,4 @@ trt_profile = (1, 1, 1, 1)
 H = np.inf
 theta = 2
 reg = 1e-1
-
-lasso_reg = 1e-2
+lasso_reg = 1e-1
