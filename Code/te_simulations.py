@@ -9,6 +9,7 @@ import pandas as pd
 from copy import deepcopy
 # from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
+from econml.grf import CausalForest
 
 from rashomon import tva
 from rashomon import loss
@@ -33,7 +34,7 @@ def parse_arguments():
     # parser.add_argument("--theta", type=float,
     #                     help="Rashomon threshold")
     parser.add_argument("--method", type=str,
-                        help="One of {r, lasso, ct}")
+                        help="One of {r, lasso, cf}")
     args = parser.parse_args()
     return args
 
@@ -132,17 +133,18 @@ if __name__ == "__main__":
     output_suffix = f"_{args.sample_size}_{args.iters}"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix + ".csv"
     lasso_fname = args.output_prefix + "_lasso" + output_suffix + ".csv"
-    ct_fname = args.output_prefix + "_ct" + output_suffix + ".csv"
+    cf_fname = args.output_prefix + "_cf" + output_suffix + ".csv"
     rashomon_conf_matrix_fname = args.output_prefix + "_rashomon" + output_suffix + "_conf_mat.pkl"
+    cf_conf_matrix_fname = args.output_prefix + "_cf" + output_suffix + "_conf_mat.pkl"
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso", "ct"]:
-        print(f"method should be one of [r, lasso, ct]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso", "cf"]:
+        print(f"method should be one of [r, lasso, cf]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
-    ct_list = []
+    cf_list = []
     conf_matrices = []
 
     # Identify the pools
@@ -403,34 +405,36 @@ if __name__ == "__main__":
                 pass
 
             #
-            # Causal trees
+            # Causal forest
             #
-            if method == "ct":
-                # with warnings.catch_warnings():
-                #     warnings.filterwarnings("ignore", message="Mean of empty slice.")
-                #     warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
-                #     ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
-                # y_ct = ct_res[3]
-                # y_ct = np.reshape(y, (-1,))
-                # # depth = 0
-                # # for prof, tree in ct_res[2].items():
-                # #     depth += tree.tree_depth
-                # # print(depth)
+            if method == "cf":
+                cf_est = CausalForest(
+                    criterion="het", n_estimators=100,
+                    min_samples_leaf=1,
+                    max_depth=None,
+                    min_samples_split=2,
+                    random_state=3
+                    )
 
-                # ct_results = metrics.compute_all_metrics(
-                #     y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-                # sqrd_err = ct_results["sqrd_err"]
-                # iou_ct = ct_results["iou"]
-                # best_profile_indicator_ct = ct_results["best_prof"]
-                # min_dosage_present_ct = ct_results["min_dos_inc"]
-                # best_policy_diff_ct = ct_results["best_pol_diff"]
+                cf_est.fit(X_cf, T, y_0d)
+                te_cf = cf_est.predict(X_trt)
 
-                # this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
-                # this_list += best_profile_indicator_ct
-                # ct_list.append(this_list)
-                pass
+                cf_res = metrics.compute_te_het_metrics(
+                    te_true, te_cf, max_te, max_te_policies,
+                    D_trt, policies_ids_profiles[trt_profile_idx]
+                    )
+                mse_te_i = cf_res["mse_te"]
+                max_te_err_i = cf_res["max_te_err"]
+                iou_i = cf_res["iou"]
+                conf_mat_i = cf_res["conf_matrix"]
 
-    # profiles_str = [str(prof) for prof in profiles]
+                results_i = [
+                    n_per_pol, sim_i,
+                    mse_te_i, max_te_err_i, iou_i,
+                ]
+                cf_list.append(results_i)
+
+                conf_matrices.append(conf_mat_i)
 
     if method == "r":
         rashomon_cols = [
@@ -445,12 +449,13 @@ if __name__ == "__main__":
 
     if method == "lasso":
         lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
-        # lasso_cols += profiles_str
         lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
         lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
 
-    if method == "ct":
-        ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-        # ct_cols += profiles_str
-        ct_df = pd.DataFrame(ct_list, columns=ct_cols)
-        ct_df.to_csv(os.path.join(output_dir, ct_fname))
+    if method == "cf":
+        cf_cols = ["n_per_pol", "sim_num", "MSE_TE", "max_te_diff", "IOU"]
+        cf_df = pd.DataFrame(cf_list, columns=cf_cols)
+        cf_df.to_csv(os.path.join(output_dir, cf_fname))
+
+        with open(os.path.join(output_dir, cf_conf_matrix_fname), "wb") as f:
+            pickle.dump(conf_matrices, f, pickle.HIGHEST_PROTOCOL)
