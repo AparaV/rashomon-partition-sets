@@ -322,6 +322,7 @@ if __name__ == "__main__":
 
                 print(f"Found {num_models} after TE partitioning")
 
+                conf_matrix_sim_i = []
                 for idx, r_set in enumerate(R_set):
                     conf_matrix_list_idx = []
 
@@ -384,7 +385,9 @@ if __name__ == "__main__":
 
                         conf_matrix_list_idx.append(conf_mat_i)
 
-                    conf_matrices.append(conf_matrix_list_idx)
+                    conf_matrix_sim_i.append(conf_matrix_list_idx)
+
+                conf_matrices.append(conf_matrix_sim_i)
 
             #
             # Run Lasso
@@ -419,11 +422,12 @@ if __name__ == "__main__":
             #
             if method == "cf":
                 cf_est = CausalForest(
-                    criterion="het", n_estimators=100,
+                    criterion="mse", n_estimators=100,
                     min_samples_leaf=1,
-                    max_depth=None,
-                    min_samples_split=2,
-                    random_state=3
+                    # max_depth=None,
+                    # min_samples_split=2,
+                    random_state=3,
+                    # fit_intercept=False
                     )
 
                 cf_est.fit(X_cf, T, y_0d)
