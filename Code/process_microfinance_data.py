@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 
@@ -19,7 +20,7 @@ regional_cols = [
     "area_business_total_base",
     "area_exp_pc_mean_base",
     "area_literate_head_base",
-    "area_literate_base"
+    "area_literate_base",
 ]
 
 endline2_cols = [
@@ -35,6 +36,7 @@ endline2_cols = [
     "bizprofit_2",
     "bizrev_2",
     "bizemployees_2",
+    "bizassets_2",
 ]
 
 cols_to_keep = endline2_cols + regional_cols
@@ -54,6 +56,39 @@ endline2_df["treatment"] = endline2_df["treatment"].replace({
 
 endline2_df["hh_edu"] = raw_endlines[["head_noeduc_1", "head_noeduc_2"]].max(axis=1, skipna=True)
 endline2_df["hh_edu"] = endline2_df["hh_edu"].fillna(0)
+
+endline2_df["hh_size"] = raw_endlines[["hhsize_1", "hhsize_2"]].max(axis=1, skipna=True)
+endline2_df["hh_size"] = endline2_df["hh_size"].fillna(0)
+min_hh_size = int(np.min(endline2_df["hh_size"]))
+max_hh_size = int(np.max(endline2_df["hh_size"]))
+hhsize_cuts = [2, 4, 6]
+hhsize_dict = {}
+level = 0
+for i in range(min_hh_size, max_hh_size+1):
+    hhsize_dict[i] = level
+    if i in hhsize_cuts:
+        level += 1
+endline2_df["hh_size"] = endline2_df["hh_size"].replace(hhsize_dict)
+
+endline2_df["children"] = raw_endlines[["children_1", "children_2"]].max(axis=1, skipna=True)
+endline2_df["children"] = endline2_df["children"].fillna(0)
+endline2_df["children"] = endline2_df["children"].replace({
+    0: 0,
+    1: 1,
+    2: 2,
+    3: 3,
+    4: 3,
+    5: 3,
+    6: 3,
+    7: 3,
+    8: 3,
+    9: 3,
+    10: 3,
+    11: 3,
+    12: 3,
+    13: 3,
+    14: 3
+})
 
 endline2_df["hh_gender"] = raw_endlines["male_head_1"]
 endline2_df["hh_gender"] = endline2_df["hh_gender"].fillna(1)
@@ -98,6 +133,8 @@ reordered_cols = [
     "treatment",
     "hh_edu",
     "hh_gender",
+    "hh_size",
+    "children",
     "old_biz",
     "area_pop_base",
     "area_debt_total_base",
@@ -115,7 +152,8 @@ reordered_cols = [
     "bizprofit_2",
     "bizrev_2",
     "bizemployees_2",
-    "girls_school_2"
+    "girls_school_2",
+    "bizassets_2"
 ]
 
 endline2_df = endline2_df[reordered_cols]
