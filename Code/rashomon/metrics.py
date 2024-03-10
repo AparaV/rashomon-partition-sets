@@ -118,7 +118,8 @@ def compute_te_het_metrics(te_true, te_est, max_te, max_te_policies,
     # Count policies with +, 0, - effects
     te_true_sign = np.sign(te_true)
     te_est_sign = np.sign(te_est)
-    conf_mat = confusion_matrix(te_true_sign, te_est_sign, labels=[-1, 0, 1])
+    conf_mat = confusion_matrix(te_true_sign, te_est_sign, labels=[-1, 0, 1],
+                                normalize="true")
 
     # # Compute overall MSE
     # mse_i = mean_squared_error(y_tc[:, 0], mu_D)
