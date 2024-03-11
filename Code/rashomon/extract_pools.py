@@ -8,6 +8,9 @@ import numpy as np
 
 
 def lattice_edges(policies):
+    """
+    Enumerate the Hasse adjacencies
+    """
     num_policies = len(policies)
     edges = []
     for i in range(num_policies):
@@ -84,6 +87,11 @@ def connected_components(n, edges):
 
 def extract_pools(policies, sigma, lattice_edges=None):
     """
+    lattice_edges: List of Hasse adjacencies.
+        Policies are indexed by their ID according to position in `policies`
+        Defaults to `None` where adjacencies are computed.
+        This results in significantly slower runtimes.
+
     Returns: (pi_pools, pi_policies)
     pi_pools is a dictionary. Key = pool_id, Value = List of policy_id
     pi_policies is a dictionary. Key = policy_id, Value = pool_id
