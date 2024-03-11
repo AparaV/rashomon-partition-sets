@@ -121,7 +121,8 @@ if __name__ == "__main__":
     #
     # Find the Rashomon set
     #
-    R_set, R_profiles = RAggregate(M, R, H, D, y, q, reg=reg, verbose=True)
+    # R_set, R_profiles = RAggregate(M, R, H, D, y, q, reg=reg, verbose=True)
+    R_set, R_profiles = RAggregate(M, R, H, D, y, q, reg=reg, verbose=True, bruteforce=True)
     print(f"There are {len(R_set)} models in the Rashomon set")
 
     #

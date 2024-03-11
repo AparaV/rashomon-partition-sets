@@ -1,8 +1,9 @@
+import time
 import numpy as np
 
 from sklearn.metrics import mean_squared_error
 
-from .profile import RAggregate_profile
+from .profile import RAggregate_profile, _brute_RAggregate_profile
 from .utils import find_feasible_sum_subsets
 
 from .. import loss
@@ -100,7 +101,7 @@ def remove_unused_poolings(R_set, rashomon_profiles):
     return rashomon_profiles
 
 
-def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False):
+def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False, bruteforce=False):
 
     # TODO: Edge case when dosage in one arm is binary
     #       This will fail currently
@@ -182,11 +183,43 @@ def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False):
             rashomon_k.P_qe = [None]
             rashomon_k.Q = np.array([control_loss])
         else:
-            rashomon_k = RAggregate_profile(M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
-                                            policies_k, policy_means_k, normalize=num_data)
-            rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg, normalize=num_data)
+            # print(R_k, np.sum(R_k))
+            if not bruteforce:
+                if verbose:
+                    print("Adaptive")
+                    start = time.time()
 
+                rashomon_k = RAggregate_profile(M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
+                                                policies_k, policy_means_k, normalize=num_data)
+                if verbose:
+                    end = time.time()
+                    elapsed = end - start
+                    print(f"Took {elapsed} s adaptively")
+
+                # start = time.time()
+                rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg, normalize=num_data)
+                # end = time.time()
+                # elapsed = end - start
+                # print(f"Took {elapsed} s to calculate loss")
+            else:
+                if verbose:
+                    print("Brute forcing")
+                    start = time.time()
+
+                rashomon_k = _brute_RAggregate_profile(
+                    M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
+                    policies_k, policy_means_k, normalize=num_data)
+
+                if verbose:
+                    end = time.time()
+                    elapsed = end - start
+                    print(f"Took {elapsed} s when brute forcing")
+
+        # start = time.time()
         rashomon_k.sort()
+        # end = time.time()
+        # elapsed = end - start
+        # print(f"Took {elapsed} s to sort")
         rashomon_profiles[k] = rashomon_k
         if verbose:
             print(len(rashomon_k))
