@@ -1,9 +1,24 @@
+import time
 import collections
 import numpy as np
 
 #
 # Extract pools from Sigma matrix
 #
+
+
+def lattice_edges(policies):
+    num_policies = len(policies)
+    edges = []
+    for i in range(num_policies):
+        pol1 = policies[i]
+        for j in range(i + 1, num_policies):
+            pol2 = policies[j]
+            diff = np.array(pol1) - np.array(pol2)
+            diff = np.sum(np.abs(diff))
+            if diff == 1:
+                edges.append((i, j))
+    return edges
 
 
 def lattice_adjacencies(sigma, policies):
@@ -23,6 +38,19 @@ def lattice_adjacencies(sigma, policies):
                 if sigma[arm, min_dosage - 1] == 1:
                     edges.append((i, j))
     return edges
+
+
+def prune_lattice_edges(sigma, edges, policies):
+    pruned_edges = []
+    for i, j in edges:
+        pol_i = np.array(policies[i])
+        pol_j = np.array(policies[j])
+        diff = pol_i - pol_j
+        arm = np.where(diff != 0)[0][0]
+        min_dosage = min(pol_i[arm], pol_j[arm])
+        if sigma[arm, min_dosage - 1] == 1:
+            pruned_edges.append((i, j))
+    return pruned_edges
 
 
 # Helper to merge components
@@ -54,14 +82,21 @@ def connected_components(n, edges):
     return conn_comps
 
 
-def extract_pools(policies, sigma):
+def extract_pools(policies, sigma, lattice_edges=None):
     """
     Returns: (pi_pools, pi_policies)
     pi_pools is a dictionary. Key = pool_id, Value = List of policy_id
     pi_policies is a dictionary. Key = policy_id, Value = pool_id
     """
-    relations = lattice_adjacencies(sigma, policies)
-    pools = connected_components(len(policies), relations)
+
+    # t0 = time.time()
+    if lattice_edges is None:
+        lattice_relations = lattice_adjacencies(sigma, policies)
+    else:
+        lattice_relations = prune_lattice_edges(sigma, lattice_edges, policies)
+    # t1 = time.time()
+    pools = connected_components(len(policies), lattice_relations)
+    # t2 = time.time()
     pi_pools = {}
     pi_policies = {}
     for i, pool in enumerate(pools):
@@ -69,6 +104,7 @@ def extract_pools(policies, sigma):
         for policy in pool:
             pi_policies[policy] = i
     return (pi_pools, pi_policies)
+    # return (pi_pools, pi_policies, t1-t0, t2-t1)
 
 
 def aggregate_pools(pi_policies: dict[int, dict[int, int]], policies_ids_profiles) -> tuple[dict, dict]:

@@ -23,7 +23,7 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
-    trt_het = False
+    trt_het = True
     edu_het = False
     gen_het = False
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     data_fname = "../Data/banerjee_miracle.csv"
     results_dir = "../Results/microfinance/"
     # chosen_covariates_idx = [2, 3, 4, 5, 7, 8]
-    chosen_covariates_idx = [2, 3, 4, 6, 7, 8, 9]
+    chosen_covariates_idx = [2, 3, 4, 6, 7, 9, 10]
 
     df = pd.read_csv(data_fname)
 

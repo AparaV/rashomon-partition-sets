@@ -7,6 +7,7 @@ from .. import loss
 from .. import counter
 from ..tva import enumerate_policies, policy_to_profile
 from ..sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
+from ..extract_pools import lattice_edges
 
 
 def initialize_sigma(M, R):
@@ -161,15 +162,29 @@ def _brute_RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=Non
     for i in range(len(idx_rows)):
         indices.append((idx_rows[i], idx_cols[i]))
 
+    # t1_ctr = 0
+    # t2_ctr = 0
+    # ctr = 0
+
+    hasse_edges = lattice_edges(policies)
+
     for x in powerset(indices):
         sigma_x = sigma.copy()
         for i, j in x:
             sigma_x[i, j] = 0
 
-        Q = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize)
+        # Q, t1, t2 = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges)
+        Q = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges)
         if Q <= theta:
             P_qe.insert(sigma_x)
             P_qe.Q = np.append(P_qe.Q, Q)
+
+        # ctr += 1
+        # t1_ctr += t1
+        # t2_ctr += t2
+
+    # print(f"\tLattice took {t1_ctr / ctr} ({t1_ctr}) s on average")
+    # print(f"\tConnected components took {t2_ctr / ctr} ({t2_ctr}) s on average")
 
     return P_qe
 
