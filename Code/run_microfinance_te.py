@@ -62,12 +62,13 @@ if __name__ == "__main__":
         # If empty, continue on
         if len(R_set) == 0:
             print("\tEmpty Rashomon set")
-            pruned_te_rashomon_profiles = []
+            # pruned_te_rashomon_profiles = []
             te_res_dict = {
                 "reg": reg,
                 "q": q,
                 "eps": eps,
-                "R_list": pruned_te_rashomon_profiles
+                "R_set": [],
+                "R_profiles": []
             }
             with open(pickle_te_pools_fname, "wb") as f:
                 pickle.dump(te_res_dict, f, pickle.HIGHEST_PROTOCOL)
@@ -235,16 +236,17 @@ if __name__ == "__main__":
         loss_comb_np = np.array(loss_combinations)
         max_id_per_profile = np.max(loss_comb_np, axis=0)
 
-        pruned_te_rashomon_profiles = []
+        pruned_te_rashomon_profiles = [[]] * len(profiles_x)
 
         for k, max_id in enumerate(max_id_per_profile):
-            pruned_te_rashomon_profiles.append(te_rashomon_profiles[k][:(max_id+1)])
+            pruned_te_rashomon_profiles[k] = te_rashomon_profiles[k][:(max_id+1)]
 
         pickle_res_dict = {
             "reg": reg,
             "q": q,
             "eps": eps,
-            "R_list": pruned_te_rashomon_profiles
+            "R_set": loss_combinations,
+            "R_profiles": pruned_te_rashomon_profiles
         }
 
         with open(pickle_te_pools_fname, "wb") as f:
