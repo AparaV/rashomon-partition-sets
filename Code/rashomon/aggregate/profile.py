@@ -145,6 +145,7 @@ def _brute_RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=Non
         sigma = np.zeros(shape=(M, 1)) + np.inf
         P_qe = RashomonSet(sigma.shape)
         P_qe.insert(sigma)
+        P_qe.calculate_loss(D, y, policies, policy_means, reg, normalize=normalize)
         return P_qe
 
     sigma = initialize_sigma(M, R)
