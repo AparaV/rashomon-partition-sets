@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     trt_het = False
     edu_het = False
-    gen_het = False
+    gen_het = True
 
     output_fname_suffix = ""
     if trt_het:
