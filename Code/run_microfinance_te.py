@@ -20,12 +20,14 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
+    args = parse_arguments()
+
     df_original = pd.read_csv("../Data/banerjee_miracle.csv")
     results_dir = "../Results/microfinance/"
     cols = df_original.columns
 
     chosen_covariates_idx = [2, 3, 4, 6, 7, 9, 10]
-    outcome_col_id = 14
+    outcome_col_id = args.outcome_col
     outcome_col = cols[outcome_col_id]
     chosen_covariates = [cols[x] for x in chosen_covariates_idx]
 
@@ -58,6 +60,8 @@ if __name__ == "__main__":
         eps = res_dict["eps"]
         R_set = res_dict["R_set"]
         R_profiles = res_dict["R_profiles"]
+
+        # print(q)
 
         # If empty, continue on
         if len(R_set) == 0:
@@ -188,7 +192,7 @@ if __name__ == "__main__":
                     continue
                 seen_pairs_bytes.append(bytes_rep)
 
-                if sigma_trt_i is None and sigma_ctl_i is None:
+                if sigma_trt_i is None or sigma_ctl_i is None:
                     te_rashomon_x_i = RashomonSet(shape=None)
                     te_rashomon_x_i.P_qe = [None]
                     Q_ctl = R_profiles[trt_profile_idx].Q[sigma_trt_R_set_idx]
@@ -196,6 +200,15 @@ if __name__ == "__main__":
                     te_rashomon_x_i.Q = np.append(te_rashomon_x_i.Q, Q_ctl + Q_trt)
 
                 else:
+                    # if sigma_trt_i is None:
+                    #     print("Trt is None")
+                    #     print(policies_ids_profiles[trt_profile_idx])
+                    #     print(policies_ids_profiles[ctl_profile_idx])
+                    #     print(tc_policies_ids)
+                    #     print(D_tc.shape)
+                    #     print(R)
+                    # if sigma_ctl_i is None:
+                    #     print("Ctl is None")
                     te_rashomon_x_i = find_te_het_partitions(
                         sigma_trt_i, sigma_ctl_i, trt_profile_idx, ctl_profile_idx, trt_policies, ctl_policies,
                         trt_arm_idx, all_policies, policies_ids_profiles,
