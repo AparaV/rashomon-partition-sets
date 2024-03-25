@@ -131,10 +131,12 @@ def __aggregator_universalize_policy_ids__(
     """
 
     pi_policies_univ = {}
-    for k, pi_policies_k in pi_policies.items():
+    for k, pi_policies_k_0 in pi_policies.items():
         pi_policies_k = {}
         policies_ids_k = policies_ids_profiles[k]
-        for pol_id, pool_id in pi_policies_k.items():
+        for pol_id, pool_id in pi_policies_k_0.items():
+            if pool_id is None:
+                continue
             agg_pol_id = policies_ids_k[pol_id]
             pi_policies_k[agg_pol_id] = pool_id
         pi_policies_univ[k] = pi_policies_k
