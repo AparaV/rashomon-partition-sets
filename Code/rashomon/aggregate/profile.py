@@ -48,6 +48,7 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
         return P_qe
 
     sigma = initialize_sigma(M, R)
+    hasse_edges = lattice_edges(policies)
 
     # If R is fixed across, make it a list for compatbility later on
     if isinstance(R, int):
@@ -95,20 +96,23 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
                 queue.append((sigma_0, m, j0))
 
         # Check if further splits in arm i is feasible
-        B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg, normalize)
+        # B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg, normalize)
+        B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg, normalize, hasse_edges)
         if B > theta:
             continue
 
         # Check if the pooling already satisfies the Rashomon threshold
         if not Q_seen.seen(sigma_1):
             Q_seen.insert(sigma_1)
-            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize)
+            # Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize)
+            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize, hasse_edges)
             if Q <= theta:
                 P_qe.insert(sigma_1)
 
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
-            Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize)
+            # Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize)
+            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize, hasse_edges)
             if Q <= theta:
                 P_qe.insert(sigma_0)
 

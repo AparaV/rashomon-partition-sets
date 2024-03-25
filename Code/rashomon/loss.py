@@ -55,14 +55,14 @@ def partition_sigma(sigma, i, j):
     return sigma_fix
 
 
-def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0):
+def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0, lattice_edges=None):
     """
     The B function in Theorem 6.3 \ref{thm:rashomon-equivalent-bound}
     """
 
     # Split maximally in arm i from dosage j
     sigma_fix = partition_sigma(sigma, i, j)
-    pi_fixed_pools, pi_fixed_policies = extract_pools(policies, sigma_fix)
+    pi_fixed_pools, pi_fixed_policies = extract_pools(policies, sigma_fix, lattice_edges)
 
     # Compute squared loss for this maximal split
     # This loss is B minus the regularization term
