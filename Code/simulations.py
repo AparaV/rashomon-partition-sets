@@ -1,7 +1,6 @@
 import os
 import argparse
 import importlib
-import warnings
 import numpy as np
 import pandas as pd
 
@@ -11,7 +10,6 @@ from sklearn import linear_model
 from rashomon import tva
 from rashomon import loss
 from rashomon import metrics
-from rashomon import causal_trees
 from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 
@@ -24,14 +22,10 @@ def parse_arguments():
                         help="Number of samples per feature combination")
     parser.add_argument("--iters", type=int,
                         help="Number of iterations")
-    # parser.add_argument("--output_dir", type=str,
-    #                     help="Where should output be saved")
     parser.add_argument("--output_prefix", type=str,
                         help="Prefix for output file name")
-    # parser.add_argument("--theta", type=float,
-    #                     help="Rashomon threshold")
     parser.add_argument("--method", type=str,
-                        help="One of {r, lasso, ct}")
+                        help="One of {r, lasso}")
     args = parser.parse_args()
     return args
 
@@ -99,7 +93,6 @@ if __name__ == "__main__":
     output_suffix = f"_{args.sample_size}_{args.iters}.csv"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
-    ct_fname = args.output_prefix + "_ct" + output_suffix
 
     # Identify the pools
     policies_profiles = {}
@@ -152,12 +145,11 @@ if __name__ == "__main__":
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso", "ct"]:
-        print(f"method should be one of [r, lasso, ct]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso"]:
+        print(f"method should be one of [r, lasso]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
-    ct_list = []
 
     np.random.seed(3)
 
@@ -302,33 +294,6 @@ if __name__ == "__main__":
                 this_list += best_profile_indicator_tva
                 lasso_list.append(this_list)
 
-            #
-            # Causal trees
-            #
-            if method == "ct":
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", message="Mean of empty slice.")
-                    warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide")
-                    ct_res = causal_trees.ctl(M, R, D, y, D_matrix)
-                y_ct = ct_res[3]
-                y_ct = np.reshape(y, (-1,))
-                # depth = 0
-                # for prof, tree in ct_res[2].items():
-                #     depth += tree.tree_depth
-                # print(depth)
-
-                ct_results = metrics.compute_all_metrics(
-                    y, y_ct, D, true_best, all_policies, profile_map, min_dosage_best_policy, true_best_effect)
-                sqrd_err = ct_results["sqrd_err"]
-                iou_ct = ct_results["iou"]
-                best_profile_indicator_ct = ct_results["best_prof"]
-                min_dosage_present_ct = ct_results["min_dos_inc"]
-                best_policy_diff_ct = ct_results["best_pol_diff"]
-
-                this_list = [n_per_pol, sim_i, sqrd_err, iou_ct, min_dosage_present_ct, best_policy_diff_ct]
-                this_list += best_profile_indicator_ct
-                ct_list.append(this_list)
-
     profiles_str = [str(prof) for prof in profiles]
 
     if method == "r":
@@ -342,9 +307,3 @@ if __name__ == "__main__":
         lasso_cols += profiles_str
         lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
         lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
-
-    if method == "ct":
-        ct_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-        ct_cols += profiles_str
-        ct_df = pd.DataFrame(ct_list, columns=ct_cols)
-        ct_df.to_csv(os.path.join(output_dir, ct_fname))
