@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     trt_het = False
     edu_het = False
-    gen_het = False
+    gen_het = True
 
     output_fname_suffix = ""
     if trt_het:
@@ -45,7 +45,8 @@ if __name__ == "__main__":
 
     data_fname = "../Data/banerjee_miracle.csv"
     results_dir = "../Results/microfinance/"
-    chosen_covariates_idx = [2, 3, 4, 5, 7, 8]
+    # chosen_covariates_idx = [2, 3, 4, 5, 7, 8]
+    chosen_covariates_idx = [2, 3, 4, 6, 7, 9, 10]
 
     df = pd.read_csv(data_fname)
 
@@ -83,8 +84,8 @@ if __name__ == "__main__":
     #
     # Setup policy means
     #
-    M = 6
-    R = np.array([trt_max_dosage, edu_max_dosage, gen_max_dosage, 4, 4, 4])
+    M = 7
+    R = np.array([trt_max_dosage, edu_max_dosage, gen_max_dosage, 4, 4, 4, 4])
 
     num_profiles = 2**M
     profiles, profile_map = tva.enumerate_profiles(M)
@@ -120,7 +121,8 @@ if __name__ == "__main__":
     #
     # Find the Rashomon set
     #
-    R_set, R_profiles = RAggregate(M, R, H, D, y, q, reg=reg, verbose=True)
+    # R_set, R_profiles = RAggregate(M, R, H, D, y, q, reg=reg, verbose=True)
+    R_set, R_profiles = RAggregate(M, R, H, D, y, q, reg=reg, verbose=True, bruteforce=True)
     print(f"There are {len(R_set)} models in the Rashomon set")
 
     #

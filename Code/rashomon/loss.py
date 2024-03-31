@@ -4,7 +4,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LinearRegression
 
 from rashomon import counter
-from rashomon.extract_pools import extract_pools
+from rashomon.extract_pools import extract_pools, get_trt_ctl_pooled_partition
 
 
 def compute_policy_means(D, y, num_policies):
@@ -55,14 +55,14 @@ def partition_sigma(sigma, i, j):
     return sigma_fix
 
 
-def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0):
+def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0, lattice_edges=None):
     """
     The B function in Theorem 6.3 \ref{thm:rashomon-equivalent-bound}
     """
 
     # Split maximally in arm i from dosage j
     sigma_fix = partition_sigma(sigma, i, j)
-    pi_fixed_pools, pi_fixed_policies = extract_pools(policies, sigma_fix)
+    pi_fixed_pools, pi_fixed_policies = extract_pools(policies, sigma_fix, lattice_edges)
 
     # Compute squared loss for this maximal split
     # This loss is B minus the regularization term
@@ -85,12 +85,13 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0):
     return B
 
 
-def compute_Q(D, y, sigma, policies, policy_means, reg=1, normalize=0):
+def compute_Q(D, y, sigma, policies, policy_means, reg=1, normalize=0, lattice_edges=None):
     """
     Compute the loss Q
     """
 
-    pi_pools, pi_policies = extract_pools(policies, sigma)
+    # pi_pools, pi_policies, t1, t2 = extract_pools(policies, sigma, lattice_edges)
+    pi_pools, pi_policies = extract_pools(policies, sigma, lattice_edges)
     mu_pools = compute_pool_means(policy_means, pi_pools)
     D_pool = [pi_policies[pol_id] for pol_id in D[:, 0]]
     mu_D = mu_pools[D_pool]
@@ -103,6 +104,7 @@ def compute_Q(D, y, sigma, policies, policy_means, reg=1, normalize=0):
     Q = mse + reg * h
 
     return Q
+    # return Q, t1, t2
 
 
 def compute_B_slopes(D, X, y, sigma, i, j, policies, reg=1, normalize=0):
@@ -170,6 +172,28 @@ def compute_Q_slopes(D, X, y, sigma, policies, reg=1, normalize=0):
         mse = mse * D.shape[0] / normalize
 
     h = len(pi_pools.keys())
+    Q = mse + reg * h
+
+    return Q
+
+
+def compute_het_Q(D_tc, y_tc, sigma_int, trt_pools, ctl_pools, policy_means, reg=1, normalize=0):
+    """
+    Compute the loss after pooling across treatment and control as per sigma_int
+    D_tc indices need not be re-indexed. The indicies should match policy_means
+    policy_means is for the entire dataset
+    """
+
+    sigma_pools, sigma_policies = get_trt_ctl_pooled_partition(trt_pools, ctl_pools, sigma_int)
+    mu_pools = compute_pool_means(policy_means, sigma_pools)
+    D_tc_pool = [sigma_policies[pol_id] for pol_id in D_tc[:, 0]]
+    mu_D = mu_pools[D_tc_pool]
+    mse = mean_squared_error(y_tc[:, 0], mu_D)
+
+    if normalize > 0:
+        mse = mse * D_tc.shape[0] / normalize
+
+    h = mu_pools.shape[0]
     Q = mse + reg * h
 
     return Q

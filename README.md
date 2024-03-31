@@ -26,3 +26,11 @@ $ source venv/bin/activate
 (venv) $ python setup.py install
 (venv) $ cd ..
 ```
+
+## Developer instructions
+
+To update `requirements.txt`, run
+```
+$ pip install pipreqs
+$ pipreqs . --force
+```
