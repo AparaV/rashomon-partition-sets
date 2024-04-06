@@ -2,6 +2,7 @@ import pickle
 import argparse
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from copy import deepcopy
 
@@ -21,11 +22,83 @@ def parse_arguments():
     return args
 
 
+def make_plot(losses, sizes, fname, title):
+
+    sorted_losses = np.sort(losses)
+    sorted_indices = np.argsort(model_losses)
+    sorted_sizes = model_sizes[sorted_indices]
+    sorted_posteriors = np.exp(-sorted_losses)
+    map_to_model_ratio = sorted_posteriors / np.max(sorted_posteriors)
+
+    n_range = np.arange(len(sorted_posteriors))
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+
+    # ax.spines[['right', 'top']].set_visible(False)
+    ax.spines[['top']].set_visible(False)
+
+    ax2 = ax.twinx()
+
+    ax.plot(n_range, map_to_model_ratio,
+            color="dodgerblue",
+            zorder=3.1)
+    ax2.scatter(n_range, sorted_sizes,
+                color="indianred", s=2,
+                zorder=3.1, )
+    # ax.plot(n_range[:max_idx], map_to_model_ratio[:max_idx],
+    #         linewidth=3,
+    #         color="forestgreen",
+    #        zorder=3.1)
+
+    ax.set_xlabel(r"$i$")
+    ax.set_ylabel(r"$P(\Pi_i | Z) / P(\Pi_0 | Z)$", rotation=90)
+    ax2.set_ylabel(r"$|\Pi_i|$", rotation=90)
+
+    # ax.set_yticks([1, 100, 200, 300, 400, 500])
+
+    ax.set_xlim(0)
+
+    ax.set_title(title)
+
+    plt.savefig(fname, dpi=300, bbox_inches="tight")
+
+    print(f"Saved figure to {fname}")
+
+    num_models = np.arange(0, len(model_losses))+1
+    # model_errors = sorted_losses * num_models
+    est_err = 1 / (num_models * sorted_posteriors)
+    sorted_epsilon = sorted_losses / np.min(model_losses) - 1
+
+    print(np.where(sorted_epsilon <= 0.0025)[0])
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+
+    ax.spines[['right', 'top']].set_visible(False)
+
+    ax.plot(sorted_epsilon, est_err,
+            color="dodgerblue",
+            zorder=3.1)
+
+    # ax.plot(sorted_epsilon[100:], full_error[100:],
+    #         color="indianred",
+    #        zorder=3.1)
+
+    ax.set_xlabel(r"$\epsilon$")
+    ax.set_ylabel(r"$\mathcal{O} \left( 1 / \theta |P_{\theta}| \right)$", rotation=90)
+
+    ax.set_ylim(0)
+
+    err_fname = fname[:-4] + "_err.png"
+    plt.savefig(err_fname, dpi=300, bbox_inches="tight")
+
+    # plt.show()
+
+
 if __name__ == "__main__":
 
-    trt_het = False
-    edu_het = False
-    gen_het = True
+    trt_het = True
+    edu_het = True
+    gen_het = False
 
     output_fname_suffix = ""
     if trt_het:
@@ -143,6 +216,9 @@ if __name__ == "__main__":
         model_losses.append(loss_r)
         model_sizes.append(size_r)
 
+    model_losses = np.array(model_losses)
+    model_sizes = np.array(model_sizes)
+
     if len(R_set) > 0:
         q0 = np.min(model_losses)
         eps = (np.max(model_losses) - np.min(model_losses)) / q0
@@ -168,7 +244,14 @@ if __name__ == "__main__":
     }
 
     results_subdir = results_dir + outcome_col + "/"
-    pkl_fname = results_subdir + outcome_col + output_fname_suffix + ".pkl"
+
+    if len(R_set) > 0:
+        plot_fname = f"{outcome_col}_{output_fname_suffix}_{reg:.2e}.png"
+        plot_fname = results_subdir + plot_fname
+        plot_title = f"{outcome_col} {output_fname_suffix}, lambda = {reg:.2e}"
+        make_plot(model_losses, model_sizes, plot_fname, plot_title)
+
+    pkl_fname = results_subdir + outcome_col + output_fname_suffix + f"_{reg:.2e}.pkl"
     print(f"Pickling to {pkl_fname}")
 
     with open(pkl_fname, "wb") as f:
