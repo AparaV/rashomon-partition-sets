@@ -1,8 +1,8 @@
 #!/bin/bash
 
 outcome_col=25
-q=0.00302
-lambda=1e-5
+q=0.002804
+lambda=2e-6
 
 
 python run_microfinance.py --outcome_col $outcome_col --q $q --reg $lambda
