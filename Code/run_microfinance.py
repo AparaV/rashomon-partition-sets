@@ -18,6 +18,12 @@ def parse_arguments():
                         help="Regularization parameter")
     parser.add_argument("--q", type=float,
                         help="q threshold")
+    parser.add_argument('--trt',
+                        action=argparse.BooleanOptionalAction)
+    parser.add_argument('--gen',
+                        action=argparse.BooleanOptionalAction)
+    parser.add_argument('--edu',
+                        action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
     return args
 
@@ -26,7 +32,7 @@ def make_plot(losses, sizes, fname, title):
 
     sorted_losses = np.sort(losses)
     sorted_indices = np.argsort(model_losses)
-    sorted_sizes = model_sizes[sorted_indices]
+    sorted_sizes = sizes[sorted_indices]
     sorted_posteriors = np.exp(-sorted_losses)
     map_to_model_ratio = sorted_posteriors / np.max(sorted_posteriors)
 
@@ -69,7 +75,7 @@ def make_plot(losses, sizes, fname, title):
     est_err = 1 / (num_models * sorted_posteriors)
     sorted_epsilon = sorted_losses / np.min(model_losses) - 1
 
-    print(np.where(sorted_epsilon <= 0.0025)[0])
+    # print(np.where(sorted_epsilon <= 0.0025)[0])
 
     fig, ax = plt.subplots(figsize=(6, 5))
 
@@ -96,9 +102,14 @@ def make_plot(losses, sizes, fname, title):
 
 if __name__ == "__main__":
 
-    trt_het = True
-    edu_het = True
-    gen_het = False
+    args = parse_arguments()
+
+    trt_het = args.trt
+    edu_het = args.edu
+    gen_het = args.gen
+    # trt_het = True
+    # edu_het = True
+    # gen_het = False
 
     output_fname_suffix = ""
     if trt_het:
@@ -107,8 +118,6 @@ if __name__ == "__main__":
         output_fname_suffix += "_edu"
     if gen_het:
         output_fname_suffix += "_gen"
-
-    args = parse_arguments()
 
     outcome_col_id = args.outcome_col
 
@@ -208,6 +217,7 @@ if __name__ == "__main__":
         loss_r = 0
         size_r = 0
         for profile, model_prof in enumerate(r_set):
+            sigma_r_prof = R_profiles[profile].sigma[model_prof]
             loss_r_prof = R_profiles[profile].loss[model_prof]
             size_r_prof = R_profiles[profile].pools[model_prof]
             loss_r += loss_r_prof
