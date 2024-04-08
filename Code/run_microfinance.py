@@ -221,7 +221,11 @@ if __name__ == "__main__":
             loss_r_prof = R_profiles[profile].loss[model_prof]
             size_r_prof = R_profiles[profile].pools[model_prof]
             loss_r += loss_r_prof
-            size_r += size_r_prof
+            # size_r += size_r_prof
+            if sigma_r_prof is None and loss_r_prof == 0:
+                pass
+            else:
+                size_r += size_r_prof
 
         model_losses.append(loss_r)
         model_sizes.append(size_r)
