@@ -1,7 +1,7 @@
 #!/bin/bash
 
-outcome_col=19
-q=0.0031785
+outcome_col=25
+q=0.00276
 lambda=1.5e-6
 
 

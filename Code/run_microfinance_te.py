@@ -20,7 +20,7 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
-    lambda_str = "_2.00e-06"
+    lambda_str = "_1.50e-06"
 
     args = parse_arguments()
 
