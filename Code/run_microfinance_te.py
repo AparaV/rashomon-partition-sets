@@ -20,6 +20,8 @@ def parse_arguments():
 
 if __name__ == "__main__":
 
+    lambda_str = "_1.50e-06"
+
     args = parse_arguments()
 
     df_original = pd.read_csv("../Data/banerjee_miracle.csv")
@@ -48,8 +50,8 @@ if __name__ == "__main__":
         results_subdir = results_dir + outcome_col
         outcome_fname = outcome_col + suffix
 
-        pickle_pools_results = results_subdir + "/" + outcome_fname + ".pkl"
-        pickle_te_pools_fname = results_subdir + "/" + outcome_fname + "_te.pkl"
+        pickle_pools_results = results_subdir + "/" + outcome_fname + lambda_str + "_pruned" + ".pkl"
+        pickle_te_pools_fname = results_subdir + "/" + outcome_fname + lambda_str + "_pruned" + "_te.pkl"
 
         # Read pickle file
         with open(pickle_pools_results, "rb") as f:
