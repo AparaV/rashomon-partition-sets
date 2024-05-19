@@ -1,4 +1,6 @@
-# Rashomon Sets for Factorial Design Experiments
+# Rashomon Partition Sets 
+
+This code is supplementary to Venkateswaran, A., Sankar, A., Chandrasekhar, A. G., & McCormick, T. H. (2024). Robustly estimating heterogeneity in factorial data using Rashomon Partitions. _arXiv preprint arXiv:2404.02141_. URL: [https://arxiv.org/abs/2404.02141](https://arxiv.org/abs/2404.02141)
 
 ## Requirements
 
