@@ -10,7 +10,7 @@ This code is supplementary to Venkateswaran, A., Sankar, A., Chandrasekhar, A. G
 
 1. Clone the repo
 ```
-$ git clone https://github.com/AparaV/rashomon-tva
+$ git clone https://github.com/AparaV/rashomon-partition-sets.git
 $ cd rashomon-tva/Code
 ```
 
