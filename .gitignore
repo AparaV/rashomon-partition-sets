@@ -8,6 +8,12 @@ Results/nhanes*
 Results/4arms*
 Results/microfinance/
 Results/TE/
+Results/harvard_talk_april_11_pickles/*
+Results/harvard_talk_april_11_pickles-20240429T212105Z-001.zip
+
+# DS Store Files
+.DS_Store
+Data/.DS_Store
 
 # VS Code
 .vscode/
