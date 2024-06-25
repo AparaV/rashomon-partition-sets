@@ -18,7 +18,7 @@ $ cd rashomon-tva/Code
 ```
 $ python -m venv venv
 $ source venv/bin/activate
-(venv) $ pip install requirements.txt
+(venv) $ pip install -r requirements.txt
 ```
 
 ## Developer instructions
