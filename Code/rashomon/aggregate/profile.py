@@ -85,6 +85,8 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
         for m in range(M):
             R_m = R[m]
             j1 = 0
+
+            # TODO: Fix this
             while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
                 j1 += 1
             if j1 <= R_m - 3:
@@ -112,7 +114,7 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
             # Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize)
-            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize, hasse_edges)
+            Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize, hasse_edges)
             if Q <= theta:
                 P_qe.insert(sigma_0)
 
