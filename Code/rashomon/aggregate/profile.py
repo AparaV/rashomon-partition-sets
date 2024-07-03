@@ -87,15 +87,26 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
             j1 = 0
 
             # TODO: Fix this
-            while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
+            while j1 < R_m - 3:
+                if not problems.seen(sigma_1, m, j1):
+                    queue.append((sigma_1, m, j1))
+                    break
                 j1 += 1
-            if j1 <= R_m - 3:
-                queue.append((sigma_1, m, j1))
+            # while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
+            #     j1 += 1
+            # if j1 <= R_m - 3:
+            #     queue.append((sigma_1, m, j1))
+
             j0 = 0
-            while problems.seen(sigma_0, m, j0) and j0 < R_m - 3:
+            while j0 < R_m - 3:
+                if not problems.seen(sigma_0, m, j0):
+                    queue.append((sigma_0, m, j0))
+                    break
                 j0 += 1
-            if j0 <= R_m - 3:
-                queue.append((sigma_0, m, j0))
+            # while problems.seen(sigma_0, m, j0) and j0 < R_m - 3:
+            #     j0 += 1
+            # if j0 <= R_m - 3:
+            #     queue.append((sigma_0, m, j0))
 
         # Check if further splits in arm i is feasible
         # B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg, normalize)
