@@ -2,7 +2,6 @@ import numpy as np
 
 from collections import deque
 
-from .utils import powerset
 from .. import loss
 from .. import counter
 from ..tva import enumerate_policies, policy_to_profile
@@ -205,7 +204,7 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
 
     hasse_edges = lattice_edges(policies)
 
-    for x in powerset(indices):
+    for x in counter.powerset(indices):
         sigma_x = sigma.copy()
         for i, j in x:
             sigma_x[i, j] = 0
