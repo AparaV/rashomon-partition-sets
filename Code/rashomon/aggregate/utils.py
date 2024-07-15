@@ -3,13 +3,24 @@ import numpy as np
 from itertools import chain, combinations
 
 
-def powerset(iterable):
-    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+def powerset(iterable) -> list:
+    "powerset([1,2,3]) -> [(), (1,), (2,), (3,), (1,2), (1,3), (2,3), (1,2,3)]"
     s = list(iterable)
     return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
 
-def find_feasible_sum_subsets(S: list[np.ndarray], theta):
+def find_feasible_sum_subsets(S: list[np.ndarray], theta: float) -> list[list[int]]:
+    """
+    Find all combinations of indices from the list of arrays S such that sum <= theta
+
+    Arguments:
+    S (list[np.ndarray]): List of arrays of numbers
+    theta (float): Threshold
+
+    Returns:
+    list[list[int]]: List of combinations of indices, one from each array in S
+        such that their sum is less than or equal to theta
+    """
     # See this https://stackoverflow.com/q/62311484/5055644
     # NP Hard? https://link.springer.com/chapter/10.1007/978-3-540-24777-7_11
 
