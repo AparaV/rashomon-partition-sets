@@ -2,12 +2,8 @@
 import collections
 import numpy as np
 
-#
-# Extract pools from Sigma matrix
-#
 
-
-def lattice_edges(policies):
+def lattice_edges(policies: list) -> list[tuple[int, int]]:
     """
     Enumerate the Hasse adjacencies
     """
@@ -24,7 +20,18 @@ def lattice_edges(policies):
     return edges
 
 
-def lattice_adjacencies(sigma, policies):
+def lattice_adjacencies(sigma: np.ndarray, policies: int) -> list[tuple[int, int]]:
+    """
+    Find edges in the Hasse based on partition sigma
+    Constructs edges from scratch. More expensive that `prune_lattice_edges`
+
+    Arguments:
+    sigma (np.ndarray): Partition matrix
+    policies (list): List of policies
+
+    Returns:
+    edges (list[tuple[int, int]]): List of edges in the Hasse
+    """
     num_policies = len(policies)
     edges = []
     for i in range(num_policies):
@@ -43,7 +50,20 @@ def lattice_adjacencies(sigma, policies):
     return edges
 
 
-def prune_lattice_edges(sigma, edges, policies):
+def prune_lattice_edges(sigma: np.ndarray, edges: list[tuple[int, int]],
+                        policies: list) -> list[tuple[int, int]]:
+    """
+    Find edges remaining in the Hasse based on partition sigma.
+    Uses list of all possible lattice edges to remove edges based on sigma.
+
+    Arguments:
+    sigma (np.ndarray): Partition matrix
+    edges (list[tuple[int, int]]): List of all possible edges in the Hasse
+    policies (list): List of policies
+
+    Returns:
+    pruned_edges (list[tuple[int, int]]): List of edges remaining in the Hasse
+    """
     pruned_edges = []
     for i, j in edges:
         pol_i = np.array(policies[i])
@@ -56,16 +76,26 @@ def prune_lattice_edges(sigma, edges, policies):
     return pruned_edges
 
 
-# Helper to merge components
 def __merge_components__(parent, x):
+    """ Helper function to merge components in `connected_components` """
     if parent[x] == x:
         return x
     return __merge_components__(parent, parent[x])
 
 
-# Disjoint Set Union Algorithm from https://cp-algorithms.com/data_structures/disjoint_set_union.html
-# Implementation modified from https://www.geeksforgeeks.org/connected-components-in-an-undirected-graph/
-def connected_components(n, edges):
+def connected_components(n: int, edges: list[tuple[int, int]]) -> list[list[int]]:
+    """
+    Algorithm to find connected components in a graph
+    Disjoint Set Union Algorithm from https://cp-algorithms.com/data_structures/disjoint_set_union.html
+    Implementation modified from https://www.geeksforgeeks.org/connected-components-in-an-undirected-graph/
+
+    Arguments:
+    n (int): Number of nodes
+    edges (list[tuple[int, int]]): Edges in graph
+
+    Returns:
+    list[list[int]]: List of connected components
+    """
     # find all parents
     parent = [i for i in range(n)]
     for x in edges:
@@ -85,16 +115,25 @@ def connected_components(n, edges):
     return conn_comps
 
 
-def extract_pools(policies, sigma, lattice_edges=None):
+def extract_pools(policies: list, sigma: np.ndarray,
+                  lattice_edges: list[tuple[int, int]] = None) -> tuple[
+                      dict[int, list[int]], dict[int, int]
+                  ]:
     """
-    lattice_edges: List of Hasse adjacencies.
+    Extracts pools from sigma matrix
+
+    Arguments:
+    policies (list): List of features
+    sigma (np.ndarray): Partition matrix
+    lattice_edges (list[tuple[int, int]]): List of Hasse adjacencies.
         Policies are indexed by their ID according to position in `policies`
         Defaults to `None` where adjacencies are computed.
         This results in significantly slower runtimes.
 
-    Returns: (pi_pools, pi_policies)
-    pi_pools is a dictionary. Key = pool_id, Value = List of policy_id
-    pi_policies is a dictionary. Key = policy_id, Value = pool_id
+    Returns:
+    (pi_pools, pi_policies): Extracted pools
+        pi_pools (dict[int, list[int]]): Key = pool_id, Value = List of policy_id
+        pi_policies (dict[int, int]): Key = policy_id, Value = pool_id
     """
 
     # t0 = time.time()
@@ -117,17 +156,22 @@ def extract_pools(policies, sigma, lattice_edges=None):
 
 def __aggregator_universalize_policy_ids__(
         pi_policies: dict[int, dict[int, int]],
-        policies_ids_profiles) -> dict[int, dict[int, int]]:
+        policies_ids_profiles: dict[int, list[int]]) -> dict[int, dict[int, int]]:
     """
     Universalizies policy IDs to follow unified numbering system.
     Does not modify pool IDs within profile
-    pi_policies: key = profile_id, value = dictionary
+
+    Arguments:
+    pi_policies (dict[int, dict[int, int]]): key = profile_id, value = dictionary
         pi_policies[k]: key = policy_id within that profile
                         value = pool_id within that profile
-    policies_ids_profiles: key = profile_id, value is list of policy IDs
+    policies_ids_profiles (: dict[int, list[int]]): key = profile_id, value is list of policy IDs
         These policy IDs are unique even across profiles
         The i-th policy in profile k aoccroding to pi_policies[k]
         gets mapped to policies_ids_profiles[k][i]
+
+    Returns:
+    pi_policies_univ (dict[int, dict[int, int]]): Universalized policy IDs
     """
 
     pi_policies_univ = {}
@@ -148,9 +192,16 @@ def __aggregate_pools__(pi_policies: dict[int, dict[int, int]]) -> tuple[dict, d
     """
     Aggregate partitions across multiple profiles into a unified ID numbering system
     Assumes that policy IDs are already universalized.
-    pi_policies: key = profile_id, value = dictionary
+
+    Arguments:
+    pi_policies (dict[int, dict[int, int]]): key = profile_id, value = dictionary
         pi_policies[k]: key = universal policy_id
                         value = pool_id within profile k
+
+    Returns:
+    (agg_pi_pools, agg_pi_policies): Aggregated pools and policies
+        agg_pi_pools (dict[int, list[int]]): Key = pool_id, Value = List of policy_id
+        agg_pi_policies (dict[int, int]): Key = policy_id, Value = pool_id
     """
     agg_pi_policies: dict[int, int] = {}
     agg_pi_pools: dict[int, list[int]] = {}
@@ -173,17 +224,27 @@ def __aggregate_pools__(pi_policies: dict[int, dict[int, int]]) -> tuple[dict, d
     return (agg_pi_pools, agg_pi_policies)
 
 
-def aggregate_pools(pi_policies: dict[int, dict[int, int]], policies_ids_profiles) -> tuple[dict, dict]:
+def aggregate_pools(pi_policies: dict[int, dict[int, int]],
+                    policies_ids_profiles: dict[int, list[int]]) -> tuple[
+                        dict[int, list[int]], dict[int, int]
+                    ]:
     """
     Aggregate partitions across multiple profiles into a unified ID numbering system
     The unified ID numbering system is given by policies_ids_profiles
-    pi_policies: key = profile_id, value = dictionary
+
+    Arguments:
+    pi_policies (dict[int, dict[int, int]]): key = profile_id, value = dictionary
         pi_policies[k]: key = policy_id within that profile
                         value = pool_id
-    policies_ids_profiles: key = profile_id, value is list of policy IDs
+    policies_ids_profiles (dict[int, list[int]]): key = profile_id, value is list of policy IDs
         These policy IDs are unique even across profiles
         The i-th policy in profile k aoccroding to pi_policies[k]
         gets mapped to policies_ids_profiles[k][i]
+
+    Returns:
+    (agg_pi_pools, agg_pi_policies): Aggregated pools and policies
+        agg_pi_pools (dict[int, list[int]]): Key = pool_id, Value = List of policy_id
+        agg_pi_policies (dict[int, int]): Key = policy_id, Value = pool_id
     """
 
     pi_policies_univ = __aggregator_universalize_policy_ids__(pi_policies, policies_ids_profiles)
