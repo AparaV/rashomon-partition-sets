@@ -253,41 +253,6 @@ def aggregate_pools(pi_policies: dict[int, dict[int, int]],
     return (agg_pi_pools, agg_pi_policies)
 
 
-def aggregate_pools_old(pi_policies: dict[int, dict[int, int]], policies_ids_profiles) -> tuple[dict, dict]:
-    """
-    Aggregate partitions across multiple profiles into a unified ID numbering system
-    The unified ID numbering system is given by policies_ids_profiles
-    pi_policies: key = profile_id, value = dictionary
-        pi_policies[k]: key = policy_id within that profile
-                        value = pool_id
-    policies_ids_profiles: key = profile_id, value is list of policy IDs
-        These policy IDs are unique even across profiles
-        The i-th policy in profile k aoccroding to pi_policies[k]
-        gets mapped to policies_ids_profiles[k][i]
-    """
-    agg_pi_policies: dict[int, int] = {}
-    agg_pi_pools: dict[int, list[int]] = {}
-    pool_ctr = 0
-    for k, pi_policies_k in pi_policies.items():
-        policies_ids_k = policies_ids_profiles[k]
-        pool_id_map = {}
-        for pol_id, pool_id in pi_policies_k.items():
-            if pool_id is None:
-                continue
-            try:
-                agg_pool_id = pool_id_map[pool_id]
-            except KeyError:
-                agg_pool_id = pool_ctr
-                agg_pi_pools[agg_pool_id] = []
-                pool_id_map[pool_id] = agg_pool_id
-                pool_ctr += 1
-            agg_pol_id = policies_ids_k[pol_id]
-            agg_pi_policies[agg_pol_id] = agg_pool_id
-            agg_pi_pools[agg_pool_id].append(agg_pol_id)
-
-    return (agg_pi_pools, agg_pi_policies)
-
-
 def get_trt_ctl_pooled_partition(trt_pools, ctl_pools, sigma_int):
     pools_tmp = {
         "trt": trt_pools.copy(),
