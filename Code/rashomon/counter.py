@@ -6,6 +6,7 @@ from functools import reduce
 
 
 def prime_factors(n):
+    """ Find prime factors of n """
     factors = []
 
     while n % 2 == 0:
@@ -25,6 +26,7 @@ def prime_factors(n):
 
 
 def generate_all_factorizations(factors):
+    """ [Helper] Generate all factorizations from a list of factors """
     def prod(x):
         res = 1
         for xi in x:
@@ -45,6 +47,7 @@ def generate_all_factorizations(factors):
 
 
 def factorizations(factors):
+    """ Generate all factorizations from a list of factors """
     seen = set()
     for f in generate_all_factorizations(factors):
         f = tuple(sorted(f))
@@ -55,7 +58,10 @@ def factorizations(factors):
 
 
 def factors(n):
-    # From https://stackoverflow.com/a/6800214
+    """
+    Find all factors of n
+    From https://stackoverflow.com/a/6800214
+    """
     return set(
         reduce(
             list.__add__,
@@ -64,7 +70,18 @@ def factors(n):
     )
 
 
-def __num_admissible_poolings_classic__(h, m, R: int):
+def __num_admissible_poolings_classic__(h: int, m: int, R: int) -> int:
+    """
+    Find number of admissible partitions when R is fixed
+
+    Arguments:
+    h (int): Number of pools
+    m (int): Number of arms
+    R (int): Number of factor levels
+
+    Returns:
+    N (int): Number of admissible partitions
+    """
     if h == 1 or h == (R - 1) ** m:
         return 1
 
@@ -85,7 +102,18 @@ def __num_admissible_poolings_classic__(h, m, R: int):
     return N
 
 
-def __num_admissible_poolings_complex__(h, m, R: np.array):
+def __num_admissible_poolings_complex__(h: int, m: int, R: np.array) -> int:
+    """
+    Find number of admissible partitions when R differs across arms
+
+    Arguments:
+    h (int): Number of pools
+    m (int): Number of arms
+    R (np.array): Number of factor levels in each arm
+
+    Returns:
+    N (int): Number of admissible partitions
+    """
     if h == 1 or h == np.prod(R - 1):
         return 1
 
@@ -109,8 +137,19 @@ def __num_admissible_poolings_complex__(h, m, R: np.array):
     return N
 
 
-def num_admissible_poolings(h, m, R):
-    # Lemma 4.7 \ref{lemma:num-sigma-matrix-pools}
+def num_admissible_poolings(h: int, m: int, R: int | np.ndarray) -> int:
+    """
+    Find number of admissible partitions.
+    Lemma \ref{lemma:num-sigma-matrix-pools}
+
+    Arguments:
+    h (int): Number of pools
+    m (int): Number of arms
+    R (int | np.array): Number of factor levels in each arm
+
+    Returns:
+    N (int): Number of admissible partitions
+    """
     if isinstance(R, int):
         N = __num_admissible_poolings_classic__(h, m, R)
     else:
@@ -118,7 +157,8 @@ def num_admissible_poolings(h, m, R):
     return N
 
 
-def find_R(sigma):
+def find_R(sigma: np.ndarray) -> np.ndarray:
+    """ Find factor levels in each arm given a partition matrix """
     R = np.sum(~np.isinf(sigma), axis=1) + 2
     if np.all(R == R[0]):
         return int(R[0])
@@ -126,12 +166,16 @@ def find_R(sigma):
 
 
 def powerset(arr):
+    "powerset([1,2,3]) -> [(), (1,), (2,), (3,), (1,2), (1,3), (2,3), (1,2,3)]"
     s = list(arr)
     return it.chain.from_iterable(it.combinations(s, r) for r in range(len(s)+1))
 
 
-def sum_product_k(arr):
-    # Adapted from https://www.geeksforgeeks.org/sum-of-products-of-all-possible-k-size-subsets-of-the-given-array/
+def sum_product_k(arr: list) -> int:
+    """
+    Helper function to find sum of products of all possible k-size subsets of the given array
+    Adapted from https://www.geeksforgeeks.org/sum-of-products-of-all-possible-k-size-subsets-of-the-given-array/
+    """
 
     n = len(arr)
     cache = [0] * (n + 1)
@@ -157,7 +201,17 @@ def sum_product_k(arr):
     return k_sum
 
 
-def __num_pools_classic__(sigma, R: int):
+def __num_pools_classic__(sigma: np.ndarray, R: int) -> int:
+    """
+    Find number of pools in sigma when R is fixed
+
+    Arguments:
+    sigma (np.ndarray): Partition matrix
+    R (int): Number of factor levels
+
+    Returns:
+    H (int): Number of pools
+    """
     m, _ = sigma.shape
     z = np.sum(sigma, axis=1)
     z_sums = sum_product_k(z)
@@ -170,7 +224,17 @@ def __num_pools_classic__(sigma, R: int):
     return H
 
 
-def __num_pools_complex__(sigma, R: np.array):
+def __num_pools_complex__(sigma: np.ndarray, R: np.ndarray) -> int:
+    """
+    Find number of pools in sigma when R differs between features
+
+    Arguments:
+    sigma (np.ndarray): Partition matrix
+    R (np.ndarray): Number of factor levels in each feature
+
+    Returns:
+    H (int): Number of pools
+    """
     m, _ = sigma.shape
     R = R - 1
     R_prod = np.prod(R)
@@ -189,7 +253,21 @@ def __num_pools_complex__(sigma, R: np.array):
     return H
 
 
-def num_pools(sigma, R=None):
+def num_pools(sigma: np.ndarray, R: int | np.ndarray | None = None) -> int:
+    """
+    Find number of pools in partition matrix
+
+    Arguments:
+    sigma (np.ndarray): Partition matrix
+    R (int | np.ndarray | None): Number of factor levels in each feature
+        If int, then all features have the same number of factor levels
+        If np.ndarray, then each feature has a different number of factor levels
+        If None, then R is calculated from sigma
+        Defaults to None
+
+    Returns:
+    H (int): Number of pools
+    """
     # Lemma 4.5 \ref{lemma:sigma-ones-pools}
 
     if np.all(np.isinf(sigma)):
