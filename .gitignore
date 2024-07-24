@@ -14,6 +14,7 @@ Results/harvard_talk_april_11_pickles-20240429T212105Z-001.zip
 # DS Store Files
 .DS_Store
 Data/.DS_Store
+Results/.DS_Store
 
 # VS Code
 .vscode/

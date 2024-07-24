@@ -11,18 +11,21 @@ from ..tva import enumerate_profiles, enumerate_policies, policy_to_profile
 from ..sets import RashomonSet
 
 
-# rashomon aggregation across profiles
-# Need to keep track of seen problems and their lower bounds
-#   maybe a dictionary?
-#   actually no need to do this
-# Overall threshold is theta
-# For each profile, find the equivalent policy lower bound
-#   call this t_i for profile i
-# Then, for profile k, the threshold is theta_k = theta - \sum_{i \neq k} t_i
-# Get R-sets for each profile, R_i for profile i
-# Now, we need to mix and match across profiles
+def subset_data(D: np.ndarray, y: np.ndarray,
+                policy_profiles_idx: list[int]) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """
+    Subset data into different profiles
 
-def subset_data(D, y, policy_profiles_idx):
+    Arguments:
+    D (np.ndarray): Data i.e., policy integers
+    y (np.ndarray): Outcomes
+    policy_profiles_idx (list[int]): List of policy indices for this profile
+
+    Returns:
+    (D_profile, y_profile): Subset of D and y for this profile
+        D_profile (np.ndarray): Subset of D for this profile
+        y_profile (np.ndarray): Subset of y for this profile
+    """
     # The idea here is that values in D corresponds to the index of that policy
     # So we mask and retrieve those values
     mask = np.isin(D, policy_profiles_idx)
@@ -41,7 +44,8 @@ def subset_data(D, y, policy_profiles_idx):
     return D_profile, y_profile
 
 
-def find_profile_lower_bound(D_k, y_k, policy_means_k):
+def find_profile_lower_bound(D_k: np.ndarray, y_k: np.ndarray, policy_means_k: np.ndarray) -> float:
+    """ Find the MSE lower bound for this profile """
     n_k = D_k.shape[0]
     nodata_idx = np.where(policy_means_k[:, 1] == 0)[0]
     policy_means_k[nodata_idx, 1] = 1
@@ -53,8 +57,22 @@ def find_profile_lower_bound(D_k, y_k, policy_means_k):
     return mse
 
 
-def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H,
-                               sorted=False, verbose=False):
+def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta: float, H: int,
+                               sorted: bool = False, verbose: bool = False) -> list[list[int]]:
+    """
+    Find feasible combinations of poolings across profiles based on Rashomon threshold
+
+    Arguments:
+    rashomon_profiles (list[RashomonSet]): List of RashomonSet objects for each profile
+    theta (float): Rashomon threshold
+    H (int): Maximum number of pools
+    sorted (bool): Whether the profiles are sorted by loss. Defaults to False
+    verbose (bool): Print debug information. Defaults to False
+
+    Returns:
+    list[list[int]]: List of feasible combinations of poolings.
+        Each list contains the indices of the pools in the RashomonSet
+    """
 
     if not sorted:
         for idx, r in enumerate(rashomon_profiles):
@@ -91,7 +109,9 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta, H,
     return feasible_combinations
 
 
-def remove_unused_poolings(R_set, rashomon_profiles):
+def remove_unused_poolings(R_set: list[list[int]],
+                           rashomon_profiles: list[RashomonSet]) -> list[RashomonSet]:
+    """ Remove any pools that are absent in the final RPS solution """
     R_set_np = np.array(R_set)
     sigma_max_id = np.max(R_set_np, axis=0)
 
@@ -101,10 +121,28 @@ def remove_unused_poolings(R_set, rashomon_profiles):
     return rashomon_profiles
 
 
-def RAggregate(M, R, H, D, y, theta, reg=1, verbose=False, bruteforce=False):
+def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.ndarray,
+               theta: float, reg: float = 1, verbose: bool = False,
+               bruteforce: bool = False) -> tuple[list[list[int]], list[RashomonSet]]:
+    """
+    RPS enumeration algorithm
 
-    # TODO: Edge case when dosage in one arm is binary
-    #       This will fail currently
+    Parameters:
+    M (int): Number of features
+    R (int or np.ndarray of int): Number of factor levels per feature
+    H (int): Maximum number of pools in this profile
+    D (np.ndarray): Data i.e., policy integers
+    y (np.ndarray): Outcomes
+    theta (float): Rashomon threshold
+    reg (float): Regularization parameter. Defaults to 1
+    verbose (bool): Print debug information. Defaults to False
+    bruteforce (bool): Use brute force instead of adaptive. Defaults to False
+
+    Returns:
+    (R_set, rashomon_profiles): Rashomon Partitions Set
+        R_set (list[list[int]]): List of list of indices of pools for each profile
+        rashomon_profiles (list[RashomonSet]): Set of Rashomon pools for each profile
+    """
 
     num_profiles = 2**M
     profiles, profile_map = enumerate_profiles(M)

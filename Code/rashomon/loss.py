@@ -7,12 +7,19 @@ from rashomon import counter
 from rashomon.extract_pools import extract_pools, get_trt_ctl_pooled_partition
 
 
-def compute_policy_means(D, y, num_policies):
+def compute_policy_means(D: np.ndarray, y: np.ndarray, num_policies: int) -> np.ndarray:
     """
-    Returns: policy_means
-    policy_means is a np.ndarray of size (num_policies,2)
-    policy_means[i, 0] = sum of all y where D[i,0] = i
-    policy_means[i, 1] = count of where D[i,0] = i
+    Compute an array that makes it easy to find means for each policy
+
+    Arguments:
+    D (np.ndarray): Dataset
+    y (np.ndarray): Outcomes
+    num_policies (int): Number of policies
+
+    Returns:
+    policy_means (np.ndarray): Size (num_policies,2)
+        policy_means[i, 0] = sum of all y where D[i,0] = i
+        policy_means[i, 1] = count of where D[i,0] = i
     """
     policy_means = np.ndarray(shape=(num_policies, 2))
     for policy_id in range(num_policies):
@@ -22,11 +29,19 @@ def compute_policy_means(D, y, num_policies):
     return policy_means
 
 
-def compute_pool_means(policy_means, pi_pools):
+def compute_pool_means(policy_means: np.ndarray, pi_pools: dict[int, list[int]]) -> np.ndarray:
     """
-    Returns: mu_pools
-    mu_pools is a np.ndarray of size (H,) where H is the number of pools
-    mu_pools[i] = mean value in pool i
+    Compute the mean value in each pool
+
+    Arguments:
+    policy_means (np.ndarray): Size (num_policies,2)
+        policy_means[i, 0] = sum of all y where D[i,0] = i
+        policy_means[i, 1] = count of where D[i,0] = i
+    pi_pools (dict[int, list[int]]): Dictionary mapping pools to policies
+
+    Returns:
+    mu_pools (np.ndarray): Size (H,) where H is the number of pools
+        mu_pools[i] = mean value in pool i
     """
     H = len(pi_pools.keys())
     mu_pools_temp = np.ndarray(shape=(H, 2))
@@ -44,7 +59,7 @@ def compute_pool_means(policy_means, pi_pools):
     return mu_pools
 
 
-def partition_sigma(sigma, i, j):
+def partition_sigma(sigma: np.ndarray, i: int, j: int) -> np.ndarray:
     """
     Maximally split policies in arm i starting at dosage j
     All other existing splits are maintained
@@ -55,9 +70,26 @@ def partition_sigma(sigma, i, j):
     return sigma_fix
 
 
-def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0, lattice_edges=None):
+def compute_B(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, i: int, j: int,
+              policies: list, policy_means: np.ndarray, reg: float = 1, normalize: int = 0,
+              lattice_edges: list[tuple[int, int]] | None = None) -> float:
     """
-    The B function in Theorem 6.3 \ref{thm:rashomon-equivalent-bound}
+    The B function in Theorem \ref{thm:rashomon-equivalent-bound}
+
+    Arguments:
+    D (np.ndarray): Dataset
+    y (np.ndarray): Outcomes
+    sigma (np.ndarray): Partition matrix
+    i (int): Feature index
+    j (int): Factor level index
+    policies (list): List of policies
+    policy_means (np.ndarray): Size (num_policies, 2). See `compute_policy_means`
+    reg (float): Regularization parameter. Defaults 1
+    normalize (int): Normalization factor. Defaults 0
+    lattice_edges (list[tuple[int, int]]): List of edges in the Hasse. Defaults to None
+
+    Returns:
+    B (int): The lower bound on the loss function
     """
 
     # Split maximally in arm i from dosage j
@@ -85,9 +117,24 @@ def compute_B(D, y, sigma, i, j, policies, policy_means, reg=1, normalize=0, lat
     return B
 
 
-def compute_Q(D, y, sigma, policies, policy_means, reg=1, normalize=0, lattice_edges=None):
+def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
+              policy_means: np.ndarray, reg: float = 1, normalize: int = 0,
+              lattice_edges: list[tuple[int, int]] | None = None) -> float:
     """
     Compute the loss Q
+
+    Arguments:
+    D (np.ndarray): Dataset
+    y (np.ndarray): Outcomes
+    sigma (np.ndarray): Partition matrix
+    policies (list): List of policies
+    policy_means (np.ndarray): Size (num_policies, 2). See `compute_policy_means`
+    reg (float): Regularization parameter. Defaults 1
+    normalize (int): Normalization factor. Defaults 0
+    lattice_edges (list[tuple[int, int]]): List of edges in the Hasse. Defaults to None
+
+    Returns:
+    Q (int): The loss function
     """
 
     # pi_pools, pi_policies, t1, t2 = extract_pools(policies, sigma, lattice_edges)

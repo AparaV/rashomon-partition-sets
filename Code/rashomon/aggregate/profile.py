@@ -2,7 +2,6 @@ import numpy as np
 
 from collections import deque
 
-from .utils import powerset
 from .. import loss
 from .. import counter
 from ..tva import enumerate_policies, policy_to_profile
@@ -10,7 +9,8 @@ from ..sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 from ..extract_pools import lattice_edges
 
 
-def initialize_sigma(M, R):
+def initialize_sigma(M: int, R: int | np.ndarray) -> np.ndarray:
+    """ Initialize the sigma matrix with M arms and R dosage levels."""
     if isinstance(R, int):
         sigma = np.ndarray(shape=(M, R - 2))
         sigma[:, :] = 1
@@ -22,18 +22,27 @@ def initialize_sigma(M, R):
     return sigma
 
 
-def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, policy_means=None, normalize=0):
+def RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
+                       y: np.ndarray, theta: float, profile: tuple, reg: float = 1,
+                       policies: list | None = None, policy_means: np.ndarray | None = None,
+                       normalize: int = 0) -> RashomonSet:
     """
-    Aggregation algorithm for a single profile
-    M: int - number of arms
-    R: int or list of integers - number of dosage levels per arm (not max dosage)
-    H: int - maximum number of pools in this profile
-    D - Data i.e., policy integers
-    y - Data i.e., outcomes
-    theta: float - Rashomon threshold
-    profile: tuple - the profile we are considering
-    reg: float - regularization parameter
-    policies, policy_means - Optional precomputed values when repeatedly calling RAggregate_profile
+    RPS enumeration algorithm for a single profile
+
+    Parameters:
+    M (int): Number of features
+    R (int or np.ndarray of int): Number of factor levels per feature
+    H (int): Maximum number of pools in this profile
+    D (np.ndarray): Data i.e., policy integers
+    y (np.ndarray): Outcomes
+    theta (float): Rashomon threshold
+    profile (tuple): Profile under consideration
+    reg (float): Regularization parameter. Defaults to 1
+    policies (list), policy_means (np.ndarray) - Optional precomputed values. Defaults to None
+    normalize (int): Normalization parameter. Defaults to 0
+
+    Returns:
+    RashomonSet: Set of near-optimal poolings
     """
 
     if policies is None or policy_means is None:
@@ -84,15 +93,17 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
         # Add problem variants to queue
         for m in range(M):
             R_m = R[m]
+
             j1 = 0
             while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
                 j1 += 1
-            if j1 <= R_m - 3:
+            if j1 <= R_m - 3 and not problems.seen(sigma_1, m, j1):
                 queue.append((sigma_1, m, j1))
+
             j0 = 0
             while problems.seen(sigma_0, m, j0) and j0 < R_m - 3:
                 j0 += 1
-            if j0 <= R_m - 3:
+            if j0 <= R_m - 3 and not problems.seen(sigma_0, m, j0):
                 queue.append((sigma_0, m, j0))
 
         # Check if further splits in arm i is feasible
@@ -112,7 +123,7 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
             # Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize)
-            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize, hasse_edges)
+            Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize, hasse_edges)
             if Q <= theta:
                 P_qe.insert(sigma_0)
 
@@ -126,18 +137,27 @@ def RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, poli
     return P_qe
 
 
-def _brute_RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=None, policy_means=None, normalize=0):
+def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
+                              y: np.ndarray, theta: float, profile: tuple, reg: float = 1,
+                              policies: list | None = None, policy_means: np.ndarray | None = None,
+                              normalize: int = 0) -> RashomonSet:
     """
-    Aggregation algorithm for a single profile
-    M: int - number of arms
-    R: int or list of integers - number of dosage levels per arm (not max dosage)
-    H: int - maximum number of pools in this profile
-    D - Data i.e., policy integers
-    y - Data i.e., outcomes
-    theta: float - Rashomon threshold
-    profile: tuple - the profile we are considering
-    reg: float - regularization parameter
-    policies, policy_means - Optional precomputed values when repeatedly calling RAggregate_profile
+    Brute force RPS enumeration for a single profile
+
+    Parameters:
+    M (int): Number of features
+    R (int or np.ndarray of int): Number of factor levels per feature
+    H (int): Maximum number of pools in this profile
+    D (np.ndarray): Data i.e., policy integers
+    y (np.ndarray): Outcomes
+    theta (float): Rashomon threshold
+    profile (tuple): Profile under consideration
+    reg (float): Regularization parameter. Defaults to 1
+    policies (list), policy_means (np.ndarray) - Optional precomputed values. Defaults to None
+    normalize (int): Normalization parameter. Defaults to 0
+
+    Returns:
+    RashomonSet: Set of near-optimal poolings
     """
 
     if policies is None or policy_means is None:
@@ -173,7 +193,7 @@ def _brute_RAggregate_profile(M, R, H, D, y, theta, profile, reg=1, policies=Non
 
     hasse_edges = lattice_edges(policies)
 
-    for x in powerset(indices):
+    for x in counter.powerset(indices):
         sigma_x = sigma.copy()
         for i, j in x:
             sigma_x[i, j] = 0
