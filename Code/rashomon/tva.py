@@ -11,7 +11,7 @@ def __enumerate_policies_classic__(M: int, R: int) -> list:
     return policies
 
 
-def __enumerate_policies_complex__(R: np.array) -> list:
+def __enumerate_policies_complex__(R: np.ndarray) -> list:
     """ Enumerate all features with varying R factor levels """
     intensities = []
     for Ri in R:
@@ -22,13 +22,13 @@ def __enumerate_policies_complex__(R: np.array) -> list:
     return policies
 
 
-def enumerate_policies(M: int, R: int | np.array) -> list:
+def enumerate_policies(M: int, R: int | np.ndarray) -> list:
     """
     Enumerate all possible features
 
     Arguments:
     M (int): Number of arms
-    R (int | np.array): Number of factor levels for each arm.
+    R (int | np.ndarray): Number of factor levels for each arm.
         If type is of int, all arms have same number of factor levels
 
     Returns:
