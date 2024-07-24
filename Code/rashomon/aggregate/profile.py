@@ -93,29 +93,18 @@ def RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
         # Add problem variants to queue
         for m in range(M):
             R_m = R[m]
-            j1 = 0
 
-            # TODO: Fix this
-            while j1 < R_m - 3:
-                if not problems.seen(sigma_1, m, j1):
-                    queue.append((sigma_1, m, j1))
-                    break
+            j1 = 0
+            while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
                 j1 += 1
-            # while problems.seen(sigma_1, m, j1) and j1 < R_m - 3:
-            #     j1 += 1
-            # if j1 <= R_m - 3:
-            #     queue.append((sigma_1, m, j1))
+            if j1 <= R_m - 3 and not problems.seen(sigma_1, m, j1):
+                queue.append((sigma_1, m, j1))
 
             j0 = 0
-            while j0 < R_m - 3:
-                if not problems.seen(sigma_0, m, j0):
-                    queue.append((sigma_0, m, j0))
-                    break
+            while problems.seen(sigma_0, m, j0) and j0 < R_m - 3:
                 j0 += 1
-            # while problems.seen(sigma_0, m, j0) and j0 < R_m - 3:
-            #     j0 += 1
-            # if j0 <= R_m - 3:
-            #     queue.append((sigma_0, m, j0))
+            if j0 <= R_m - 3 and not problems.seen(sigma_0, m, j0):
+                queue.append((sigma_0, m, j0))
 
         # Check if further splits in arm i is feasible
         # B = loss.compute_B(D, y, sigma, i, j, policies, policy_means, reg, normalize)
