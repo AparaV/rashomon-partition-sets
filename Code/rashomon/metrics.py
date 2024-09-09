@@ -2,7 +2,7 @@ import numpy as np
 
 from sklearn.metrics import mean_squared_error, confusion_matrix
 
-from rashomon import tva
+from rashomon import hasse
 
 
 def make_predictions(D, pi_policies, pool_means):
@@ -19,7 +19,7 @@ def find_profiles(subset_policies, all_policies, profile_map):
     """
     Return a list of indicators denoting which profiles are present in subset_policies
     """
-    subset_profiles = [tva.policy_to_profile(all_policies[x]) for x in subset_policies]
+    subset_profiles = [hasse.policy_to_profile(all_policies[x]) for x in subset_policies]
     subset_profile_ids = [profile_map[x] for x in subset_profiles]
     profile_indicator = [0] * len(profile_map)
     for prof_id in subset_profile_ids:

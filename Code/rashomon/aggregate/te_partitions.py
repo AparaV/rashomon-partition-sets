@@ -3,7 +3,7 @@ import numpy as np
 from ..sets import RashomonSet
 from ..loss import compute_het_Q
 from ..extract_pools import extract_pools
-from ..tva import remove_arm, profile_ids_to_univ_ids
+from ..hasse import remove_arm, profile_ids_to_univ_ids
 
 
 def get_intersection_matrix(ctl_pools, trt_pools, all_policies, trt_arm_idx):

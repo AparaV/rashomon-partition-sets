@@ -7,7 +7,7 @@ import pandas as pd
 from copy import deepcopy
 from sklearn import linear_model
 
-from rashomon import tva
+from rashomon import hasse
 from rashomon import loss
 from rashomon import metrics
 from rashomon import extract_pools
@@ -78,8 +78,8 @@ if __name__ == "__main__":
     lasso_reg = params.lasso_reg
 
     num_profiles = 2**M
-    profiles, profile_map = tva.enumerate_profiles(M)
-    all_policies = tva.enumerate_policies(M, R)
+    profiles, profile_map = hasse.enumerate_profiles(M)
+    all_policies = hasse.enumerate_policies(M, R)
     num_policies = len(all_policies)
 
     # Simulation parameters and variables
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     pi_pools = {}
     for k, profile in enumerate(profiles):
 
-        policies_temp = [(i, x) for i, x in enumerate(all_policies) if tva.policy_to_profile(x) == profile]
+        policies_temp = [(i, x) for i, x in enumerate(all_policies) if hasse.policy_to_profile(x) == profile]
         unzipped_temp = list(zip(*policies_temp))
         policies_ids_k = list(unzipped_temp[0])
         policies_k = list(unzipped_temp[1])
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     min_dosage_best_policy = metrics.find_min_dosage(true_best, all_policies)
 
     # The transformation matrix for Lasso
-    G = tva.alpha_matrix(all_policies)
+    G = hasse.alpha_matrix(all_policies)
 
     # Simulation results data structure
     method = args.method
@@ -171,7 +171,7 @@ if __name__ == "__main__":
             X, D, y = generate_data(mu, var, n_per_pol, all_policies, pi_policies, M)
             policy_means = loss.compute_policy_means(D, y, num_policies)
             # The dummy matrix for Lasso
-            D_matrix = tva.get_dummy_matrix(D, G, num_policies)
+            D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
 
             #
             # Run Rashomon

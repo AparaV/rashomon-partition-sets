@@ -1,6 +1,6 @@
 import numpy as np
 
-from rashomon import tva
+from rashomon import hasse
 from rashomon import counter
 
 #
@@ -10,7 +10,7 @@ M = 4
 R = np.array([4, 4, 4, 4])
 
 num_profiles = 2**M
-profiles, profile_map = tva.enumerate_profiles(M)
+profiles, profile_map = hasse.enumerate_profiles(M)
 
 # Fix the partitions
 # Profile 0: (0, 0, 0, 0)

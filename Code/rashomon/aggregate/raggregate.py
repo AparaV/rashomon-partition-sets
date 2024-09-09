@@ -7,7 +7,7 @@ from .profile import RAggregate_profile, _brute_RAggregate_profile
 from .utils import find_feasible_sum_subsets
 
 from .. import loss
-from ..tva import enumerate_profiles, enumerate_policies, policy_to_profile
+from ..hasse import enumerate_profiles, enumerate_policies, policy_to_profile
 from ..sets import RashomonSet
 
 

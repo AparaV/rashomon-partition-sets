@@ -4,7 +4,7 @@ from collections import deque
 
 from .. import loss
 from .. import counter
-from ..tva import enumerate_policies, policy_to_profile
+from ..hasse import enumerate_policies, policy_to_profile
 from ..sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 
 from .profile import initialize_sigma
