@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from copy import deepcopy
 
-from rashomon import tva
+from rashomon import hasse
 from rashomon.aggregate import RAggregate
 
 
@@ -170,9 +170,9 @@ if __name__ == "__main__":
     R = np.array([trt_max_dosage, edu_max_dosage, gen_max_dosage, 4, 4, 4, 4])
 
     num_profiles = 2**M
-    profiles, profile_map = tva.enumerate_profiles(M)
+    profiles, profile_map = hasse.enumerate_profiles(M)
 
-    all_policies = tva.enumerate_policies(M, R)
+    all_policies = hasse.enumerate_policies(M, R)
     num_policies = len(all_policies)
 
     policies_profiles = {}
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     policies_ids_profiles = {}
     for k, profile in enumerate(profiles):
 
-        policies_temp = [(i, x) for i, x in enumerate(all_policies) if tva.policy_to_profile(x) == profile]
+        policies_temp = [(i, x) for i, x in enumerate(all_policies) if hasse.policy_to_profile(x) == profile]
         unzipped_temp = list(zip(*policies_temp))
         policies_ids_k = list(unzipped_temp[0])
         policies_k = list(unzipped_temp[1])

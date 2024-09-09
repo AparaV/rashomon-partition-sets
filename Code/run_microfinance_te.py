@@ -5,7 +5,8 @@ import pandas as pd
 
 from copy import deepcopy
 
-from rashomon import tva, loss
+from rashomon import hasse
+from rashomon import loss
 from rashomon.aggregate import find_te_het_partitions, find_feasible_sum_subsets
 from rashomon.sets import RashomonSet
 
@@ -110,9 +111,9 @@ if __name__ == "__main__":
         R = np.array([trt_max_dosage, edu_max_dosage, gen_max_dosage, 4, 4, 4, 4])
 
         num_profiles = 2**M
-        profiles, profile_map = tva.enumerate_profiles(M)
+        profiles, profile_map = hasse.enumerate_profiles(M)
 
-        all_policies = tva.enumerate_policies(M, R)
+        all_policies = hasse.enumerate_policies(M, R)
         num_policies = len(all_policies)
 
         policies_profiles = {}
@@ -120,7 +121,7 @@ if __name__ == "__main__":
         policies_ids_profiles = {}
         for k, profile in enumerate(profiles):
 
-            policies_temp = [(i, x) for i, x in enumerate(all_policies) if tva.policy_to_profile(x) == profile]
+            policies_temp = [(i, x) for i, x in enumerate(all_policies) if hasse.policy_to_profile(x) == profile]
             unzipped_temp = list(zip(*policies_temp))
             policies_ids_k = list(unzipped_temp[0])
             policies_k = list(unzipped_temp[1])
@@ -145,8 +146,8 @@ if __name__ == "__main__":
         # Compute the partitions
         trt_arm_idx = 0
 
-        profiles, profiles_map = tva.enumerate_profiles(M)
-        profiles_x, profiles_x_map = tva.enumerate_profiles(M-1)
+        profiles, profiles_map = hasse.enumerate_profiles(M)
+        profiles_x, profiles_x_map = hasse.enumerate_profiles(M-1)
 
         te_rashomon_profiles = [[]] * len(profiles_x)
 

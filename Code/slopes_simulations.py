@@ -6,7 +6,7 @@ import numpy as np
 
 from copy import deepcopy
 
-from rashomon import tva
+from rashomon import hasse
 from rashomon import extract_pools
 from rashomon.aggregate import RAggregate_slopes
 
@@ -76,8 +76,8 @@ if __name__ == "__main__":
     reg = params.reg
 
     num_profiles = 2**M
-    profiles, profile_map = tva.enumerate_profiles(M)
-    all_policies = tva.enumerate_policies(M, R)
+    profiles, profile_map = hasse.enumerate_profiles(M)
+    all_policies = hasse.enumerate_policies(M, R)
     num_policies = len(all_policies)
 
     # Simulation parameters and variables
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     pi_pools = {}
     for k, profile in enumerate(profiles):
 
-        policies_temp = [(i, x) for i, x in enumerate(all_policies) if tva.policy_to_profile(x) == profile]
+        policies_temp = [(i, x) for i, x in enumerate(all_policies) if hasse.policy_to_profile(x) == profile]
         unzipped_temp = list(zip(*policies_temp))
         policies_ids_k = list(unzipped_temp[0])
         policies_k = list(unzipped_temp[1])

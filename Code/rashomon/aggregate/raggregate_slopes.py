@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression
 from .profile_slopes import RAggregate_profile_slopes
 from .raggregate import find_feasible_combinations, remove_unused_poolings
 
-from ..tva import enumerate_profiles, enumerate_policies, policy_to_profile
+from ..hasse import enumerate_profiles, enumerate_policies, policy_to_profile
 from ..sets import RashomonSet
 
 

@@ -5,7 +5,7 @@ from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 
 from rashomon import loss
-from rashomon import tva
+from rashomon import hasse
 from rashomon import metrics
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
@@ -49,14 +49,14 @@ if __name__ == "__main__":
 
     # Enumerate policies and find pools
     num_policies = np.prod(R-1)
-    profiles, profile_map = tva.enumerate_profiles(M)
-    all_policies = tva.enumerate_policies(M, R)
-    policies = [x for x in all_policies if tva.policy_to_profile(x) == sigma_profile]
+    profiles, profile_map = hasse.enumerate_profiles(M)
+    all_policies = hasse.enumerate_policies(M, R)
+    policies = [x for x in all_policies if hasse.policy_to_profile(x) == sigma_profile]
     pi_pools, pi_policies = extract_pools(policies, sigma)
     num_pools = len(pi_pools)
 
     # The transformation matrix for Lasso
-    G = tva.alpha_matrix(policies)
+    G = hasse.alpha_matrix(policies)
 
     # Set data parameters
     mu = np.array([0, 1.5, 3, 3, 6, 4.5])
@@ -94,7 +94,7 @@ if __name__ == "__main__":
             # Generate data
             X, D, y = generate_data(mu, var, n_per_pol, policies, pi_policies, M)
             # The dummy matrix for Lasso
-            D_matrix = tva.get_dummy_matrix(D, G, num_policies)
+            D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
 
             #

@@ -7,7 +7,7 @@ from .profile import RAggregate_profile, _brute_RAggregate_profile
 from .utils import find_feasible_sum_subsets
 
 from .. import loss
-from ..tva import enumerate_profiles, enumerate_policies, policy_to_profile
+from ..hasse import enumerate_profiles, enumerate_policies, policy_to_profile
 from ..sets import RashomonSet
 
 
@@ -150,25 +150,33 @@ def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.nd
     num_data = D.shape[0]
     if isinstance(R, int):
         R = np.array([R]*M)
+    if isinstance(R, list):
+        raise ValueError("R should be a numpy array or int. Received list.")
 
     # In the best case, every other profile becomes a single pool
     # So max number of pools per profile is adjusted accordingly
     H_profile = H - num_profiles + 1
 
+    # Find which policies belong to which profiles
+    policies_profiles_idx = {}
+    policies_profiles = {}
+    for i, p in enumerate(all_policies):
+        profile_p = policy_to_profile(p)
+        profile_p_id = profile_map[profile_p]
+        try:
+            policies_profiles_idx[profile_p_id].append(i)
+            policies_profiles[profile_p_id].append(p)
+        except KeyError:
+            policies_profiles_idx[profile_p_id] = [i]
+            policies_profiles[profile_p_id] = [p]
+
     # Subset data by profiles and find equiv policy lower bound
     D_profiles = {}
     y_profiles = {}
-    policies_profiles = {}
     policy_means_profiles = {}
     eq_lb_profiles = np.zeros(shape=(num_profiles,))
     for k, profile in enumerate(profiles):
-
-        policies_temp = [(i, x) for i, x in enumerate(all_policies) if policy_to_profile(x) == profile]
-        unzipped_temp = list(zip(*policies_temp))
-        policy_profiles_idx_k = list(unzipped_temp[0])
-        policies_profiles[k] = list(unzipped_temp[1])
-
-        D_k, y_k = subset_data(D, y, policy_profiles_idx_k)
+        D_k, y_k = subset_data(D, y, policies_profiles_idx[k])
         D_profiles[k] = D_k
         y_profiles[k] = y_k
 
@@ -193,6 +201,15 @@ def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.nd
         D_k = D_profiles[k]
         y_k = y_profiles[k]
 
+        if D_k is None:
+            # TODO: Put all possible sigma matrices here and set loss to 0
+            rashomon_profiles[k] = RashomonSet(shape=None)
+            rashomon_profiles[k].P_qe = [None]
+            rashomon_profiles[k].Q = np.array([0])
+            if verbose:
+                print(f"Skipping profile {profile}")
+            continue
+
         policies_k = policies_profiles[k]
         policy_means_k = policy_means_profiles[k]
         profile_mask = list(map(bool, profile))
@@ -202,15 +219,6 @@ def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.nd
             policies_k[idx] = tuple([pol[i] for i in range(M) if profile_mask[i]])
         R_k = R[profile_mask]
         M_k = np.sum(profile)
-
-        if D_k is None:
-            # TODO: Put all possible sigma matrices here and set loss to 0
-            rashomon_profiles[k] = RashomonSet(shape=None)
-            rashomon_profiles[k].P_qe = [None]
-            rashomon_profiles[k].Q = np.array([0])
-            if verbose:
-                print(f"Skipping profile {profile}")
-            continue
 
         # Control group is just one policy
         if verbose:
