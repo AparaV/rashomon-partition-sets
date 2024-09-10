@@ -3,6 +3,8 @@ import numpy as np
 
 from sklearn.metrics import mean_squared_error
 
+from multiprocessing import Pool
+
 from .profile import RAggregate_profile, _brute_RAggregate_profile
 from .utils import find_feasible_sum_subsets
 
@@ -121,8 +123,74 @@ def remove_unused_poolings(R_set: list[list[int]],
     return rashomon_profiles
 
 
+def parallel_worker_RAggregat_profile(profile_k, eq_lb_k, M_k, R_k, H_profile,
+                                      D_k, y_k, theta_k, reg, policies_k,
+                                      policy_means_k, verbose, bruteforce, num_data) -> RashomonSet:
+    """ Parallel worker for RAggregate_profile """
+
+    if D_k is None:
+        rashomon_k = RashomonSet(shape=None)
+        rashomon_k.P_qe = [None]
+        rashomon_k.Q = np.array([0])
+        if verbose:
+            print(f"Skipping profile {profile_k}")
+        return rashomon_k
+
+    # Control group is just one policy
+    if verbose:
+        print(profile_k, theta_k)
+    if M_k == 0 or (len(R_k) == 1 and R_k[0] == 2):
+        rashomon_k = RashomonSet(shape=None)
+        control_loss = eq_lb_k + reg
+        rashomon_k.P_qe = [None]
+        rashomon_k.Q = np.array([control_loss])
+    else:
+        # print(R_k, np.sum(R_k))
+        if not bruteforce:
+            if verbose:
+                print("Adaptive")
+                start = time.time()
+
+            rashomon_k = RAggregate_profile(M_k, R_k, H_profile, D_k, y_k, theta_k, profile_k, reg,
+                                            policies_k, policy_means_k, normalize=num_data)
+            if verbose:
+                end = time.time()
+                elapsed = end - start
+                print(f"Profile {profile_k} took {elapsed} s adaptively")
+
+            # start = time.time()
+            rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg, normalize=num_data)
+            # end = time.time()
+            # elapsed = end - start
+            # print(f"Took {elapsed} s to calculate loss")
+        else:
+            if verbose:
+                print("Brute forcing")
+                start = time.time()
+
+            rashomon_k = _brute_RAggregate_profile(
+                M_k, R_k, H_profile, D_k, y_k, theta_k, profile_k, reg,
+                policies_k, policy_means_k, normalize=num_data)
+
+            if verbose:
+                end = time.time()
+                elapsed = end - start
+                print(f"Profile {profile_k} took {elapsed} s when brute forcing")
+
+    # start = time.time()
+    rashomon_k.sort()
+    # end = time.time()
+    # elapsed = end - start
+    # print(f"Took {elapsed} s to sort")
+    if verbose:
+        print(f"Profile {profile_k} has {len(rashomon_k)} objects in Rashomon set")
+
+    return rashomon_k
+
+
 def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.ndarray,
                theta: float, reg: float = 1, verbose: bool = False,
+               num_workers: int = 1,
                bruteforce: bool = False) -> tuple[list[list[int]], list[RashomonSet]]:
     """
     RPS enumeration algorithm
@@ -136,6 +204,7 @@ def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.nd
     theta (float): Rashomon threshold
     reg (float): Regularization parameter. Defaults to 1
     verbose (bool): Print debug information. Defaults to False
+    num_workers (int): Number of parallel workers. Defaults to 1
     bruteforce (bool): Use brute force instead of adaptive. Defaults to False
 
     Returns:
@@ -192,23 +261,12 @@ def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.nd
     eq_lb_profiles /= num_data
     eq_lb_sum = np.sum(eq_lb_profiles)
 
-    # Now solve each profile independently
-    # This step can be parallelized
-    rashomon_profiles: list[RashomonSet] = [None]*num_profiles
-    feasible = True
+    # Create arguments for parallelization
+    parallel_args = []
     for k, profile in enumerate(profiles):
         theta_k = theta - (eq_lb_sum - eq_lb_profiles[k])
         D_k = D_profiles[k]
         y_k = y_profiles[k]
-
-        if D_k is None:
-            # TODO: Put all possible sigma matrices here and set loss to 0
-            rashomon_profiles[k] = RashomonSet(shape=None)
-            rashomon_profiles[k].P_qe = [None]
-            rashomon_profiles[k].Q = np.array([0])
-            if verbose:
-                print(f"Skipping profile {profile}")
-            continue
 
         policies_k = policies_profiles[k]
         policy_means_k = policy_means_profiles[k]
@@ -220,57 +278,21 @@ def RAggregate(M: int, R: int | np.ndarray[int], H: int, D: np.ndarray, y: np.nd
         R_k = R[profile_mask]
         M_k = np.sum(profile)
 
-        # Control group is just one policy
-        if verbose:
-            print(profile, theta_k)
-        if M_k == 0 or (len(R_k) == 1 and R_k[0] == 2):
-            rashomon_k = RashomonSet(shape=None)
-            control_loss = eq_lb_profiles[k] + reg
-            rashomon_k.P_qe = [None]
-            rashomon_k.Q = np.array([control_loss])
-        else:
-            # print(R_k, np.sum(R_k))
-            if not bruteforce:
-                if verbose:
-                    print("Adaptive")
-                    start = time.time()
+        args_k = (profile, eq_lb_profiles[k], M_k, R_k, H_profile, D_k, y_k, theta_k, reg, policies_k,
+                  policy_means_k, verbose, bruteforce, num_data)
 
-                rashomon_k = RAggregate_profile(M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
-                                                policies_k, policy_means_k, normalize=num_data)
-                if verbose:
-                    end = time.time()
-                    elapsed = end - start
-                    print(f"Took {elapsed} s adaptively")
+        parallel_args.append(args_k)
 
-                # start = time.time()
-                rashomon_k.calculate_loss(D_k, y_k, policies_k, policy_means_k, reg, normalize=num_data)
-                # end = time.time()
-                # elapsed = end - start
-                # print(f"Took {elapsed} s to calculate loss")
-            else:
-                if verbose:
-                    print("Brute forcing")
-                    start = time.time()
+    # Now solve each profile independently
+    rashomon_profiles: list[RashomonSet] = [None]*num_profiles
+    with Pool(num_workers) as p:
+        rashomon_profiles = p.starmap(parallel_worker_RAggregat_profile, parallel_args)
 
-                rashomon_k = _brute_RAggregate_profile(
-                    M_k, R_k, H_profile, D_k, y_k, theta_k, profile, reg,
-                    policies_k, policy_means_k, normalize=num_data)
-
-                if verbose:
-                    end = time.time()
-                    elapsed = end - start
-                    print(f"Took {elapsed} s when brute forcing")
-
-        # start = time.time()
-        rashomon_k.sort()
-        # end = time.time()
-        # elapsed = end - start
-        # print(f"Took {elapsed} s to sort")
-        rashomon_profiles[k] = rashomon_k
-        if verbose:
-            print(len(rashomon_k))
+    feasible = True
+    for rashomon_k in rashomon_profiles:
         if len(rashomon_k) == 0:
             feasible = False
+            break
 
     # Combine solutions in a feasible way
     if verbose:
