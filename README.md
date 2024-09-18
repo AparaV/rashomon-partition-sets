@@ -51,3 +51,8 @@ The NHANES data is obtained from _National Health and Nutrition Examination Surv
 The telomere data is obtained from https://wwwn.cdc.gov/nchs/nhanes/search/datapage.aspx?Component=Laboratory&Cycle=1999-2000 (search for `TELO_A_Data` -- it is an `XPT` file). See https://wwwn.cdc.gov/Nchs/Nhanes/1999-2000/TELO_A.htm for documentation. The other half from 2001-2002 can be obtained similarly from https://wwwn.cdc.gov/nchs/nhanes/search/datapage.aspx?Component=Laboratory&Cycle=2001-2002 (search for `TELO_B_Data` -- it is an `XPT` file). See https://wwwn.cdc.gov/Nchs/Nhanes/2001-2002/TELO_B.htm for documentation.
 
 See `Code/process_nhanes_data.py` for processing the data before consuming it.
+
+
+## Contact
+
+For any questions, please contact Apara Venkat (apara.vnkat@gmail.com) or Tyler McCormick (tylermc@uw.edu). Feel free to also open an issue on GitHub.
