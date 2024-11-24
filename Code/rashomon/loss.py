@@ -70,6 +70,38 @@ def partition_sigma(sigma: np.ndarray, i: int, j: int) -> np.ndarray:
     return sigma_fix
 
 
+def predict(D: np.ndarray, sigma: np.ndarray, policies: list, policy_means: np.ndarray,
+            lattice_edges: list[tuple[int, int]] | None = None,
+            return_num_pools: bool = False) -> np.ndarray:
+    """
+    Predict outcomes based on the given dataset, policies, and partition matrix.
+
+    Arguments:
+    D (np.ndarray): Dataset of shape (N, 2) where N is the number of samples.
+     The first column contains policy indices and the second column contains dosages.
+    sigma (np.ndarray): Partition matrix of shape (P, Q) where P is the number of policies
+        and Q is the number of dosages.
+    policies (list): List of policies.
+    policy_means (np.ndarray): Array of shape (P, 2) where P is the number of policies.
+        The first column contains the sum of outcomes and the second column contains the count of samples.
+    lattice_edges (list[tuple[int, int]] | None): List of edges in the lattice structure,
+        where each edge is a tuple of two integers. Default is None.
+    return_num_pools (bool): Whether to return the number of pools. Default is False.
+
+    Returns:
+    np.ndarray: Predicted outcomes of shape (N,).
+    If return_num_pools is True, returns a tuple of predicted outcomes and the number of pools.
+    """
+    pi_pools, pi_policies = extract_pools(policies, sigma, lattice_edges)
+    mu_pools = compute_pool_means(policy_means, pi_pools)
+    D_pool = [pi_policies[pol_id] for pol_id in D[:, 0]]
+    y_hat = mu_pools[D_pool]
+
+    if return_num_pools:
+        return y_hat, mu_pools.shape[0]
+    return y_hat
+
+
 def compute_B(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, i: int, j: int,
               policies: list, policy_means: np.ndarray, reg: float = 1, normalize: int = 0,
               lattice_edges: list[tuple[int, int]] | None = None) -> float:
@@ -94,13 +126,10 @@ def compute_B(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, i: int, j: int,
 
     # Split maximally in arm i from dosage j
     sigma_fix = partition_sigma(sigma, i, j)
-    pi_fixed_pools, pi_fixed_policies = extract_pools(policies, sigma_fix, lattice_edges)
 
     # Compute squared loss for this maximal split
     # This loss is B minus the regularization term
-    mu_fixed_pools = compute_pool_means(policy_means, pi_fixed_pools)
-    D_pool = [pi_fixed_policies[pol_id] for pol_id in D[:, 0]]
-    mu_D = mu_fixed_pools[D_pool]
+    mu_D = predict(D, sigma_fix, policies, policy_means, lattice_edges)
     mse = mean_squared_error(y[:, 0], mu_D)
 
     if normalize > 0:
@@ -137,21 +166,15 @@ def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
     Q (int): The loss function
     """
 
-    # pi_pools, pi_policies, t1, t2 = extract_pools(policies, sigma, lattice_edges)
-    pi_pools, pi_policies = extract_pools(policies, sigma, lattice_edges)
-    mu_pools = compute_pool_means(policy_means, pi_pools)
-    D_pool = [pi_policies[pol_id] for pol_id in D[:, 0]]
-    mu_D = mu_pools[D_pool]
+    mu_D, h = predict(D, sigma, policies, policy_means, lattice_edges, return_num_pools=True)
     mse = mean_squared_error(y[:, 0], mu_D)
 
     if normalize > 0:
         mse = mse * D.shape[0] / normalize
 
-    h = mu_pools.shape[0]
     Q = mse + reg * h
 
     return Q
-    # return Q, t1, t2
 
 
 def compute_B_slopes(D, X, y, sigma, i, j, policies, reg=1, normalize=0):
