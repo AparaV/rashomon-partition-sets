@@ -2,8 +2,6 @@
 import collections
 import numpy as np
 
-from .hasse import is_policies_sorted
-
 
 def _hasse_index_offsets(M: int, R: np.ndarray) -> list[int]:
     """
@@ -27,7 +25,7 @@ def _hasse_index_offsets(M: int, R: np.ndarray) -> list[int]:
     return offsets
 
 
-def _lattice_edges_memory( M: int, R: np.ndarray | int) -> list[tuple[int,int]]:
+def _lattice_edges_memory(M: int, R: np.ndarray | int) -> list[tuple[int, int]]:
     """
     Enumerate the Hasse adjacencies without having to enumerate policies.
     Identifies indices similar to `_lattice_edges_sorted` but without having to enumerate policies
@@ -43,7 +41,7 @@ def _lattice_edges_memory( M: int, R: np.ndarray | int) -> list[tuple[int,int]]:
     """
     if isinstance(R, int):
         R = np.array([R] * M)
-    
+
     # Compute total number of policies
     total_policies = np.prod(R)
 
@@ -95,7 +93,7 @@ def _lattice_edges_sorted(policies: list, M: int, R: np.ndarray | int) -> list[t
 
     Returns:
         list[tuple[int, int]]: A list of tuples representing the edges in the Hasse diagram.
-    
+
     The function works as follows:
     1. If R is an integer, convert it to an array of length M with all elements equal to R.
     2. Initialize an offsets list with 1s, which will be used to calculate the index offsets for each dimension.
@@ -235,6 +233,32 @@ def connected_components(n: int, edges: list[tuple[int, int]]) -> list[list[int]
     return conn_comps
 
 
+def iterative_connected_components(n: int, edges: list[tuple[int, int]]) -> list[list[int]]:
+    """Iterative BFS to find connected components."""
+    adj = [[] for _ in range(n)]
+    for u, v in edges:
+        adj[u].append(v)
+        adj[v].append(u)
+
+    visited = [False] * n
+    components = []
+
+    for i in range(n):
+        if not visited[i]:
+            queue = [i]
+            visited[i] = True
+            comp = []
+            while queue:
+                node = queue.pop()
+                comp.append(node)
+                for neighbor in adj[node]:
+                    if not visited[neighbor]:
+                        visited[neighbor] = True
+                        queue.append(neighbor)
+            components.append(comp)
+    return components
+
+
 def extract_pools(policies: list, sigma: np.ndarray,
                   lattice_edges: list[tuple[int, int]] = None) -> tuple[
                       dict[int, list[int]], dict[int, int]
@@ -258,16 +282,12 @@ def extract_pools(policies: list, sigma: np.ndarray,
 
     # t0 = time.time()
     if lattice_edges is None:
-        sorted, M, R = False, None, None
-        if is_policies_sorted(policies):
-            sorted = True
-            M, R = len(policies[0]), np.max(policies, axis=0) + 1
         lattice_relations = lattice_adjacencies(sigma, policies)
     else:
         lattice_relations = prune_lattice_edges(sigma, lattice_edges, policies)
-    # t1 = time.time()
-    pools = connected_components(len(policies), lattice_relations)
-    # t2 = time.time()
+
+    pools = iterative_connected_components(len(policies), lattice_relations)
+
     pi_pools = {}
     pi_policies = {}
     for i, pool in enumerate(pools):
@@ -275,7 +295,6 @@ def extract_pools(policies: list, sigma: np.ndarray,
         for policy in pool:
             pi_policies[policy] = i
     return (pi_pools, pi_policies)
-    # return (pi_pools, pi_policies, t1-t0, t2-t1)
 
 
 def __aggregator_universalize_policy_ids__(

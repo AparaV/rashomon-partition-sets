@@ -45,6 +45,10 @@ def RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
     RashomonSet: Set of near-optimal poolings
     """
 
+    # If R is fixed across, make it a list for compatbility later on
+    if isinstance(R, int):
+        R = np.array([R] * M)
+
     if policies is None or policy_means is None:
         all_policies = enumerate_policies(M, R)
         policies = [x for x in all_policies if policy_to_profile(x) == profile]
@@ -58,11 +62,7 @@ def RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
 
     sigma = initialize_sigma(M, R)
     policies_sorted = is_policies_sorted(policies)
-    hasse_edges = lattice_edges(policies, sorted=policies_sorted, M=M, R=R)
-
-    # If R is fixed across, make it a list for compatbility later on
-    if isinstance(R, int):
-        R = [R] * M
+    hasse_edges = lattice_edges(policies, sorted=policies_sorted, M=M, R=R-1)
 
     P_qe = RashomonSet(sigma.shape)
     Q_seen = RashomonProblemCache(sigma.shape)
@@ -192,7 +192,7 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
     # t2_ctr = 0
     # ctr = 0
     policies_sorted = is_policies_sorted(policies)
-    hasse_edges = lattice_edges(policies, sorted=policies_sorted, M=M, R=R)
+    hasse_edges = lattice_edges(policies, sorted=policies_sorted, M=M, R=R-1)
 
     for x in counter.powerset(indices):
         sigma_x = sigma.copy()
