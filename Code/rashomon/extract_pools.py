@@ -2,10 +2,74 @@
 import collections
 import numpy as np
 
+from .hasse import is_policies_sorted
 
-def lattice_edges(policies: list) -> list[tuple[int, int]]:
+
+def _hasse_index_offsets(M: int, R: np.ndarray) -> list[int]:
     """
-    Enumerate the Hasse adjacencies
+    Calculate index offsets for each dimension in the Hasse diagram.
+
+    Args:
+        M (int): The number of dimensions in each policy.
+        R (np.ndarray): An array representing the range of values for each dimension.
+
+    Returns:
+        list[int]: A list of offsets for each dimension.
+    """
+    # Calculate index offsets for each dimension
+    # For the last dimension, the offset is 1.
+    # For the second-to-last dimension, the offset is the size of the last dimension.
+    # For the third-to-last dimension, the offset is the product of the sizes of the last two dimensions.
+    # And so on...
+    offsets = [1] * M
+    for i in reversed(range(M - 1)):
+        offsets[i] = offsets[i + 1] * R[i + 1]
+    return offsets
+
+
+def _lattice_edges_memory( M: int, R: np.ndarray | int) -> list[tuple[int,int]]:
+    """
+    Enumerate the Hasse adjacencies without having to enumerate policies.
+    Identifies indices similar to `_lattice_edges_sorted` but without having to enumerate policies
+    In cases where enumerating policies is expensive, this can be useful.
+    TODO: This is not useful as it is. Need other functionality to traverse policy and index space.
+
+    Args:
+        M (int): The number of dimensions in each policy.
+        R (np.ndarray | int): An array or integer representing the range of values for each dimension.
+
+    Returns:
+        list[tuple[int, int]]: A list of tuples representing the edges in the Hasse diagram.
+    """
+    if isinstance(R, int):
+        R = np.array([R] * M)
+    
+    # Compute total number of policies
+    total_policies = np.prod(R)
+
+    # Precompute offsets
+    offsets = _hasse_index_offsets(M, R)
+
+    edges = []
+    for i in range(total_policies):
+        for d in range(M):
+            neighbor = i + offsets[d]
+            # First check that neighbor is within total range
+            if neighbor < total_policies:
+                # Check if dimension d is not at its boundary
+                block_index = i // offsets[d]
+                # block_base is the start of that dimension's 'block'
+                block_base = (block_index // R[d]) * R[d]
+                # If block_index - block_base < R[d] - 1, we haven't reached the boundary
+                if (block_index - block_base) < (R[d] - 1):
+                    edges.append((i, neighbor))
+
+    return edges
+
+
+def _lattice_edges_default(policies: list) -> list[tuple[int, int]]:
+    """
+    Enumerate the Hasse adjacencies the naive way
     """
     num_policies = len(policies)
     edges = []
@@ -18,6 +82,62 @@ def lattice_edges(policies: list) -> list[tuple[int, int]]:
             if diff == 1:
                 edges.append((i, j))
     return edges
+
+
+def _lattice_edges_sorted(policies: list, M: int, R: np.ndarray | int) -> list[tuple[int, int]]:
+    """
+    Enumerate the Hasse adjacencies quickly using the fact that the policies are sorted.
+
+    Args:
+        policies (list): A list of policies, where each policy is represented as a list of integers.
+        M (int): The number of dimensions in each policy.
+        R (np.ndarray | int): An array or integer representing the range of values for each dimension.
+
+    Returns:
+        list[tuple[int, int]]: A list of tuples representing the edges in the Hasse diagram.
+    
+    The function works as follows:
+    1. If R is an integer, convert it to an array of length M with all elements equal to R.
+    2. Initialize an offsets list with 1s, which will be used to calculate the index offsets for each dimension.
+    3. Calculate the offsets for each dimension in reverse order.
+    4. Iterate over each policy and each dimension to find the edges in the Hasse diagram.
+    5. If the value of the current dimension is less than the maximum value (R[d] - 1), add an edge to the edges list.
+    """
+    if isinstance(R, int):
+        R = np.array([R] * M)
+
+    offsets = _hasse_index_offsets(M, R)
+
+    edges = []
+    for i, pol in enumerate(policies):
+        for d in range(M):
+            if pol[d] < R[d] - 1:
+                edges.append((i, i + offsets[d]))
+    return edges
+
+
+def lattice_edges(policies: list, **kwargs) -> list[tuple[int, int]]:
+    """
+    Enumerate the Hasse adjacencies for a given list of policies.
+
+    Parameters:
+    policies (list): A list of policies where each policy is represented as a list or array.
+    **kwargs: Additional keyword arguments.
+        sorted (bool): If True, use the sorted method for lattice edge enumeration. Default is False.
+        M (int): The length of each policy. Required if sorted is True.
+        R (array-like): The maximum values for each dimension of the policies. Required if sorted is True.
+
+    Returns:
+    list[tuple[int, int]]: A list of tuples representing the edges in the Hasse diagram.
+    """
+    sorted = kwargs.get("sorted", False)
+    if sorted:
+        M = kwargs.get("M", None)
+        R = kwargs.get("R", None)
+        if M is None or R is None:
+            raise ValueError("M and R are required when sorted is True.")
+        return _lattice_edges_sorted(policies, M, R)
+    return _lattice_edges_default(policies)
 
 
 def lattice_adjacencies(sigma: np.ndarray, policies: int) -> list[tuple[int, int]]:
@@ -138,6 +258,10 @@ def extract_pools(policies: list, sigma: np.ndarray,
 
     # t0 = time.time()
     if lattice_edges is None:
+        sorted, M, R = False, None, None
+        if is_policies_sorted(policies):
+            sorted = True
+            M, R = len(policies[0]), np.max(policies, axis=0) + 1
         lattice_relations = lattice_adjacencies(sigma, policies)
     else:
         lattice_relations = prune_lattice_edges(sigma, lattice_edges, policies)

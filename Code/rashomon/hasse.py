@@ -63,6 +63,13 @@ def enumerate_profiles(M: int) -> tuple[list, dict[tuple, int]]:
     return profiles, profile_map
 
 
+def is_policies_sorted(policies: list) -> bool:
+    """
+    Returns True if policies is sorted in ascending order, False otherwise.
+    """
+    return all(policies[i] <= policies[i+1] for i in range(len(policies) - 1))
+
+
 def policy_to_profile(policy: tuple) -> tuple:
     """ Identifies the profile that the feature belongs to """
     profile = tuple([int(x > 0) for x in policy])

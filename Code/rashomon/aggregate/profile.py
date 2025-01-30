@@ -4,7 +4,7 @@ from collections import deque
 
 from .. import loss
 from .. import counter
-from ..hasse import enumerate_policies, policy_to_profile
+from ..hasse import enumerate_policies, policy_to_profile, is_policies_sorted
 from ..sets import RashomonSet, RashomonProblemCache, RashomonSubproblemCache
 from ..extract_pools import lattice_edges
 
@@ -57,7 +57,8 @@ def RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
         return P_qe
 
     sigma = initialize_sigma(M, R)
-    hasse_edges = lattice_edges(policies)
+    policies_sorted = is_policies_sorted(policies)
+    hasse_edges = lattice_edges(policies, sorted=policies_sorted, M=M, R=R)
 
     # If R is fixed across, make it a list for compatbility later on
     if isinstance(R, int):
@@ -190,8 +191,8 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
     # t1_ctr = 0
     # t2_ctr = 0
     # ctr = 0
-
-    hasse_edges = lattice_edges(policies)
+    policies_sorted = is_policies_sorted(policies)
+    hasse_edges = lattice_edges(policies, sorted=policies_sorted, M=M, R=R)
 
     for x in counter.powerset(indices):
         sigma_x = sigma.copy()
