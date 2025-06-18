@@ -2,13 +2,14 @@ import numpy as np
 from rashomon import hasse, counter
 
 
-def create_simulation_params(M, R_vals):
+def create_simulation_params(M, R_vals, seed):
     """
     Create simulation parameters for given M and R values
     Args:
         M: Number of features
         R_vals: Array of factor levels per feature (e.g., [4, 4, 4, 4])
     """
+    np.random.seed(seed)
 
     # Generate all profiles
     num_profiles = 2**M
@@ -39,7 +40,7 @@ def create_simulation_params(M, R_vals):
 
         if i == target_profile_idx:  # All features active profile
             m = np.sum(profile)
-            sigma_i = np.ones(shape=(m, R_vals[0]-2))  # All splits active
+            sigma_i = np.random.binomial(1, 0.5, size=(m, R_vals[0]-2))  # Bernoulli(0.5) splits
 
             # Create heterogeneous effects
             num_pools = counter.num_pools(sigma_i)
@@ -50,7 +51,7 @@ def create_simulation_params(M, R_vals):
             # Other profiles get simpler structure
             m = np.sum(profile)
             if m > 0:
-                sigma_i = np.ones(shape=(m, R_vals[0]-2))
+                sigma_i = np.random.binomial(1, 0.5, size=(m, R_vals[0]-2))  # Bernoulli(0.5) splits
                 mu_i = np.array([np.random.uniform(1, 3)])
                 var_i = np.array([1.0])
             else:

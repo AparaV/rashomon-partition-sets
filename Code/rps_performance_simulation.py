@@ -252,13 +252,14 @@ def run_parameter_sweep():
 
     results = []
 
-    for M in M_values:
-        for R_val in R_values:
+    for i, M in enumerate(M_values):
+        for j, R_val in enumerate(R_values):
             print(f"Running simulations for M={M}, R={R_val}")
 
             # Create parameters
+            seed = i * len(R_values) + j  # Unique seed for each (M, R) combination
             R_array = np.array([R_val] * M)
-            params = create_simulation_params(M, R_array)
+            params = create_simulation_params(M, R_array, seed)
 
             # Calculate base H needed
             base_H = params['H']
