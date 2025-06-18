@@ -328,11 +328,13 @@ def run_parameter_sweep():
     n_data_generations = 20  # Number of random data generations (10-100 as requested)
     n_per_policy = 30  # Samples per policy
 
-    results = []
 
     # for i, M in enumerate(M_values):
     #     for j, R_val in enumerate(R_values):
     for i, M_R_set in enumerate(M_R_values):
+
+        results = []
+
         M = M_R_set[0]  # Extract M from the first tuple
         R_val = M_R_set[1]  # Extract R from the second tuple
         print(f"Running simulations for M={M}, R={R_val}")
@@ -395,12 +397,12 @@ def run_parameter_sweep():
             if (seed + 1) % 10 == 0:
                 print(f"  Completed {seed + 1}/{n_data_generations} data generations")
 
-    # Save results
-    df = pd.DataFrame(results)
-    dir = "../Results/timed_sims/"
-    os.makedirs(dir, exist_ok=True)
-    df.to_csv(f"{dir}rps_performance_results.csv", index=False)
-    print(f"Simulation complete. Results saved to {dir}rps_performance_results.csv")
+        # Save results
+        df = pd.DataFrame(results)
+        dir = "../Results/timed_sims/"
+        os.makedirs(dir, exist_ok=True)
+        df.to_csv(f"{dir}rps_performance_results_{M}_{R_val}.csv", index=False)
+        print(f"Simulation complete. Results saved to {dir}rps_performance_results_{M}_{R_val}.csv")
 
     return df
 
