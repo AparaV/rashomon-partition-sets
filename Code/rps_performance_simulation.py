@@ -21,7 +21,7 @@ def compute_pool_matching_error(rps_pools: np.ndarray, gt_pools: np.ndarray,
         # Single pool case - direct comparison
         return abs(rps_pools[0] - gt_pools[0])    # Multi-pool case: find best matching by checking all permutations
     # For small number of pools, this is feasible
-    
+
     # Get pool IDs
     rps_pool_ids = list(pi_pools_rps.keys())
     gt_pool_ids = list(pi_pools_gt.keys())
@@ -141,8 +141,8 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
         else:
             # Different partition structure - compute loss difference
             # Compare losses rather than means
-            true_loss = loss.compute_loss(D, y, len(target_policies), pi_pools_true, mu_true, reg)
-            rps_loss = loss.compute_loss(D, y, len(target_policies), pi_pools_rps, pool_means_rps, reg)
+            true_loss = loss.compute_Q(D, y, sigma_true, target_policies, policy_means, reg)
+            rps_loss = loss.compute_Q(D, y, rps_sigma, target_policies, policy_means, reg)
             error = abs(rps_loss - true_loss)
 
         errors.append(error)
