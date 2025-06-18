@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import time
-import itertools
 from typing import Dict
 import os
 
@@ -10,56 +9,10 @@ from rashomon import hasse, loss, extract_pools
 from rps_simulation_params import create_simulation_params
 
 
-def compute_pool_matching_error(rps_pools: np.ndarray, gt_pools: np.ndarray,
-                                pi_pools_rps: Dict, pi_pools_gt: Dict) -> float:
+def generate_ground_truth_data(params: Dict, data_gen_seed: int, n_per_policy: int = 50) -> Dict:
     """
-    Compute error between pool means by matching pools based on policy membership
-    """
-    if len(rps_pools) != len(gt_pools):
-        return float('inf')
-
-    if len(rps_pools) == 1:
-        # Single pool case - direct comparison
-        return abs(rps_pools[0] - gt_pools[0])    # Multi-pool case: find best matching by checking all permutations
-    # For small number of pools, this is feasible
-
-    # Get pool IDs
-    rps_pool_ids = list(pi_pools_rps.keys())
-    gt_pool_ids = list(pi_pools_gt.keys())
-
-    min_error = float('inf')
-
-    # Try all possible assignments
-    for gt_perm in itertools.permutations(gt_pool_ids):
-        total_error = 0.0
-        valid_assignment = True
-
-        for i, rps_pool_id in enumerate(rps_pool_ids):
-            gt_pool_id = gt_perm[i]
-
-            # Check if pools contain same policies
-            rps_policy_set = set(pi_pools_rps[rps_pool_id])
-            gt_policy_set = set(pi_pools_gt[gt_pool_id])
-
-            if rps_policy_set == gt_policy_set:
-                # Pools match - add error
-                total_error += abs(rps_pools[rps_pool_id] - gt_pools[gt_pool_id])
-            else:
-                # Pools don't match - invalid assignment
-                valid_assignment = False
-                break
-
-        if valid_assignment:
-            avg_error = total_error / len(rps_pools)
-            min_error = min(min_error, avg_error)
-
-    return min_error
-
-
-def run_single_simulation(params: Dict, H_val: int, epsilon: float,
-                          data_gen_seed: int, n_per_policy: int = 50) -> Dict:
-    """
-    Run a single simulation with given parameters
+    Generate ground truth data for a given M, R, and seed.
+    This is independent of H and epsilon values.
     """
     np.random.seed(data_gen_seed)
 
@@ -105,6 +58,45 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
 
         idx_ctr += 1
 
+    # Map true beta (pool means) to each policy/feature
+    true_beta = np.zeros(len(target_policies))
+    for policy_idx, policy in enumerate(target_policies):
+        pool_id = pi_policies_true[policy_idx]
+        true_beta[policy_idx] = mu_true[pool_id]
+
+    return {
+        'M': M,
+        'R': R,
+        'target_policies': target_policies,
+        'target_profile': target_profile,
+        'sigma_true': sigma_true,
+        'mu_true': mu_true,
+        'var_true': var_true,
+        'pi_pools_true': pi_pools_true,
+        'pi_policies_true': pi_policies_true,
+        'true_beta': true_beta,
+        'X': X,
+        'D': D,
+        'y': y,
+        'seed': data_gen_seed,
+        'n_per_policy': n_per_policy
+    }
+
+
+def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float) -> Dict:
+    """
+    Evaluate RPS algorithm performance on pre-generated ground truth data
+    """
+    # Extract ground truth data
+    M = ground_truth_data['M']
+    R = ground_truth_data['R']
+    target_policies = ground_truth_data['target_policies']
+    target_profile = ground_truth_data['target_profile']
+    sigma_true = ground_truth_data['sigma_true']
+    true_beta = ground_truth_data['true_beta']
+    D = ground_truth_data['D']
+    y = ground_truth_data['y']
+
     # Time RPS algorithm (adaptive/clever version)
     theta = epsilon  # Use epsilon as Rashomon threshold
     reg = 0.1
@@ -124,24 +116,18 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
 
     # Compute proper Bayesian posterior approximation error
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
-    
-    # Step 1: Map true beta (pool means) to each policy/feature
-    true_beta = np.zeros(len(target_policies))
-    for policy_idx, policy in enumerate(target_policies):
-        pool_id = pi_policies_true[policy_idx]
-        true_beta[policy_idx] = mu_true[pool_id]
-    
+
     # Compute Q values for all partitions in RPS
     rps_q_values = []
     rps_betas = []
-    
+
     for rps_idx in range(len(rashomon_set)):
         rps_sigma = rashomon_set.sigma[rps_idx]
-        
-        # Step 1: Get RPS pool means and map to policies
+
+        # Get RPS pool means and map to policies
         pi_pools_rps, _ = extract_pools.extract_pools(target_policies, rps_sigma)
         pool_means_rps = loss.compute_pool_means(policy_means, pi_pools_rps)
-        
+
         # Map pool means to each policy
         rps_beta = np.zeros(len(target_policies))
         for policy_idx, policy in enumerate(target_policies):
@@ -150,52 +136,53 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
                 if policy_idx in pool_policies:
                     rps_beta[policy_idx] = pool_means_rps[pool_id]
                     break
-        
+
         rps_betas.append(rps_beta)
-        
+
         # Compute Q value for this partition
         q_value = loss.compute_Q(D, y, rps_sigma, target_policies, policy_means, reg)
         rps_q_values.append(q_value)
-    
+
     # Step 2: Compute RPS posterior approximation using softmax weights
     rps_q_values = np.array(rps_q_values)
     # Use negative Q values for softmax (lower Q = higher probability)
     weights = np.exp(-rps_q_values)
     weights = weights / np.sum(weights)  # Normalize to get probabilities
-    
+
     # Step 3: Compute posterior mean beta as weighted average
     posterior_beta = np.zeros(len(target_policies))
     for i, beta in enumerate(rps_betas):
         posterior_beta += weights[i] * beta
-    
+
     # Step 4: Compute L2 norm of difference
     error = np.linalg.norm(true_beta - posterior_beta, ord=2)
-    
+
     return {
         'M': M,
         'R_val': R[0],
         'H': H_val,
         'epsilon': epsilon,
-        'seed': data_gen_seed,
-        'n_per_policy': n_per_policy,
+        'seed': ground_truth_data['seed'],
+        'n_per_policy': ground_truth_data['n_per_policy'],
         'rps_time': rps_time,
         'num_rps_partitions': len(rashomon_set),
         'found_true_partition': int(any(np.array_equal(sigma, sigma_true) for sigma in rashomon_set.sigma)),
-        'posterior_beta_error': error,  # L2 norm error of posterior approximation
-        'num_unique_betas': len(np.unique([tuple(beta) for beta in rps_betas])),  # Number of unique beta vectors
-        'posterior_entropy': -np.sum(weights * np.log(weights + 1e-10))  # Entropy of posterior weights
+        'posterior_beta_error': error,
+        'num_unique_betas': len(np.unique([tuple(beta) for beta in rps_betas])),
+        'posterior_entropy': -np.sum(weights * np.log(weights + 1e-10))
     }
 
 
 def run_parameter_sweep():
     """
-    Main function to run the parameter sweep simulation
+    Main function to run the parameter sweep simulation using efficient approach:
+    Generate ground truth data once per (M, R, seed) and reuse for all H and epsilon
     """
     # Parameter ranges
-    M_values = [3, 4] #, 5]  # Number of features
-    R_values = [3, 4] #, 5]  # Factor levels (uniform across features)
-    H_multipliers = [1.0, 1.5] #, 2.0]  # Multipliers for H relative to minimum needed
-    epsilon_values = [10] #, 1.0, 1.5]  # Rashomon thresholds
+    M_values = [3, 4]  # , 5]  # Number of features
+    R_values = [3, 4]  # , 5]  # Factor levels (uniform across features)
+    H_multipliers = [1.0, 1.5]  # , 2.0]  # Multipliers for H relative to minimum needed
+    epsilon_values = [10]  # , 1.0, 1.5]  # Rashomon thresholds
 
     # Simulation settings
     n_data_generations = 2  # Number of random data generations (10-100 as requested)
@@ -214,26 +201,29 @@ def run_parameter_sweep():
             # Calculate base H needed
             base_H = params['H']
 
-            for H_mult in H_multipliers:
-                H_val = int(base_H * H_mult)
+            # Generate ground truth data once per (M, R, seed)
+            for seed in range(n_data_generations):
+                print(f"  Generating ground truth data for seed {seed}")
+                
+                # Generate ground truth data once for this (M, R, seed)
+                ground_truth_data = generate_ground_truth_data(params, seed, n_per_policy)
+                
+                # Now evaluate RPS for all H and epsilon combinations using this ground truth
+                for H_mult in H_multipliers:
+                    H_val = int(base_H * H_mult)
 
-                for epsilon in epsilon_values:
-                    print(f"  H={H_val}, epsilon={epsilon}")
+                    for epsilon in epsilon_values:
+                        print(f"    Evaluating H={H_val}, epsilon={epsilon}")
 
-                    # Run multiple data generations
-                    for seed in range(n_data_generations):
-                        # try:
-                        result = run_single_simulation(
-                            params, H_val, epsilon, seed, n_per_policy
-                        )
-                        results.append(result)
+                        try:
+                            result = evaluate_rps_performance(ground_truth_data, H_val, epsilon)
+                            results.append(result)
+                        except Exception as e:
+                            print(f"      Error in H={H_val}, epsilon={epsilon}: {e}")
+                            continue
 
-                        if (seed + 1) % 10 == 0:
-                            print(f"    Completed {seed + 1}/{n_data_generations} generations")
-
-                        # except Exception as e:
-                        #     print(f"    Error in seed {seed}: {e}")
-                        #     continue
+                if (seed + 1) % 10 == 0:
+                    print(f"  Completed {seed + 1}/{n_data_generations} data generations")
 
     # Save results
     df = pd.DataFrame(results)
