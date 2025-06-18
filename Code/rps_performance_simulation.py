@@ -2,68 +2,11 @@ import numpy as np
 import pandas as pd
 import time
 import itertools
-from typing import Dict, List
+from typing import Dict
 
 from rashomon.aggregate import RAggregate_profile
-from rashomon import hasse, loss, extract_pools, counter
+from rashomon import hasse, loss, extract_pools
 from rps_simulation_params import create_simulation_params
-
-
-def enumerate_all_partitions_brute_force(M: int, R: np.ndarray, H: int,
-                                         profile: tuple, policies: list) -> List[np.ndarray]:
-    """
-    Enumerate ALL possible partitions for a given profile to compute ground truth
-    """
-    if np.sum(profile) == 0:  # Baseline profile
-        return [None]
-
-    # Get active features count
-    m = np.sum(profile)
-
-    # Initialize sigma matrix
-    sigma_base = np.ones(shape=(m, R[0]-2))
-
-    # Get all possible binary combinations for sigma matrix
-    indices_raw = np.where(sigma_base == 1)
-    idx_rows = indices_raw[0]
-    idx_cols = indices_raw[1]
-    indices = [(idx_rows[i], idx_cols[i]) for i in range(len(idx_rows))]
-
-    all_partitions = []
-
-    # Enumerate all possible combinations (powerset)
-    for subset in itertools.chain.from_iterable(
-        itertools.combinations(indices, r) for r in range(len(indices) + 1)
-    ):
-        sigma_candidate = sigma_base.copy()
-        for i, j in subset:
-            sigma_candidate[i, j] = 0
-
-        # Check if partition has <= H pools
-        if counter.num_pools(sigma_candidate) <= H:
-            all_partitions.append(sigma_candidate.copy())
-
-    return all_partitions
-
-
-def compute_ground_truth_pool_means(all_partitions: List[np.ndarray],
-                                    policies: list, D: np.ndarray, y: np.ndarray) -> Dict:
-    """
-    Compute pool means for all possible partitions (ground truth)
-    """
-    ground_truth = {}
-    policy_means = loss.compute_policy_means(D, y, len(policies))
-
-    for idx, sigma in enumerate(all_partitions):
-        if sigma is None:
-            # Single pool case - store as array for consistency
-            ground_truth[idx] = np.array([np.mean(y)])
-        else:
-            pi_pools, pi_policies = extract_pools.extract_pools(policies, sigma)
-            pool_means = loss.compute_pool_means(policy_means, pi_pools)
-            ground_truth[idx] = pool_means  # This is already an np.ndarray
-
-    return ground_truth
 
 
 def compute_pool_matching_error(rps_pools: np.ndarray, gt_pools: np.ndarray,
@@ -76,12 +19,9 @@ def compute_pool_matching_error(rps_pools: np.ndarray, gt_pools: np.ndarray,
 
     if len(rps_pools) == 1:
         # Single pool case - direct comparison
-        return abs(rps_pools[0] - gt_pools[0])
-
-    # Multi-pool case: find best matching by checking all permutations
+        return abs(rps_pools[0] - gt_pools[0])    # Multi-pool case: find best matching by checking all permutations
     # For small number of pools, this is feasible
-    import itertools
-
+    
     # Get pool IDs
     rps_pool_ids = list(pi_pools_rps.keys())
     gt_pool_ids = list(pi_pools_gt.keys())
@@ -164,10 +104,6 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
 
         idx_ctr += 1
 
-    # Enumerate all possible partitions (ground truth)
-    all_partitions = enumerate_all_partitions_brute_force(M, R, H_val, target_profile, target_policies)
-    ground_truth_pools = compute_ground_truth_pool_means(all_partitions, target_policies, D, y)
-
     # Time RPS algorithm (adaptive/clever version)
     theta = epsilon  # Use epsilon as Rashomon threshold
     reg = 0.1
@@ -185,7 +121,7 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
     )
     rps_time = time.time() - start_time
 
-    # Compute absolute errors in pool means
+    # Compute absolute errors in pool means compared to ground truth
     errors = []
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
 
@@ -196,23 +132,20 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
         pi_pools_rps, _ = extract_pools.extract_pools(target_policies, rps_sigma)
         pool_means_rps = loss.compute_pool_means(policy_means, pi_pools_rps)
 
-        # Find closest ground truth partition and compute error
-        min_error = float('inf')
-        for gt_idx, gt_pool_means in ground_truth_pools.items():
-            if len(pool_means_rps) == len(gt_pool_means):
-                gt_sigma = all_partitions[gt_idx]
-                if gt_sigma is None:
-                    # Single pool case - both are arrays with one element
-                    error = abs(pool_means_rps[0] - gt_pool_means[0])
-                else:
-                    # Multi-pool case - need proper matching
-                    pi_pools_gt, _ = extract_pools.extract_pools(target_policies, gt_sigma)
-                    error = compute_pool_matching_error(
-                        pool_means_rps, gt_pool_means, pi_pools_rps, pi_pools_gt
-                    )
-                min_error = min(min_error, error)
+        # Compare against the true partition that generated the data
+        if np.array_equal(rps_sigma, sigma_true):
+            # Found the exact true partition - compare pool means directly
+            error = compute_pool_matching_error(
+                pool_means_rps, mu_true, pi_pools_rps, pi_pools_true
+            )
+        else:
+            # Different partition structure - compute loss difference
+            # Compare losses rather than means
+            true_loss = loss.compute_loss(D, y, len(target_policies), pi_pools_true, mu_true, reg)
+            rps_loss = loss.compute_loss(D, y, len(target_policies), pi_pools_rps, pool_means_rps, reg)
+            error = abs(rps_loss - true_loss)
 
-        errors.append(min_error)
+        errors.append(error)
 
     return {
         'M': M,
@@ -223,10 +156,10 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
         'n_per_policy': n_per_policy,
         'rps_time': rps_time,
         'num_rps_partitions': len(rashomon_set),
-        'num_total_partitions': len(all_partitions),
-        'mean_pool_error': np.mean(errors) if errors else 0.0,
-        'max_pool_error': np.max(errors) if errors else 0.0,
-        'min_pool_error': np.min(errors) if errors else 0.0
+        'found_true_partition': int(any(np.array_equal(sigma, sigma_true) for sigma in rashomon_set.sigma)),
+        'mean_error_vs_truth': np.mean(errors) if errors else 0.0,
+        'max_error_vs_truth': np.max(errors) if errors else 0.0,
+        'min_error_vs_truth': np.min(errors) if errors else 0.0
     }
 
 
