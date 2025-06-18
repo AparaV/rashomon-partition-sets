@@ -4,7 +4,7 @@ import time
 import itertools
 from typing import Dict, List
 
-from rashomon.aggregate import _brute_RAggregate_profile
+from rashomon.aggregate import RAggregate_profile
 from rashomon import hasse, loss, extract_pools, counter
 from rps_simulation_params import create_simulation_params
 
@@ -168,11 +168,11 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
     all_partitions = enumerate_all_partitions_brute_force(M, R, H_val, target_profile, target_policies)
     ground_truth_pools = compute_ground_truth_pool_means(all_partitions, target_policies, D, y)
 
-    # Time RPS algorithm
+    # Time RPS algorithm (adaptive/clever version)
     theta = epsilon  # Use epsilon as Rashomon threshold
     reg = 0.1
     start_time = time.time()
-    rashomon_set = _brute_RAggregate_profile(
+    rashomon_set = RAggregate_profile(
         M=np.sum(target_profile),
         R=int(R[0]),  # Assuming uniform R
         H=H_val,
