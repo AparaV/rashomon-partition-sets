@@ -105,7 +105,7 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     all_partitions_set = RAggregate_profile(
         M=np.sum(target_profile),
         R=int(R[0]),  # Assuming uniform R
-        H=H_val,
+        H=np.inf,
         D=D,
         y=y,
         theta=np.inf,  # Set to infinity to get ALL partitions
@@ -147,6 +147,7 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     # Step 3: Compute posterior probabilities using e^Q_i / sum(e^Q_j)
     # Note: We use negative Q values since lower Q = better fit = higher probability
     posterior_weights = np.exp(-all_q_values)
+    norm_constant = np.sum(posterior_weights)
     posterior_weights = posterior_weights / np.sum(posterior_weights)
     
     # Step 4: Find MAP partition (highest posterior probability)
@@ -193,8 +194,7 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     # Compute RPS posterior weights (subset of all posterior weights)
     rps_q_values = np.array(rps_q_values)
     rps_weights = np.exp(-rps_q_values)
-    norm_constant = np.sum(rps_weights)
-    rps_weights = rps_weights / norm_constant  # Renormalize within RPS
+    rps_weights = rps_weights / np.sum(rps_weights)  # Renormalize within RPS
     
     # Compute RPS posterior mean beta as weighted average
     rps_posterior_beta = np.zeros(len(target_policies))
@@ -242,7 +242,7 @@ def run_parameter_sweep():
     """
     # Parameter ranges
     M_values = [3, 4]  # , 5]  # Number of features
-    R_values = [3, 4]  # , 5]  # Factor levels (uniform across features)
+    R_values = [3]  # , 5]  # Factor levels (uniform across features)
     H_multipliers = [1.0, 1.5]  # , 2.0]  # Multipliers for H relative to minimum needed
     epsilon_values = [0.0, 0.1, 0.5]  # Multipliers for theta = q_0 * (1 + epsilon)
 
