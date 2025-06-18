@@ -4,7 +4,7 @@ import time
 from typing import Dict
 import os
 
-from rashomon.aggregate import RAggregate_profile
+from rashomon.aggregate import RAggregate_profile, _brute_RAggregate_profile
 from rashomon import hasse, loss, extract_pools
 from rps_simulation_params import create_simulation_params
 
@@ -102,7 +102,7 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     # Step 1: Find Q for ALL possible partitions using brute force with theta = infinity
     print("    Computing Q values for all partitions...")
     start_time = time.time()
-    all_partitions_set = RAggregate_profile(
+    all_partitions_set = _brute_RAggregate_profile(
         M=np.sum(target_profile),
         R=int(R[0]),  # Assuming uniform R
         H=np.inf,

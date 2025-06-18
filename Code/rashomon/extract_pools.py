@@ -128,13 +128,14 @@ def lattice_edges(policies: list, **kwargs) -> list[tuple[int, int]]:
     Returns:
     list[tuple[int, int]]: A list of tuples representing the edges in the Hasse diagram.
     """
-    sorted = kwargs.get("sorted", False)
-    if sorted:
-        M = kwargs.get("M", None)
-        R = kwargs.get("R", None)
-        if M is None or R is None:
-            raise ValueError("M and R are required when sorted is True.")
-        return _lattice_edges_sorted(policies, M, R)
+    # This does not work. TODO: Fix it.
+    # sorted = kwargs.get("sorted", False)
+    # if sorted:
+    #     M = kwargs.get("M", None)
+    #     R = kwargs.get("R", None)
+    #     if M is None or R is None:
+    #         raise ValueError("M and R are required when sorted is True.")
+    #     return _lattice_edges_sorted(policies, M, R)
     return _lattice_edges_default(policies)
 
 
