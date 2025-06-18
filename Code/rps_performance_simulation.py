@@ -56,13 +56,63 @@ def compute_ground_truth_pool_means(all_partitions: List[np.ndarray],
 
     for idx, sigma in enumerate(all_partitions):
         if sigma is None:
-            ground_truth[idx] = {0: np.mean(y)}
+            # Single pool case - store as array for consistency
+            ground_truth[idx] = np.array([np.mean(y)])
         else:
             pi_pools, pi_policies = extract_pools.extract_pools(policies, sigma)
             pool_means = loss.compute_pool_means(policy_means, pi_pools)
-            ground_truth[idx] = pool_means
+            ground_truth[idx] = pool_means  # This is already an np.ndarray
 
     return ground_truth
+
+
+def compute_pool_matching_error(rps_pools: np.ndarray, gt_pools: np.ndarray,
+                                pi_pools_rps: Dict, pi_pools_gt: Dict) -> float:
+    """
+    Compute error between pool means by matching pools based on policy membership
+    """
+    if len(rps_pools) != len(gt_pools):
+        return float('inf')
+
+    if len(rps_pools) == 1:
+        # Single pool case - direct comparison
+        return abs(rps_pools[0] - gt_pools[0])
+
+    # Multi-pool case: find best matching by checking all permutations
+    # For small number of pools, this is feasible
+    import itertools
+
+    # Get pool IDs
+    rps_pool_ids = list(pi_pools_rps.keys())
+    gt_pool_ids = list(pi_pools_gt.keys())
+
+    min_error = float('inf')
+
+    # Try all possible assignments
+    for gt_perm in itertools.permutations(gt_pool_ids):
+        total_error = 0.0
+        valid_assignment = True
+
+        for i, rps_pool_id in enumerate(rps_pool_ids):
+            gt_pool_id = gt_perm[i]
+
+            # Check if pools contain same policies
+            rps_policy_set = set(pi_pools_rps[rps_pool_id])
+            gt_policy_set = set(pi_pools_gt[gt_pool_id])
+
+            if rps_policy_set == gt_policy_set:
+                # Pools match - add error
+                total_error += abs(rps_pools[rps_pool_id] - gt_pools[gt_pool_id])
+            else:
+                # Pools don't match - invalid assignment
+                valid_assignment = False
+                break
+
+        if valid_assignment:
+            avg_error = total_error / len(rps_pools)
+            min_error = min(min_error, avg_error)
+
+    return min_error
 
 
 def run_single_simulation(params: Dict, H_val: int, epsilon: float,
@@ -121,11 +171,10 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
     # Time RPS algorithm
     theta = epsilon  # Use epsilon as Rashomon threshold
     reg = 0.1
-
     start_time = time.time()
     rashomon_set = _brute_RAggregate_profile(
         M=np.sum(target_profile),
-        R=R[0],  # Assuming uniform R
+        R=int(R[0]),  # Assuming uniform R
         H=H_val,
         D=D,
         y=y,
@@ -151,10 +200,16 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
         min_error = float('inf')
         for gt_idx, gt_pool_means in ground_truth_pools.items():
             if len(pool_means_rps) == len(gt_pool_means):
-                # Compute absolute error between pool means
-                rps_means = np.array(list(pool_means_rps.values()))
-                gt_means = np.array(list(gt_pool_means.values()))
-                error = np.mean(np.abs(rps_means - gt_means))
+                gt_sigma = all_partitions[gt_idx]
+                if gt_sigma is None:
+                    # Single pool case - both are arrays with one element
+                    error = abs(pool_means_rps[0] - gt_pool_means[0])
+                else:
+                    # Multi-pool case - need proper matching
+                    pi_pools_gt, _ = extract_pools.extract_pools(target_policies, gt_sigma)
+                    error = compute_pool_matching_error(
+                        pool_means_rps, gt_pool_means, pi_pools_rps, pi_pools_gt
+                    )
                 min_error = min(min_error, error)
 
         errors.append(min_error)
@@ -210,18 +265,18 @@ def run_parameter_sweep():
 
                     # Run multiple data generations
                     for seed in range(n_data_generations):
-                        try:
-                            result = run_single_simulation(
-                                params, H_val, epsilon, seed, n_per_policy
-                            )
-                            results.append(result)
+                        # try:
+                        result = run_single_simulation(
+                            params, H_val, epsilon, seed, n_per_policy
+                        )
+                        results.append(result)
 
-                            if (seed + 1) % 10 == 0:
-                                print(f"    Completed {seed + 1}/{n_data_generations} generations")
+                        if (seed + 1) % 10 == 0:
+                            print(f"    Completed {seed + 1}/{n_data_generations} generations")
 
-                        except Exception as e:
-                            print(f"    Error in seed {seed}: {e}")
-                            continue
+                        # except Exception as e:
+                        #     print(f"    Error in seed {seed}: {e}")
+                        #     continue
 
     # Save results
     df = pd.DataFrame(results)
