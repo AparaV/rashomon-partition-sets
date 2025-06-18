@@ -241,13 +241,13 @@ def run_parameter_sweep():
     Generate ground truth data once per (M, R, seed) and reuse for all H and epsilon
     """
     # Parameter ranges
-    M_values = [3, 4]  # , 5]  # Number of features
-    R_values = [3]  # , 5]  # Factor levels (uniform across features)
-    H_multipliers = [1.0, 1.5]  # , 2.0]  # Multipliers for H relative to minimum needed
-    epsilon_values = [0.0, 0.1, 0.5]  # Multipliers for theta = q_0 * (1 + epsilon)
+    M_values = [3]  # , 5]  # Number of features
+    R_values = [4]  # , 5]  # Factor levels (uniform across features)
+    H_multipliers = [1.0]  # , 2.0]  # Multipliers for H relative to minimum needed
+    epsilon_values = [0.1]  # Multipliers for theta = q_0 * (1 + epsilon)
 
     # Simulation settings
-    n_data_generations = 2  # Number of random data generations (10-100 as requested)
+    n_data_generations = 1  # Number of random data generations (10-100 as requested)
     n_per_policy = 30  # Samples per policy
 
     results = []
