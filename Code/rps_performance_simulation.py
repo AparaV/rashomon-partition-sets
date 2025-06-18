@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import itertools
 from typing import Dict
+import os
 
 from rashomon.aggregate import RAggregate_profile
 from rashomon import hasse, loss, extract_pools
@@ -191,13 +192,13 @@ def run_parameter_sweep():
     Main function to run the parameter sweep simulation
     """
     # Parameter ranges
-    M_values = [3, 4, 5]  # Number of features
-    R_values = [3, 4, 5]  # Factor levels (uniform across features)
-    H_multipliers = [1.0, 1.5, 2.0]  # Multipliers for H relative to minimum needed
-    epsilon_values = [0.5, 1.0, 2.0, 4.0]  # Rashomon thresholds
+    M_values = [3, 4] #, 5]  # Number of features
+    R_values = [3, 4] #, 5]  # Factor levels (uniform across features)
+    H_multipliers = [1.0, 1.5] #, 2.0]  # Multipliers for H relative to minimum needed
+    epsilon_values = [10] #, 1.0, 1.5]  # Rashomon thresholds
 
     # Simulation settings
-    n_data_generations = 50  # Number of random data generations (10-100 as requested)
+    n_data_generations = 2  # Number of random data generations (10-100 as requested)
     n_per_policy = 30  # Samples per policy
 
     results = []
@@ -236,8 +237,10 @@ def run_parameter_sweep():
 
     # Save results
     df = pd.DataFrame(results)
-    df.to_csv("../Results/timed_sims/rps_performance_results.csv", index=False)
-    print("Simulation complete. Results saved to ../Results/timed_sims/rps_performance_results.csv")
+    dir = "../Results/timed_sims/"
+    os.makedirs(dir, exist_ok=True)
+    df.to_csv(f"{dir}rps_performance_results.csv", index=False)
+    print(f"Simulation complete. Results saved to {dir}rps_performance_results.csv")
 
     return df
 
