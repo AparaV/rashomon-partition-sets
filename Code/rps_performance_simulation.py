@@ -311,32 +311,44 @@ def run_parameter_sweep():
     # M_values = [3, 4]  # , 5]  # Number of features
     # R_values = [4, 4]  # , 5]  # Factor levels (uniform across features)
     # H_multipliers = [1.0, 1.5, 2.0]  # , 2.0]  # Multipliers for H relative to minimum needed
-    epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # Multipliers for theta = q_0 * (1 + epsilon)
+    epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]  # Multipliers for theta = q_0 * (1 + epsilon)
 
-    M_R_values_3 = [(3, i) for i in range(4, 11)]
-    M_R_values_4 = [(4, i) for i in range(4, 11)]
+    M_R_values_3 = [(3, i) for i in range(4, 11, 2)]
+    M_R_values_4 = [(4, i) for i in range(4, 11, 2)]
     M_R_values_5 = [(5, i) for i in range(4, 11, 2)]
-    M_R_values_6 = [(6, i) for i in range(4, 11, 2)]
-    M_R_values_7 = [(7, i) for i in range(4, 11, 2)]
-    M_R_values_8 = [(8, i) for i in range(4, 11, 2)]
-    M_R_values_9 = [(9, i) for i in range(4, 11, 2)]
-    M_R_values_10 = [(10, i) for i in range(4, 11, 2)]
+    M_R_values_6 = [(6, i) for i in range(4, 11, 4)]
+    M_R_values_7 = [(7, i) for i in range(4, 11, 4)]
+    M_R_values_8 = [(8, i) for i in range(4, 11, 4)]
+    M_R_values_9 = [(9, i) for i in range(4, 11, 10)]
+    M_R_values_10 = [(10, i) for i in range(4, 11, 10)]
 
     M_R_values = M_R_values_3 + M_R_values_4 + M_R_values_5 + M_R_values_6 + M_R_values_7 + M_R_values_8 + M_R_values_9 + M_R_values_10
 
     # Simulation settings
-    n_data_generations = 20  # Number of random data generations (10-100 as requested)
+    n_data_generations = 10  # Number of random data generations
     n_per_policy = 30  # Samples per policy
+
+    dir = "../Results/timed_sims/"
+    os.makedirs(dir, exist_ok=True)
 
 
     # for i, M in enumerate(M_values):
     #     for j, R_val in enumerate(R_values):
     for i, M_R_set in enumerate(M_R_values):
 
-        results = []
-
         M = M_R_set[0]  # Extract M from the first tuple
         R_val = M_R_set[1]  # Extract R from the second tuple
+
+        fname = f"rps_performance_results_{M}_{R_val}.csv"
+        path = f"{dir}{fname}"
+
+        # Check if results already exist
+        if os.path.exists(path):
+            print(f"Results for M={M_R_set[0]}, R={M_R_set[1]} already exist. Skipping.")
+            continue
+
+        results = []
+
         print(f"Running simulations for M={M}, R={R_val}")
 
         # Create parameters
@@ -399,10 +411,8 @@ def run_parameter_sweep():
 
         # Save results
         df = pd.DataFrame(results)
-        dir = "../Results/timed_sims/"
-        os.makedirs(dir, exist_ok=True)
-        df.to_csv(f"{dir}rps_performance_results_{M}_{R_val}.csv", index=False)
-        print(f"Simulation complete. Results saved to {dir}rps_performance_results_{M}_{R_val}.csv")
+        df.to_csv(path, index=False)
+        print(f"Simulation complete. Results saved to {path}.csv")
 
     return df
 
