@@ -83,7 +83,7 @@ def generate_ground_truth_data(params: Dict, data_gen_seed: int, n_per_policy: i
     }
 
 
-def compute_all_partitions_and_map(ground_truth_data: Dict, H_val: int, reg: float = 0.1) -> Dict:
+def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1) -> Dict:
     """
     Compute all partitions, Q values, posterior probabilities, and find MAP.
     This handles steps 1-4 of the RPS performance evaluation.
@@ -185,7 +185,7 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, H_val: int, reg: flo
 
 
 def evaluate_rps_performance(
-    ground_truth_data: Dict, H_val: int, epsilon: float, all_partitions_results: Dict = None
+    ground_truth_data: Dict, epsilon: float, all_partitions_results: Dict = None
 ) -> Dict:
     """
     Evaluate RPS algorithm performance on pre-generated ground truth data
@@ -202,7 +202,7 @@ def evaluate_rps_performance(
     """
     # Compute all partitions and MAP if not provided
     if all_partitions_results is None:
-        all_partitions_results = compute_all_partitions_and_map(ground_truth_data, H_val)
+        all_partitions_results = compute_all_partitions_and_map(ground_truth_data)
 
     all_partitions_set = all_partitions_results['all_partitions_set']
     all_q_values = all_partitions_results['all_q_values']
@@ -236,7 +236,7 @@ def evaluate_rps_performance(
     rashomon_set = RAggregate_profile(
         M=np.sum(target_profile),
         R=int(R[0]),  # Assuming uniform R
-        H=H_val,
+        H=np.inf,
         D=D,
         y=y,
         theta=theta,
@@ -279,7 +279,7 @@ def evaluate_rps_performance(
     return {
         'M': M,
         'R_val': R[0],
-        'H': H_val,
+        # 'H': H_val,
         'epsilon': epsilon,
         'seed': ground_truth_data['seed'],
         'n_per_policy': ground_truth_data['n_per_policy'],
@@ -308,76 +308,92 @@ def run_parameter_sweep():
     Generate ground truth data once per (M, R, seed) and reuse for all H and epsilon
     """
     # Parameter ranges
-    M_values = [3]  # , 5]  # Number of features
-    R_values = [4]  # , 5]  # Factor levels (uniform across features)
-    H_multipliers = [1.0]  # , 2.0]  # Multipliers for H relative to minimum needed
-    epsilon_values = [0.1]  # Multipliers for theta = q_0 * (1 + epsilon)
+    # M_values = [3, 4]  # , 5]  # Number of features
+    # R_values = [4, 4]  # , 5]  # Factor levels (uniform across features)
+    # H_multipliers = [1.0, 1.5, 2.0]  # , 2.0]  # Multipliers for H relative to minimum needed
+    epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # Multipliers for theta = q_0 * (1 + epsilon)
+
+    M_R_values_3 = [(3, i) for i in range(4, 11)]
+    M_R_values_4 = [(4, i) for i in range(4, 11)]
+    M_R_values_5 = [(5, i) for i in range(4, 11, 2)]
+    M_R_values_6 = [(6, i) for i in range(4, 11, 2)]
+    M_R_values_7 = [(7, i) for i in range(4, 11, 2)]
+    M_R_values_8 = [(8, i) for i in range(4, 11, 2)]
+    M_R_values_9 = [(9, i) for i in range(4, 11, 2)]
+    M_R_values_10 = [(10, i) for i in range(4, 11, 2)]
+
+    M_R_values = M_R_values_3 + M_R_values_4 + M_R_values_5 + M_R_values_6 + M_R_values_7 + M_R_values_8 + M_R_values_9 + M_R_values_10
 
     # Simulation settings
-    n_data_generations = 1  # Number of random data generations (10-100 as requested)
+    n_data_generations = 20  # Number of random data generations (10-100 as requested)
     n_per_policy = 30  # Samples per policy
 
     results = []
 
-    for i, M in enumerate(M_values):
-        for j, R_val in enumerate(R_values):
-            print(f"Running simulations for M={M}, R={R_val}")
+    # for i, M in enumerate(M_values):
+    #     for j, R_val in enumerate(R_values):
+    for i, M_R_set in enumerate(M_R_values):
+        M = M_R_set[0]  # Extract M from the first tuple
+        R_val = M_R_set[1]  # Extract R from the second tuple
+        print(f"Running simulations for M={M}, R={R_val}")
 
-            # Create parameters
-            seed = i * len(R_values) + j  # Unique seed for each (M, R) combination
-            R_array = np.array([R_val] * M)
-            params = create_simulation_params(M, R_array, seed)
+        # Create parameters
+        seed_MR = i  # Unique seed for each (M, R) combination
+        R_array = np.array([R_val] * M)
+        params = create_simulation_params(M, R_array, seed_MR)
 
-            # Calculate base H needed
-            base_H = params['H']
+        # Calculate base H needed
+        base_H = params['H']
 
-            # Generate ground truth data once per (M, R, seed)
-            for seed in range(n_data_generations):
-                print(f"  Generating ground truth data for seed {seed}")
+        # Generate ground truth data once per (M, R, seed)
+        for seed in range(n_data_generations):
+            print(f"  Generating ground truth data for seed {seed}")
 
-                # Generate ground truth data once for this (M, R, seed)
-                ground_truth_data = generate_ground_truth_data(params, seed, n_per_policy)
+            # Generate ground truth data once for this (M, R, seed)
+            ground_truth_data = generate_ground_truth_data(params, seed, n_per_policy)
 
-                # For each H value, precompute all partitions and MAP
-                # This only needs to be done once per (M, R, seed, H) combination
-                h_partition_results = {}
-                for H_mult in H_multipliers:
-                    H_val = int(base_H * H_mult)
-                    print(f"    Precomputing all partitions for H={H_val}")
+            # For each H value, precompute all partitions and MAP
+            # This only needs to be done once per (M, R, seed, H) combination
+            # h_partition_results = {}
+            # for H_mult in H_multipliers:
+            #     H_val = int(base_H * H_mult)
+            #     print(f"    Precomputing all partitions for H={H_val}")
 
-                    try:
-                        # Compute all partitions and MAP once for this H value
-                        all_partitions_results = compute_all_partitions_and_map(ground_truth_data, H_val)
-                        h_partition_results[H_val] = all_partitions_results
-                    except Exception as e:
-                        print(f"      Error in precomputing for H={H_val}: {e}")
-                        continue
+            #     try:
+            #         # Compute all partitions and MAP once for this H value
+            #         all_partitions_results = compute_all_partitions_and_map(ground_truth_data, H_val)
+            #         h_partition_results[H_val] = all_partitions_results
+            #     except Exception as e:
+            #         print(f"      Error in precomputing for H={H_val}: {e}")
+            #         continue
 
-                # Now evaluate RPS for all H and epsilon combinations using precomputed results
-                for H_mult in H_multipliers:
-                    H_val = int(base_H * H_mult)
+            all_partitions_results = compute_all_partitions_and_map(ground_truth_data)
 
-                    # Skip if we couldn't precompute for this H
-                    if H_val not in h_partition_results:
-                        continue
+            # Now evaluate RPS for all H and epsilon combinations using precomputed results
+            # for H_mult in H_multipliers:
+            #     H_val = int(base_H * H_mult)
 
-                    all_partitions_results = h_partition_results[H_val]
+                # # Skip if we couldn't precompute for this H
+                # if H_val not in h_partition_results:
+                #     continue
 
-                    for epsilon in epsilon_values:
-                        print(f"    Evaluating H={H_val}, epsilon={epsilon}")
+                # all_partitions_results = h_partition_results[H_val]
 
-                        try:
-                            # Pass precomputed results to avoid redundant computation
-                            result = evaluate_rps_performance(
-                                ground_truth_data, H_val, epsilon, all_partitions_results
-                            )
-                            results.append(result)
-                        except Exception as e:
-                            print(f"      Error in H={H_val}, epsilon={epsilon}: {e}")
-                            continue
+            for epsilon in epsilon_values:
+                print(f"    Evaluating epsilon={epsilon}")
 
-                if (seed + 1) % 10 == 0:
-                    print(f"  Completed {seed + 1}/{n_data_generations} data generations")
+                # try:
+                    # Pass precomputed results to avoid redundant computation
+                result = evaluate_rps_performance(
+                    ground_truth_data, epsilon, all_partitions_results
+                )
+                results.append(result)
+                # except Exception as e:
+                #     print(f"      Error in H={H_val}, epsilon={epsilon}: {e}")
+                #     continue
+
+            if (seed + 1) % 10 == 0:
+                print(f"  Completed {seed + 1}/{n_data_generations} data generations")
 
     # Save results
     df = pd.DataFrame(results)
