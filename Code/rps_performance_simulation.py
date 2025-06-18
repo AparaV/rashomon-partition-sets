@@ -121,32 +121,55 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
     )
     rps_time = time.time() - start_time
 
-    # Compute absolute errors in pool means compared to ground truth
-    errors = []
+    # Compute proper Bayesian posterior approximation error
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
-
+    
+    # Step 1: Map true beta (pool means) to each policy/feature
+    true_beta = np.zeros(len(target_policies))
+    for policy_idx, policy in enumerate(target_policies):
+        pool_id = pi_policies_true[policy_idx]
+        true_beta[policy_idx] = mu_true[pool_id]
+    
+    # Compute Q values for all partitions in RPS
+    rps_q_values = []
+    rps_betas = []
+    
     for rps_idx in range(len(rashomon_set)):
         rps_sigma = rashomon_set.sigma[rps_idx]
-
-        # Get RPS pool means
+        
+        # Step 1: Get RPS pool means and map to policies
         pi_pools_rps, _ = extract_pools.extract_pools(target_policies, rps_sigma)
         pool_means_rps = loss.compute_pool_means(policy_means, pi_pools_rps)
-
-        # Compare against the true partition that generated the data
-        if np.array_equal(rps_sigma, sigma_true):
-            # Found the exact true partition - compare pool means directly
-            error = compute_pool_matching_error(
-                pool_means_rps, mu_true, pi_pools_rps, pi_pools_true
-            )
-        else:
-            # Different partition structure - compute loss difference
-            # Compare losses rather than means
-            true_loss = loss.compute_Q(D, y, sigma_true, target_policies, policy_means, reg)
-            rps_loss = loss.compute_Q(D, y, rps_sigma, target_policies, policy_means, reg)
-            error = abs(rps_loss - true_loss)
-
-        errors.append(error)
-
+        
+        # Map pool means to each policy
+        rps_beta = np.zeros(len(target_policies))
+        for policy_idx, policy in enumerate(target_policies):
+            # Find which pool this policy belongs to
+            for pool_id, pool_policies in pi_pools_rps.items():
+                if policy_idx in pool_policies:
+                    rps_beta[policy_idx] = pool_means_rps[pool_id]
+                    break
+        
+        rps_betas.append(rps_beta)
+        
+        # Compute Q value for this partition
+        q_value = loss.compute_Q(D, y, rps_sigma, target_policies, policy_means, reg)
+        rps_q_values.append(q_value)
+    
+    # Step 2: Compute RPS posterior approximation using softmax weights
+    rps_q_values = np.array(rps_q_values)
+    # Use negative Q values for softmax (lower Q = higher probability)
+    weights = np.exp(-rps_q_values)
+    weights = weights / np.sum(weights)  # Normalize to get probabilities
+    
+    # Step 3: Compute posterior mean beta as weighted average
+    posterior_beta = np.zeros(len(target_policies))
+    for i, beta in enumerate(rps_betas):
+        posterior_beta += weights[i] * beta
+    
+    # Step 4: Compute L2 norm of difference
+    error = np.linalg.norm(true_beta - posterior_beta, ord=2)
+    
     return {
         'M': M,
         'R_val': R[0],
@@ -157,9 +180,9 @@ def run_single_simulation(params: Dict, H_val: int, epsilon: float,
         'rps_time': rps_time,
         'num_rps_partitions': len(rashomon_set),
         'found_true_partition': int(any(np.array_equal(sigma, sigma_true) for sigma in rashomon_set.sigma)),
-        'mean_error_vs_truth': np.mean(errors) if errors else 0.0,
-        'max_error_vs_truth': np.max(errors) if errors else 0.0,
-        'min_error_vs_truth': np.min(errors) if errors else 0.0
+        'posterior_beta_error': error,  # L2 norm error of posterior approximation
+        'num_unique_betas': len(np.unique([tuple(beta) for beta in rps_betas])),  # Number of unique beta vectors
+        'posterior_entropy': -np.sum(weights * np.log(weights + 1e-10))  # Entropy of posterior weights
     }
 
 
