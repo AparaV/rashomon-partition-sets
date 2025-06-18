@@ -177,7 +177,7 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
 
     # If R is fixed across, make it a list for compatbility later on
     if isinstance(R, int):
-        R = [R] * M
+        R = np.full(M, R)
 
     P_qe = RashomonSet(sigma.shape)
 
