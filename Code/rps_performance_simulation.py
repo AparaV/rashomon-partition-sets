@@ -225,8 +225,8 @@ def run_parameter_sweep():
 
     # Save results
     df = pd.DataFrame(results)
-    df.to_csv("rps_performance_results.csv", index=False)
-    print("Simulation complete. Results saved to rps_performance_results.csv")
+    df.to_csv("../Results/timed_sims/rps_performance_results.csv", index=False)
+    print("Simulation complete. Results saved to ../Results/timed_sims/rps_performance_results.csv")
 
     return df
 
