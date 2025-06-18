@@ -193,7 +193,8 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     # Compute RPS posterior weights (subset of all posterior weights)
     rps_q_values = np.array(rps_q_values)
     rps_weights = np.exp(-rps_q_values)
-    rps_weights = rps_weights / np.sum(rps_weights)  # Renormalize within RPS
+    norm_constant = np.sum(rps_weights)
+    rps_weights = rps_weights / norm_constant  # Renormalize within RPS
     
     # Compute RPS posterior mean beta as weighted average
     rps_posterior_beta = np.zeros(len(target_policies))
@@ -222,14 +223,15 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
         'num_rps_partitions': len(rashomon_set),
         'map_q_value': map_q_value,
         'map_posterior_prob': map_posterior_prob,
+        'norm_constant': norm_constant,
         'theta_used': theta,
         'found_true_partition': int(any(np.array_equal(sigma, sigma_true) for sigma in rashomon_set.sigma)),
         'rps_posterior_beta_error': rps_error,  # L2 norm error using RPS posterior
         'full_posterior_beta_error': full_error,  # L2 norm error using full posterior
-        'rps_posterior_entropy': -np.sum(rps_weights * np.log(rps_weights + 1e-10)),
-        'full_posterior_entropy': -np.sum(posterior_weights * np.log(posterior_weights + 1e-10)),
-        'num_unique_rps_betas': len(np.unique([tuple(beta) for beta in rps_betas])),
-        'num_unique_all_betas': len(np.unique([tuple(beta) for beta in all_betas]))
+        # 'rps_posterior_entropy': -np.sum(rps_weights * np.log(rps_weights + 1e-10)),
+        # 'full_posterior_entropy': -np.sum(posterior_weights * np.log(posterior_weights + 1e-10)),
+        # 'num_unique_rps_betas': len(np.unique([tuple(beta) for beta in rps_betas])),
+        # 'num_unique_all_betas': len(np.unique([tuple(beta) for beta in all_betas]))
     }
 
 
