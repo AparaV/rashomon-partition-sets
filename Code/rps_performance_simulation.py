@@ -98,7 +98,7 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     y = ground_truth_data['y']
 
     reg = 0.1
-    
+
     # Step 1: Find Q for ALL possible partitions using brute force with theta = infinity
     print("    Computing Q values for all partitions...")
     start_time = time.time()
@@ -114,20 +114,20 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
         policies=target_policies
     )
     all_partitions_time = time.time() - start_time
-    
+
     # Step 2: Compute Q values and posterior probabilities for all partitions
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
-    
+
     all_q_values = []
     all_betas = []
-    
+
     for partition_idx in range(len(all_partitions_set)):
         partition_sigma = all_partitions_set.sigma[partition_idx]
-        
+
         # Get partition pool means and map to policies
         pi_pools_partition, _ = extract_pools.extract_pools(target_policies, partition_sigma)
         pool_means_partition = loss.compute_pool_means(policy_means, pi_pools_partition)
-        
+
         # Map pool means to each policy
         partition_beta = np.zeros(len(target_policies))
         for policy_idx, policy in enumerate(target_policies):
@@ -135,32 +135,32 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
                 if policy_idx in pool_policies:
                     partition_beta[policy_idx] = pool_means_partition[pool_id]
                     break
-        
+
         all_betas.append(partition_beta)
-        
+
         # Compute Q value for this partition
         q_value = loss.compute_Q(D, y, partition_sigma, target_policies, policy_means, reg)
         all_q_values.append(q_value)
-    
+
     all_q_values = np.array(all_q_values)
-    
+
     # Step 3: Compute posterior probabilities using e^Q_i / sum(e^Q_j)
     # Note: We use negative Q values since lower Q = better fit = higher probability
     posterior_weights = np.exp(-all_q_values)
     norm_constant = np.sum(posterior_weights)
     posterior_weights = posterior_weights / np.sum(posterior_weights)
-    
+
     # Step 4: Find MAP partition (highest posterior probability)
     map_idx = np.argmax(posterior_weights)
     map_q_value = all_q_values[map_idx]
     map_posterior_prob = posterior_weights[map_idx]
-    
+
     # Step 5: Redefine theta as q_0 * (1 + epsilon) where q_0 is MAP's Q value
     theta = map_q_value * (1 + epsilon)
-    
+
     print(f"    MAP Q value: {map_q_value:.4f}, MAP posterior prob: {map_posterior_prob:.4f}")
     print(f"    Using theta = {theta:.4f} (= {map_q_value:.4f} * (1 + {epsilon}))")
-    
+
     # Step 6: Run RPS algorithm with the new theta
     start_time = time.time()
     rashomon_set = RAggregate_profile(
@@ -180,32 +180,32 @@ def evaluate_rps_performance(ground_truth_data: Dict, H_val: int, epsilon: float
     # Get Q values and betas for partitions in the RPS (subset of all partitions)
     rps_q_values = []
     rps_betas = []
-    
+
     for rps_idx in range(len(rashomon_set)):
         rps_sigma = rashomon_set.sigma[rps_idx]
-        
+
         # Find this partition in our all_partitions list to get its Q value
         for all_idx, all_sigma in enumerate(all_partitions_set.sigma):
             if np.array_equal(rps_sigma, all_sigma):
                 rps_q_values.append(all_q_values[all_idx])
                 rps_betas.append(all_betas[all_idx])
                 break
-    
+
     # Compute RPS posterior weights (subset of all posterior weights)
     rps_q_values = np.array(rps_q_values)
     rps_weights = np.exp(-rps_q_values)
     rps_weights = rps_weights / np.sum(rps_weights)  # Renormalize within RPS
-    
+
     # Compute RPS posterior mean beta as weighted average
     rps_posterior_beta = np.zeros(len(target_policies))
     for i, beta in enumerate(rps_betas):
         rps_posterior_beta += rps_weights[i] * beta
-    
+
     # Compute full posterior mean beta using all partitions
     full_posterior_beta = np.zeros(len(target_policies))
     for i, beta in enumerate(all_betas):
         full_posterior_beta += posterior_weights[i] * beta
-    
+
     # Compute errors
     rps_error = np.linalg.norm(true_beta - rps_posterior_beta, ord=2)
     full_error = np.linalg.norm(true_beta - full_posterior_beta, ord=2)
@@ -267,10 +267,10 @@ def run_parameter_sweep():
             # Generate ground truth data once per (M, R, seed)
             for seed in range(n_data_generations):
                 print(f"  Generating ground truth data for seed {seed}")
-                
+
                 # Generate ground truth data once for this (M, R, seed)
                 ground_truth_data = generate_ground_truth_data(params, seed, n_per_policy)
-                
+
                 # Now evaluate RPS for all H and epsilon combinations using this ground truth
                 for H_mult in H_multipliers:
                     H_val = int(base_H * H_mult)
