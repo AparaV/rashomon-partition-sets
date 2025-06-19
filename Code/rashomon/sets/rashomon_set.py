@@ -54,6 +54,7 @@ class RashomonSet:
             raise RuntimeError("Call RashomonSet.calculate_loss before RashomonSet.sort")
         sorted_idx = np.argsort(self.Q)
         self.Q = self.Q[sorted_idx]
+        self.H = self.H[sorted_idx]
         self.P_qe = [self.P_qe[i] for i in sorted_idx]
 
     @property

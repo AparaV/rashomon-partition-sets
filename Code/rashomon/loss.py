@@ -148,7 +148,8 @@ def compute_B(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, i: int, j: int,
 
 def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
               policy_means: np.ndarray, reg: float = 1, normalize: int = 0,
-              lattice_edges: list[tuple[int, int]] | None = None) -> float:
+              lattice_edges: list[tuple[int, int]] | None = None,
+              return_H: bool = False) -> float:
     """
     Compute the loss Q
 
@@ -173,6 +174,9 @@ def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
         mse = mse * D.shape[0] / normalize
 
     Q = mse + reg * h
+
+    if return_H:
+        return Q, h
 
     return Q
 

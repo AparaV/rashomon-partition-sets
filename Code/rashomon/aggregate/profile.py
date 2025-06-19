@@ -185,8 +185,9 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
     idx_rows = indices_raw[0]
     idx_cols = indices_raw[1]
     indices = []
-    for i in range(len(idx_rows)):
-        indices.append((idx_rows[i], idx_cols[i]))
+    # for i in range(len(idx_rows)):
+    #     indices.append((idx_rows[i], idx_cols[i]))
+    indices = [(idx_rows[i], idx_cols[i]) for i in range(len(idx_rows))]
 
     # t1_ctr = 0
     # t2_ctr = 0
@@ -200,10 +201,11 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
             sigma_x[i, j] = 0
 
         # Q, t1, t2 = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges)
-        Q = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges)
+        Q, h = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges, return_H=True)
         if Q <= theta:
             P_qe.insert(sigma_x)
             P_qe.Q = np.append(P_qe.Q, Q)
+            P_qe.H = np.append(P_qe.H, h)
 
         # ctr += 1
         # t1_ctr += t1
