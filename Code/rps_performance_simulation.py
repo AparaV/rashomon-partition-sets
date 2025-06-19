@@ -132,10 +132,6 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1, fu
     # Step 2: Compute Q values and posterior probabilities for all partitions
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
 
-    all_q_values = []
-    all_betas = []
-    all_sigmas = []  # Store all sigmas for easier lookup later
-
     # policy_data = np.array([[idx for idx in enumerate(target_policies)]])
     policy_data = np.zeros(shape=(len(target_policies), 1), dtype=int)
     for pol_idx, policy in enumerate(target_policies):
@@ -143,6 +139,9 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1, fu
     # hasse_edges = extract_pools.lattice_edges(target_policies)
     # hasse_edges = None
 
+    all_q_values = []
+    all_betas = []
+    all_sigmas = []
     if full_partition:
         for partition_idx in range(len(all_partitions_set)):
             partition_sigma = all_partitions_set.sigma[partition_idx]
@@ -192,9 +191,9 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1, fu
 
     return {
         'all_partitions_set': all_partitions_set,
-        # 'all_q_values': all_q_values,
-        # 'all_betas': all_betas,
-        # 'all_sigmas': all_sigmas,
+        'all_q_values': all_q_values,
+        'all_betas': all_betas,
+        'all_sigmas': all_sigmas,
         'norm_constant': norm_constant,
         'map_idx': map_idx,
         'map_q_value': map_q_value,
@@ -400,7 +399,7 @@ def run_parameter_sweep():
     n_data_generations = 10  # Number of random data generations
     n_per_policy = 30  # Samples per policy
 
-    dir = "../Results/timed_sims/"
+    dir = f"../Results/timed_sims/setup_{setup_id}/"
     os.makedirs(dir, exist_ok=True)
 
 
@@ -438,7 +437,12 @@ def run_parameter_sweep():
             # Generate ground truth data once for this (M, R, seed)
             ground_truth_data = generate_ground_truth_data(params, seed, n_per_policy)
 
-            all_partitions_results = compute_all_partitions_and_map(ground_truth_data)
+            all_partitions_results = compute_all_partitions_and_map(ground_truth_data, full_partition=full_partition)
+            if full_partition:
+                pkl_file = f"all_partitions_results_M{M}_R{R_val}_seed{seed}.pkl"
+                pkl_path = os.path.join(dir, pkl_file)
+                with open(pkl_path, 'wb') as f:
+                    pickle.dump(all_partitions_results, f)
 
             for epsilon in epsilon_values:
                 print(f"    Evaluating epsilon={epsilon}")
