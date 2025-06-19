@@ -219,7 +219,7 @@ if __name__ == "__main__":
         for profile, model_prof in enumerate(r_set):
             sigma_r_prof = R_profiles[profile].sigma[model_prof]
             loss_r_prof = R_profiles[profile].loss[model_prof]
-            size_r_prof = R_profiles[profile].pools[model_prof]
+            size_r_prof = R_profiles[profile].num_pools[model_prof]
             loss_r += loss_r_prof
             # size_r += size_r_prof
             if sigma_r_prof is None and loss_r_prof == 0:

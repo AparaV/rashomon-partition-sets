@@ -72,7 +72,7 @@ def partition_sigma(sigma: np.ndarray, i: int, j: int) -> np.ndarray:
 
 def predict(D: np.ndarray, sigma: np.ndarray, policies: list, policy_means: np.ndarray,
             lattice_edges: list[tuple[int, int]] | None = None,
-            return_num_pools: bool = False) -> np.ndarray:
+            return_num_pools: bool = False, return_pools: bool = False) -> np.ndarray:
     """
     Predict outcomes based on the given dataset, policies, and partition matrix.
 
@@ -97,8 +97,17 @@ def predict(D: np.ndarray, sigma: np.ndarray, policies: list, policy_means: np.n
     D_pool = [pi_policies[pol_id] for pol_id in D[:, 0]]
     y_hat = mu_pools[D_pool]
 
+    if return_pools:
+        results = {
+            'mu_pools': mu_pools,
+            'pi_pools': pi_pools,
+            'pi_policies': pi_policies
+        }
+        return y_hat, results
+
     if return_num_pools:
         return y_hat, mu_pools.shape[0]
+
     return y_hat
 
 
@@ -149,7 +158,7 @@ def compute_B(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, i: int, j: int,
 def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
               policy_means: np.ndarray, reg: float = 1, normalize: int = 0,
               lattice_edges: list[tuple[int, int]] | None = None,
-              return_H: bool = False) -> float:
+              return_H: bool = False, return_pools: bool = False) -> float:
     """
     Compute the loss Q
 
@@ -167,13 +176,17 @@ def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
     Q (int): The loss function
     """
 
-    mu_D, h = predict(D, sigma, policies, policy_means, lattice_edges, return_num_pools=True)
+    mu_D, pools = predict(D, sigma, policies, policy_means, lattice_edges, return_num_pools=True, return_pools=return_pools)
+    h = pools["mu_pools"].shape[0] if return_pools else pools
     mse = mean_squared_error(y[:, 0], mu_D)
 
     if normalize > 0:
         mse = mse * D.shape[0] / normalize
 
     Q = mse + reg * h
+
+    if return_pools:
+        return Q, pools
 
     if return_H:
         return Q, h

@@ -117,16 +117,24 @@ def RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray,
         if not Q_seen.seen(sigma_1):
             Q_seen.insert(sigma_1)
             # Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize)
-            Q = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize, hasse_edges)
+            Q, pools = loss.compute_Q(D, y, sigma_1, policies, policy_means, reg, normalize, hasse_edges, return_H=True, return_pools=True)
             if Q <= theta:
+                h = pools["mu_pools"].shape[0]
                 P_qe.insert(sigma_1)
+                P_qe.Q = np.append(P_qe.Q, Q)
+                P_qe.H = np.append(P_qe.H, h)
+                P_qe.pools.append(pools)
 
         if not Q_seen.seen(sigma_0) and counter.num_pools(sigma_0) <= H:
             Q_seen.insert(sigma_0)
             # Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize)
-            Q = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize, hasse_edges)
+            Q, pools = loss.compute_Q(D, y, sigma_0, policies, policy_means, reg, normalize, hasse_edges, return_H=True, return_pools=True)
             if Q <= theta:
+                h = pools["mu_pools"].shape[0]
                 P_qe.insert(sigma_0)
+                P_qe.Q = np.append(P_qe.Q, Q)
+                P_qe.H = np.append(P_qe.H, h)
+                P_qe.pools.append(pools)
 
         # Add children problems to the queue
         if j < R[i] - 3:  # j < R_i - 2 in math notation
@@ -201,11 +209,13 @@ def _brute_RAggregate_profile(M: int, R: int | np.ndarray, H: int, D: np.ndarray
             sigma_x[i, j] = 0
 
         # Q, t1, t2 = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges)
-        Q, h = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges, return_H=True)
+        Q, pools = loss.compute_Q(D, y, sigma_x, policies, policy_means, reg, normalize, hasse_edges, return_H=True, return_pools=True)
         if Q <= theta:
+            h = pools["mu_pools"].shape[0]
             P_qe.insert(sigma_x)
             P_qe.Q = np.append(P_qe.Q, Q)
             P_qe.H = np.append(P_qe.H, h)
+            P_qe.pools.append(pools)
 
         # ctr += 1
         # t1_ctr += t1

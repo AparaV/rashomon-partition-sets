@@ -15,6 +15,7 @@ class RashomonSet:
         self.P_qe = []
         self.Q = np.array([])
         self.H = np.array([])
+        self.pools = []
 
     def insert(self, sigma: np.ndarray) -> None:
         if self.seen(sigma):
@@ -56,6 +57,7 @@ class RashomonSet:
         self.Q = self.Q[sorted_idx]
         self.H = self.H[sorted_idx]
         self.P_qe = [self.P_qe[i] for i in sorted_idx]
+        self.pools = [self.pools[i] for i in sorted_idx]
 
     @property
     def size(self):
@@ -72,7 +74,7 @@ class RashomonSet:
         return self.Q
 
     @property
-    def pools(self):
+    def num_pools(self):
         if len(self.H) != len(self.P_qe):
             self.H = []
             for sigma_i in self.P_qe:

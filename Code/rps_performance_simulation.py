@@ -134,7 +134,7 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1) ->
     policy_data = np.zeros(shape=(len(target_policies), 1), dtype=int)
     for pol_idx, policy in enumerate(target_policies):
         policy_data[pol_idx, 0] = pol_idx
-    hasse_edges = extract_pools.lattice_edges(target_policies)
+    # hasse_edges = extract_pools.lattice_edges(target_policies)
     # hasse_edges = None
 
     for partition_idx in range(len(all_partitions_set)):
@@ -156,7 +156,14 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1) ->
         #             partition_beta[policy_idx] = pool_means_partition[pool_id]
         #             break
 
-        partition_beta = loss.predict(policy_data, partition_sigma, target_policies, policy_means, hasse_edges)
+        pools_idx = all_partitions_set.pools[partition_idx]
+        # pi_pools_idx = pools_idx['pi_pools']
+        pi_policies_idx = pools_idx['pi_policies']
+        mu_pools_idx = pools_idx['mu_pools']
+        D_pool = [pi_policies_idx[pol_id] for pol_id in policy_data[:, 0]]
+        partition_beta = mu_pools_idx[D_pool]
+
+        # partition_beta = loss.predict(policy_data, partition_sigma, target_policies, policy_means, hasse_edges)
 
         all_betas.append(partition_beta)
         all_sigmas.append(partition_sigma)
@@ -259,6 +266,7 @@ def evaluate_rps_performance(
         policies=target_policies
     )
     rps_time = time.time() - start_time
+    print(f"    RPS found {rashomon_set.size} partitions in {rps_time:.2f} seconds")
 
     # Step 7: Compute RPS-specific posterior approximation error
     # Get Q values and betas for partitions in the RPS (subset of all partitions)
@@ -268,14 +276,22 @@ def evaluate_rps_performance(
     policy_data = np.zeros(shape=(len(target_policies), 1), dtype=int)
     for pol_idx, policy in enumerate(target_policies):
         policy_data[pol_idx, 0] = pol_idx
-    hasse_edges = extract_pools.lattice_edges(target_policies)
+    # hasse_edges = extract_pools.lattice_edges(target_policies)
 
     for rps_idx in range(len(rashomon_set)):
-        rps_sigma = rashomon_set.sigma[rps_idx]
+        # rps_sigma = rashomon_set.sigma[rps_idx]
+        q_value = rashomon_set.Q[rps_idx]
 
-        rps_beta, h = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges, return_num_pools=True)
-        mse = mean_squared_error(true_beta, rps_beta)
-        q_value = mse + reg * h
+        pools_idx = rashomon_set.pools[rps_idx]
+        # pi_pools_idx = pools_idx['pi_pools']
+        pi_policies_idx = pools_idx['pi_policies']
+        mu_pools_idx = pools_idx['mu_pools']
+        D_pool = [pi_policies_idx[pol_id] for pol_id in policy_data[:, 0]]
+        rps_beta = mu_pools_idx[D_pool]
+
+        # rps_beta, h = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges, return_num_pools=True)
+        # mse = mean_squared_error(true_beta, rps_beta)
+        # q_value = mse + reg * h
 
         # rps_beta = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges)
         rps_betas.append(rps_beta)
@@ -347,7 +363,8 @@ def run_parameter_sweep():
 
     M_R_values = M_R_values_3 + M_R_values_4 + M_R_values_5 + M_R_values_6 + M_R_values_8 + M_R_values_10
     # M_R_values = M_R_values_10
-    M_R_values = M_R_values_6
+    # M_R_values = M_R_values_6
+    M_R_values = M_R_values_4
 
     # Simulation settings
     n_data_generations = 10  # Number of random data generations
