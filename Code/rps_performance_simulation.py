@@ -331,7 +331,7 @@ def evaluate_rps_performance(
         'n_per_policy': ground_truth_data['n_per_policy'],
         'all_partitions_time': all_partitions_results['all_partitions_time'],
         'rps_time': rps_time,
-        'total_partitions': 2 ** (M * R[0]),
+        'total_partitions': 2 ** (M * (R[0]-1)),
         'num_rps_partitions': len(rashomon_set),
         'map_q_value': all_partitions_results['map_q_value'],
         'map_posterior_prob': all_partitions_results['map_posterior_prob'],
@@ -353,41 +353,18 @@ def run_parameter_sweep():
     Main function to run the parameter sweep simulation using efficient approach:
     Generate ground truth data once per (M, R, seed) and reuse for all H and epsilon
     """
-    # # Parameter ranges
-    # # M_values = [3, 4]  # , 5]  # Number of features
-    # # R_values = [4, 4]  # , 5]  # Factor levels (uniform across features)
-    # # H_multipliers = [1.0, 1.5, 2.0]  # , 2.0]  # Multipliers for H relative to minimum needed
-    # epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # Multipliers for theta = q_0 * (1 + epsilon)
-    # epsilon_values = [0.01, 0.025, 0.05, 0.075, 0.1]  # Multipliers for theta = q_0 * (1 + epsilon)
 
-    # # M_R_values_3 = [(3, i) for i in range(4, 9, 2)]
-    # # M_R_values_4 = [(4, i) for i in range(4, 9, 2)]
-    # # M_R_values_5 = [(5, i) for i in range(4, 9, 2)]
-    # # M_R_values_6 = [(6, i) for i in range(4, 9, 4)]
-    # # # M_R_values_7 = [(7, i) for i in range(4, 9, 4)]
-    # # M_R_values_8 = [(8, i) for i in range(4, 9, 4)]
-    # # # M_R_values_9 = [(9, i) for i in range(4, 9, 10)]
-    # # M_R_values_10 = [(10, i) for i in range(4, 9, 10)]
+    # Setup 1: Fix M, R. Vary epsilon
+    setup_id = 1
+    M_R_values = [(3, 4), (4, 4)]
+    epsilon_values = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0]
+    full_partition = True
 
-    # # M_R_values = M_R_values_3 + M_R_values_4 + M_R_values_5 + M_R_values_6 + M_R_values_8 + M_R_values_10
-    # # M_R_values = M_R_values_10
-    # # M_R_values = M_R_values_6
-    # # M_R_values = M_R_values_4
-    # # M_R_values = M_R_values_3
-
-
-    # # Setup 1: Fix M, R. Vary epsilon
-    # setup_id = 1
-    # M_R_values = [(4, 4)]
-    # epsilon_values = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0]
-    # full_partition = True
-
-    # Setup 2: Fix M, epsilon. Vary R
-    setup_id = 2
-    M_R_values = [(3, 4), (3, 5), (3, 6), (3, 7), (3, 8)]
-    epsilon_values = [0.01]
-    full_partition = False
-
+    # # Setup 2: Fix M, epsilon. Vary R
+    # setup_id = 2
+    # M_R_values = [(3, 4), (3, 5), (3, 6), (3, 7), (3, 8)]
+    # epsilon_values = [0.01]
+    # full_partition = False
 
     # # Setup 3: Fix R, epsilon. Vary M
     # setup_id = 3
@@ -402,9 +379,7 @@ def run_parameter_sweep():
     dir = f"../Results/timed_sims/setup_{setup_id}/"
     os.makedirs(dir, exist_ok=True)
 
-
-    # for i, M in enumerate(M_values):
-    #     for j, R_val in enumerate(R_values):
+    df = None
     for i, M_R_set in enumerate(M_R_values):
 
         M = M_R_set[0]  # Extract M from the first tuple
