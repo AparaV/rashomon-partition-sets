@@ -109,7 +109,7 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1, fu
     y = ground_truth_data['y']
 
     # # Step 1: Find Q for ALL possible partitions using brute force with theta = infinity
-    if full_partition
+    if full_partition:
         print("    Computing Q values for all partitions...")
         start_time = time.time()
         all_partitions_set = _brute_RAggregate_profile(
@@ -125,8 +125,9 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1, fu
         )
         all_partitions_time = time.time() - start_time
         print(f"    Found {len(all_partitions_set)} partitions in {all_partitions_time:.2f} seconds")
-    all_partitions_set = None
-    all_partitions_time = None
+    else:
+        all_partitions_set = None
+        all_partitions_time = None
 
     # Step 2: Compute Q values and posterior probabilities for all partitions
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
@@ -377,20 +378,23 @@ def run_parameter_sweep():
 
 
     # # Setup 1: Fix M, R. Vary epsilon
+    # setup_id = 1
     # M_R_values = [(4, 4)]
     # epsilon_values = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0]
     # full_partition = True
 
-    # # Setup 2: Fix M, epsilon. Vary R
-    # M_R_values = [(3, 4), (3, 5), (3, 6), (3, 7), (3, 8)]
-    # epsilon_values = [0.01]
-    # full_partition = False
-
-
-    # Setup 3: Fix R, epsilon. Vary M
-    M_R_values = [(3, 4), (4, 4), (5, 4), (6, 4), (7, 4), (8, 4)]
+    # Setup 2: Fix M, epsilon. Vary R
+    setup_id = 2
+    M_R_values = [(3, 4), (3, 5), (3, 6), (3, 7), (3, 8)]
     epsilon_values = [0.01]
     full_partition = False
+
+
+    # # Setup 3: Fix R, epsilon. Vary M
+    # setup_id = 3
+    # M_R_values = [(3, 4), (4, 4), (5, 4), (6, 4), (7, 4), (8, 4)]
+    # epsilon_values = [0.01]
+    # full_partition = False
 
     # Simulation settings
     n_data_generations = 10  # Number of random data generations
@@ -407,7 +411,7 @@ def run_parameter_sweep():
         M = M_R_set[0]  # Extract M from the first tuple
         R_val = M_R_set[1]  # Extract R from the second tuple
 
-        fname = f"rps_performance_results_{M}_{R_val}.csv"
+        fname = f"rps_performance_results_{M}_{R_val}_setup_{setup_id}.csv"
         path = f"{dir}{fname}"
 
         # Check if results already exist
@@ -434,45 +438,15 @@ def run_parameter_sweep():
             # Generate ground truth data once for this (M, R, seed)
             ground_truth_data = generate_ground_truth_data(params, seed, n_per_policy)
 
-            # For each H value, precompute all partitions and MAP
-            # This only needs to be done once per (M, R, seed, H) combination
-            # h_partition_results = {}
-            # for H_mult in H_multipliers:
-            #     H_val = int(base_H * H_mult)
-            #     print(f"    Precomputing all partitions for H={H_val}")
-
-            #     try:
-            #         # Compute all partitions and MAP once for this H value
-            #         all_partitions_results = compute_all_partitions_and_map(ground_truth_data, H_val)
-            #         h_partition_results[H_val] = all_partitions_results
-            #     except Exception as e:
-            #         print(f"      Error in precomputing for H={H_val}: {e}")
-            #         continue
-
             all_partitions_results = compute_all_partitions_and_map(ground_truth_data)
-
-            # Now evaluate RPS for all H and epsilon combinations using precomputed results
-            # for H_mult in H_multipliers:
-            #     H_val = int(base_H * H_mult)
-
-                # # Skip if we couldn't precompute for this H
-                # if H_val not in h_partition_results:
-                #     continue
-
-                # all_partitions_results = h_partition_results[H_val]
 
             for epsilon in epsilon_values:
                 print(f"    Evaluating epsilon={epsilon}")
 
-                # try:
-                    # Pass precomputed results to avoid redundant computation
                 result = evaluate_rps_performance(
                     ground_truth_data, epsilon, all_partitions_results
                 )
                 results.append(result)
-                # except Exception as e:
-                #     print(f"      Error in H={H_val}, epsilon={epsilon}: {e}")
-                #     continue
 
             if (seed + 1) % 10 == 0:
                 print(f"  Completed {seed + 1}/{n_data_generations} data generations")
