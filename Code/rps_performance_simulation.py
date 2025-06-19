@@ -8,6 +8,7 @@ from rashomon.aggregate import RAggregate_profile, _brute_RAggregate_profile
 from rashomon import hasse, loss, extract_pools
 from rps_simulation_params import create_simulation_params
 
+from sklearn.metrics import mean_squared_error
 
 def generate_ground_truth_data(params: Dict, data_gen_seed: int, n_per_policy: int = 50) -> Dict:
     """
@@ -42,11 +43,13 @@ def generate_ground_truth_data(params: Dict, data_gen_seed: int, n_per_policy: i
     pi_pools_true, pi_policies_true = extract_pools.extract_pools(target_policies, sigma_true)
 
     idx_ctr = 0
+    true_beta = np.zeros(len(target_policies))
     for pol_idx, policy in enumerate(target_policies):
         pool_id = pi_policies_true[pol_idx]
         mu_pool = mu_true[pool_id]
         var_pool = var_true[pool_id]
 
+        true_beta[pol_idx] = mu_true[pool_id]
         y_pol = np.random.normal(mu_pool, np.sqrt(var_pool), size=(n_per_policy, 1))
 
         start_idx = idx_ctr * n_per_policy
@@ -58,11 +61,10 @@ def generate_ground_truth_data(params: Dict, data_gen_seed: int, n_per_policy: i
 
         idx_ctr += 1
 
-    # Map true beta (pool means) to each policy/feature
-    true_beta = np.zeros(len(target_policies))
-    for policy_idx, policy in enumerate(target_policies):
-        pool_id = pi_policies_true[policy_idx]
-        true_beta[policy_idx] = mu_true[pool_id]
+    # # Map true beta (pool means) to each policy/feature
+    # # TODO: This can be made more efficient by directly using pi_pools_true
+    # for policy_idx, policy in enumerate(target_policies):
+    #     pool_id = pi_policies_true[policy_idx]
 
     return {
         'M': M,
@@ -119,6 +121,7 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1) ->
         policies=target_policies
     )
     all_partitions_time = time.time() - start_time
+    print(f"    Found {len(all_partitions_set)} partitions in {all_partitions_time:.2f} seconds")
 
     # Step 2: Compute Q values and posterior probabilities for all partitions
     policy_means = loss.compute_policy_means(D, y, len(target_policies))
@@ -127,26 +130,36 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1) ->
     all_betas = []
     all_sigmas = []  # Store all sigmas for easier lookup later
 
+    # policy_data = np.array([[idx for idx in enumerate(target_policies)]])
+    policy_data = np.zeros(shape=(len(target_policies), 1), dtype=int)
+    for pol_idx, policy in enumerate(target_policies):
+        policy_data[pol_idx, 0] = pol_idx
+    hasse_edges = extract_pools.lattice_edges(target_policies)
+    # hasse_edges = None
+
     for partition_idx in range(len(all_partitions_set)):
         partition_sigma = all_partitions_set.sigma[partition_idx]
-        all_sigmas.append(partition_sigma)
-
-        # Get partition pool means and map to policies
-        pi_pools_partition, _ = extract_pools.extract_pools(target_policies, partition_sigma)
-        pool_means_partition = loss.compute_pool_means(policy_means, pi_pools_partition)
-
-        # Map pool means to each policy
-        partition_beta = np.zeros(len(target_policies))
-        for policy_idx, policy in enumerate(target_policies):
-            for pool_id, pool_policies in pi_pools_partition.items():
-                if policy_idx in pool_policies:
-                    partition_beta[policy_idx] = pool_means_partition[pool_id]
-                    break
-
-        all_betas.append(partition_beta)
+        q_value = all_partitions_set.Q[partition_idx]
 
         # Compute Q value for this partition
-        q_value = loss.compute_Q(D, y, partition_sigma, target_policies, policy_means, reg)
+        # q_value = loss.compute_Q(D, y, partition_sigma, target_policies, policy_means, reg)
+
+        # # # Get partition pool means and map to policies
+        # pi_pools_partition, _ = extract_pools.extract_pools(target_policies, partition_sigma, lattice_edges=hasse_edges)
+        # pool_means_partition = loss.compute_pool_means(policy_means, pi_pools_partition)
+
+        # # Map pool means to each policy
+        # partition_beta = np.zeros(len(target_policies))
+        # for policy_idx, policy in enumerate(target_policies):
+        #     for pool_id, pool_policies in pi_pools_partition.items():
+        #         if policy_idx in pool_policies:
+        #             partition_beta[policy_idx] = pool_means_partition[pool_id]
+        #             break
+
+        partition_beta = loss.predict(policy_data, partition_sigma, target_policies, policy_means, hasse_edges)
+
+        all_betas.append(partition_beta)
+        all_sigmas.append(partition_sigma)
         all_q_values.append(q_value)
 
     all_q_values = np.array(all_q_values)
@@ -170,10 +183,10 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1) ->
 
     return {
         'all_partitions_set': all_partitions_set,
-        'all_q_values': all_q_values,
-        'all_betas': all_betas,
-        'all_sigmas': all_sigmas,
-        'posterior_weights': posterior_weights,
+        # 'all_q_values': all_q_values,
+        # 'all_betas': all_betas,
+        # 'all_sigmas': all_sigmas,
+        'norm_constant': norm_constant,
         'map_idx': map_idx,
         'map_q_value': map_q_value,
         'map_posterior_prob': map_posterior_prob,
@@ -205,12 +218,13 @@ def evaluate_rps_performance(
         all_partitions_results = compute_all_partitions_and_map(ground_truth_data)
 
     all_partitions_set = all_partitions_results['all_partitions_set']
-    all_q_values = all_partitions_results['all_q_values']
-    all_betas = all_partitions_results['all_betas']
-    all_sigmas = all_partitions_results['all_sigmas']
-    posterior_weights = all_partitions_results['posterior_weights']
+    # all_q_values = all_partitions_results['all_q_values']
+    # all_betas = all_partitions_results['all_betas']
+    # all_sigmas = all_partitions_results['all_sigmas']
+    norm_constant = all_partitions_results['norm_constant']
     full_posterior_beta = all_partitions_results['full_posterior_beta']
     reg = all_partitions_results['reg']
+    policy_means = all_partitions_results['policy_means']
 
     # Extract ground truth data
     M = ground_truth_data['M']
@@ -251,15 +265,22 @@ def evaluate_rps_performance(
     rps_q_values = []
     rps_betas = []
 
+    policy_data = np.zeros(shape=(len(target_policies), 1), dtype=int)
+    for pol_idx, policy in enumerate(target_policies):
+        policy_data[pol_idx, 0] = pol_idx
+    hasse_edges = extract_pools.lattice_edges(target_policies)
+
     for rps_idx in range(len(rashomon_set)):
         rps_sigma = rashomon_set.sigma[rps_idx]
 
-        # Find this partition in our all_partitions list to get its Q value
-        for all_idx, all_sigma in enumerate(all_sigmas):
-            if np.array_equal(rps_sigma, all_sigma):
-                rps_q_values.append(all_q_values[all_idx])
-                rps_betas.append(all_betas[all_idx])
-                break
+        rps_beta, h = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges, return_num_pools=True)
+        mse = mean_squared_error(true_beta, rps_beta)
+        q_value = mse + reg * h
+
+        # rps_beta = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges)
+        rps_betas.append(rps_beta)
+        # q_value = loss.compute_Q(D, y, rps_sigma, target_policies, policy_means, reg)
+        rps_q_values.append(q_value)
 
     # Compute RPS posterior weights (subset of all posterior weights)
     rps_q_values = np.array(rps_q_values)
@@ -269,6 +290,8 @@ def evaluate_rps_performance(
 
     # Compute RPS posterior mean beta as weighted average
     rps_posterior_beta = np.zeros(len(target_policies))
+    # print(len(rps_betas), len(rps_weights))
+    # print(rps_betas[0].shape, rps_posterior_beta.shape, rps_weights[0])
     for i, beta in enumerate(rps_betas):
         rps_posterior_beta += rps_weights[i] * beta
 
@@ -289,7 +312,7 @@ def evaluate_rps_performance(
         'num_rps_partitions': len(rashomon_set),
         'map_q_value': all_partitions_results['map_q_value'],
         'map_posterior_prob': all_partitions_results['map_posterior_prob'],
-        'norm_constant': np.sum(posterior_weights),
+        'norm_constant': norm_constant,
         'rps_norm_constant': rps_norm_constant,
         'theta_used': theta,
         'found_true_partition': int(any(np.array_equal(sigma, sigma_true) for sigma in rashomon_set.sigma)),
@@ -311,18 +334,20 @@ def run_parameter_sweep():
     # M_values = [3, 4]  # , 5]  # Number of features
     # R_values = [4, 4]  # , 5]  # Factor levels (uniform across features)
     # H_multipliers = [1.0, 1.5, 2.0]  # , 2.0]  # Multipliers for H relative to minimum needed
-    epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0]  # Multipliers for theta = q_0 * (1 + epsilon)
+    epsilon_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # Multipliers for theta = q_0 * (1 + epsilon)
 
-    M_R_values_3 = [(3, i) for i in range(4, 11, 2)]
-    M_R_values_4 = [(4, i) for i in range(4, 11, 2)]
-    M_R_values_5 = [(5, i) for i in range(4, 11, 2)]
-    M_R_values_6 = [(6, i) for i in range(4, 11, 4)]
-    M_R_values_7 = [(7, i) for i in range(4, 11, 4)]
-    M_R_values_8 = [(8, i) for i in range(4, 11, 4)]
-    M_R_values_9 = [(9, i) for i in range(4, 11, 10)]
-    M_R_values_10 = [(10, i) for i in range(4, 11, 10)]
+    M_R_values_3 = [(3, i) for i in range(4, 9, 2)]
+    M_R_values_4 = [(4, i) for i in range(4, 9, 2)]
+    M_R_values_5 = [(5, i) for i in range(4, 9, 2)]
+    M_R_values_6 = [(6, i) for i in range(4, 9, 4)]
+    # M_R_values_7 = [(7, i) for i in range(4, 9, 4)]
+    M_R_values_8 = [(8, i) for i in range(4, 9, 4)]
+    # M_R_values_9 = [(9, i) for i in range(4, 9, 10)]
+    M_R_values_10 = [(10, i) for i in range(4, 9, 10)]
 
-    M_R_values = M_R_values_3 + M_R_values_4 + M_R_values_5 + M_R_values_6 + M_R_values_7 + M_R_values_8 + M_R_values_9 + M_R_values_10
+    M_R_values = M_R_values_3 + M_R_values_4 + M_R_values_5 + M_R_values_6 + M_R_values_8 + M_R_values_10
+    # M_R_values = M_R_values_10
+    M_R_values = M_R_values_6
 
     # Simulation settings
     n_data_generations = 10  # Number of random data generations
