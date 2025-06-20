@@ -9,7 +9,6 @@ from rashomon.aggregate import RAggregate_profile, _brute_RAggregate_profile
 from rashomon import hasse, loss, extract_pools
 from rps_simulation_params import create_simulation_params
 
-from sklearn.metrics import mean_squared_error
 
 def generate_ground_truth_data(params: Dict, data_gen_seed: int, n_per_policy: int = 50) -> Dict:
     """
@@ -100,7 +99,7 @@ def compute_all_partitions_and_map(ground_truth_data: Dict, reg: float = 0.1, fu
         Dictionary containing all partitions, Q values, betas, posterior weights, and MAP info
     """
     # Extract ground truth data
-    M = ground_truth_data['M']
+    # M = ground_truth_data['M']
     R = ground_truth_data['R']
     sigma_true = ground_truth_data['sigma_true']
     target_policies = ground_truth_data['target_policies']
@@ -225,14 +224,14 @@ def evaluate_rps_performance(
     if all_partitions_results is None:
         all_partitions_results = compute_all_partitions_and_map(ground_truth_data)
 
-    all_partitions_set = all_partitions_results['all_partitions_set']
+    # all_partitions_set = all_partitions_results['all_partitions_set']
     # all_q_values = all_partitions_results['all_q_values']
     # all_betas = all_partitions_results['all_betas']
     # all_sigmas = all_partitions_results['all_sigmas']
     norm_constant = all_partitions_results['norm_constant']
     full_posterior_beta = all_partitions_results['full_posterior_beta']
     reg = all_partitions_results['reg']
-    policy_means = all_partitions_results['policy_means']
+    # policy_means = all_partitions_results['policy_means']
 
     # Extract ground truth data
     M = ground_truth_data['M']
@@ -293,7 +292,8 @@ def evaluate_rps_performance(
         D_pool = [pi_policies_idx[pol_id] for pol_id in policy_data[:, 0]]
         rps_beta = mu_pools_idx[D_pool]
 
-        # rps_beta, h = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges, return_num_pools=True)
+        # rps_beta, h = loss.predict(policy_data, rps_sigma, target_policies, policy_means, hasse_edges,
+        # return_num_pools=True)
         # mse = mean_squared_error(true_beta, rps_beta)
         # q_value = mse + reg * h
 
@@ -354,11 +354,11 @@ def run_parameter_sweep():
     Generate ground truth data once per (M, R, seed) and reuse for all H and epsilon
     """
 
-    # Setup 1: Fix M, R. Vary epsilon
-    setup_id = 1
-    M_R_values = [(3, 4), (4, 4)]
-    epsilon_values = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0]
-    full_partition = True
+    # # Setup 1: Fix M, R. Vary epsilon
+    # setup_id = 1
+    # M_R_values = [(3, 4), (4, 4)]
+    # epsilon_values = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0]
+    # full_partition = True
 
     # # Setup 2: Fix M, epsilon. Vary R
     # setup_id = 2
@@ -366,11 +366,11 @@ def run_parameter_sweep():
     # epsilon_values = [0.01]
     # full_partition = False
 
-    # # Setup 3: Fix R, epsilon. Vary M
-    # setup_id = 3
-    # M_R_values = [(3, 4), (4, 4), (5, 4), (6, 4), (7, 4), (8, 4)]
-    # epsilon_values = [0.01]
-    # full_partition = False
+    # Setup 3: Fix R, epsilon. Vary M
+    setup_id = 3
+    M_R_values = [(3, 4), (4, 4), (5, 4), (6, 4), (7, 4), (8, 4)]
+    epsilon_values = [0.01]
+    full_partition = False
 
     # Simulation settings
     n_data_generations = 10  # Number of random data generations
@@ -401,9 +401,6 @@ def run_parameter_sweep():
         seed_MR = i  # Unique seed for each (M, R) combination
         R_array = np.array([R_val] * M)
         params = create_simulation_params(M, R_array, seed_MR)
-
-        # Calculate base H needed
-        base_H = params['H']
 
         # Generate ground truth data once per (M, R, seed)
         for seed in range(n_data_generations):

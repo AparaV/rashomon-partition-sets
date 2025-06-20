@@ -176,7 +176,8 @@ def compute_Q(D: np.ndarray, y: np.ndarray, sigma: np.ndarray, policies: list,
     Q (int): The loss function
     """
 
-    mu_D, pools = predict(D, sigma, policies, policy_means, lattice_edges, return_num_pools=True, return_pools=return_pools)
+    mu_D, pools = predict(D, sigma, policies, policy_means, lattice_edges, return_num_pools=True,
+                          return_pools=return_pools)
     h = pools["mu_pools"].shape[0] if return_pools else pools
     mse = mean_squared_error(y[:, 0], mu_D)
 
