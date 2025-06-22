@@ -31,10 +31,14 @@ class RashomonSet:
 
     def __calculate_loss_stepwise(self, D, y, policies, policy_means, reg, normalize):
         Q_list = []
+        pool_list = []
+        H_list = []
         for sigma in self.P_qe:
-            Q_sigma = compute_Q(D, y, sigma, policies, policy_means, reg, normalize)
+            Q_sigma, pools_i = compute_Q(D, y, sigma, policies, policy_means, reg, normalize, return_pools=True)
             Q_list.append(Q_sigma)
-        return Q_list
+            pool_list.append(pools_i)
+            H_list.append(pools_i["mu_pools"].shape[0])
+        return Q_list, pool_list, H_list
 
     def __calculate_loss_slopes(self, D, X, y, policies, reg, normalize):
         Q_list = []
@@ -45,7 +49,9 @@ class RashomonSet:
 
     def calculate_loss(self, D, y, policies, policy_means, reg, normalize=0, slopes=False, X=None):
         if not slopes:
-            Q_list = self.__calculate_loss_stepwise(D, y, policies, policy_means, reg, normalize)
+            Q_list, pool_list, H_list = self.__calculate_loss_stepwise(D, y, policies, policy_means, reg, normalize)
+            self.H = np.array(H_list)
+            self.pools = pool_list
         else:
             Q_list = self.__calculate_loss_slopes(D, X, y, policies, reg, normalize)
         self.Q = np.array(Q_list)

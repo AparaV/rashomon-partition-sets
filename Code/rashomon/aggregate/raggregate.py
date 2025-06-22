@@ -144,6 +144,8 @@ def parallel_worker_RAggregat_profile(profile_k, eq_lb_k, M_k, R_k, H_profile,
         control_loss = eq_lb_k + reg
         rashomon_k.P_qe = [None]
         rashomon_k.Q = np.array([control_loss])
+        rashomon_k.H = np.array([1])
+        rashomon_k.pools = [None]
     else:
         # print(R_k, np.sum(R_k))
         if not bruteforce:
