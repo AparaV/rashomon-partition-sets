@@ -11,9 +11,6 @@ from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
 
 
-import time
-
-
 def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Puffer transform the data to make it suitable for regression.
@@ -97,7 +94,7 @@ def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best
      "L1_loss": L1_loss,
      "iou_lasso": iou_lasso,
      "min_dosage_present_lasso": min_dosage_present_lasso,
-     "best_policy_error_lasso": best_policy_error_lasso  
+     "best_policy_error_lasso": best_policy_error_lasso
     }
 
     return result
@@ -223,7 +220,6 @@ if __name__ == "__main__":
                 this_list = [n_per_pol, sim_i, len(pi_pools_i), sqrd_err, iou, min_dosage_present, best_pol_diff]
                 rashomon_list.append(this_list)
 
-            
             # Run Lasso regression
             lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy, puffer_inv=None)
             lasso_list_i = [n_per_pol, sim_i, lasso_result["sqrd_err"], lasso_result["L1_loss"],
