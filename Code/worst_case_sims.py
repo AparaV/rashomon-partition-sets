@@ -11,6 +11,81 @@ from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
 
 
+import time
+
+
+def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Puffer transform the data to make it suitable for regression.
+
+    Arguments:
+    y (np.ndarray): Target variable
+    X (np.ndarray): Feature matrix
+
+    Returns:
+    y_transformed (np.ndarray): Transformed target variable
+    X_transformed (np.ndarray): Transformed feature matrix
+    """
+
+    U, S, Vh = np.linalg.svd(X, full_matrices=False)
+    S_inv = np.diag(1 / S)
+
+    # start_1 = time.time()
+    F = np.matmul(S_inv, U.T)
+    F = np.matmul(U, F)
+    # end_1 = time.time()
+    # print(f"Method 1: Time for F: {end_1 - start_1:.4f} seconds")
+
+    # start_2 = time.time()
+    # F_2 = np.matmul(U, S_inv)
+    # F_2 = np.matmul(F_2, U.T)
+    # end_2 = time.time()
+    # print(f"Method 2: Time for F: {end_2 - start_2:.4f} seconds")
+
+    # print(f"F is equal: {np.allclose(F, F_2)}")
+
+    y_transformed = np.matmul(F, y)
+    X_transformed = np.matmul(U, Vh)
+
+    # print(y.shape, X.shape)
+    # print(y_transformed.shape, X_transformed.shape)
+
+    return y_transformed, X_transformed
+
+
+def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy):
+    """ Run Lasso regression on the data."""
+
+    lasso = linear_model.Lasso(reg, fit_intercept=False)
+    lasso.fit(X, y)
+    alpha_est = lasso.coef_
+    y_lasso = lasso.predict(X)
+
+    # MSE
+    sqrd_err = mean_squared_error(y_lasso, y)
+    L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
+
+    # IOU
+    lasso_best = metrics.find_best_policies(D, y_lasso)
+    iou_lasso = metrics.intersect_over_union(set(true_best), set(lasso_best))
+
+    # Min dosage inclusion
+    min_dosage_present_lasso = metrics.check_membership(min_dosage_best_policy, lasso_best)
+
+    # Best policy MSE
+    best_policy_error_lasso = np.max(mu) - np.max(y_lasso)
+
+    result = {
+     "sqrd_err": sqrd_err,
+     "L1_loss": L1_loss,
+     "iou_lasso": iou_lasso,
+     "min_dosage_present_lasso": min_dosage_present_lasso,
+     "best_policy_error_lasso": best_policy_error_lasso  
+    }
+
+    return result
+
+
 def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
     num_data = len(policies) * n_per_pol
     X = np.ndarray(shape=(num_data, M))
@@ -68,8 +143,9 @@ if __name__ == "__main__":
     min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
 
     # Simulation parameters and variables
-    samples_per_pol = [10, 100, 1000, 5000]
+    samples_per_pol = [10, 20, 50, 100, 500, 1000]
     num_sims = 100
+    # num_sims = 2
 
     H = 10
     theta = 2
@@ -78,6 +154,7 @@ if __name__ == "__main__":
     # Simulation results data structure
     rashomon_list = []
     lasso_list = []
+    tva_list = []
 
     #
     # Simulations
@@ -96,6 +173,9 @@ if __name__ == "__main__":
             # The dummy matrix for Lasso
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
+
+            y_puffer, D_puffer = puffer_transform(y, D_matrix)
+            # break
 
             #
             # Run Rashomon
@@ -125,30 +205,20 @@ if __name__ == "__main__":
                 this_list = [n_per_pol, sim_i, len(pi_pools_i), sqrd_err, iou, min_dosage_present, best_pol_diff]
                 rashomon_list.append(this_list)
 
-            #
-            # Run Lasso
-            #
-            lasso = linear_model.Lasso(reg, fit_intercept=False)
-            lasso.fit(D_matrix, y)
-            alpha_est = lasso.coef_
-            y_tva = lasso.predict(D_matrix)
+            
+            # Run Lasso regression
+            lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy)
+            lasso_list_i = [n_per_pol, sim_i, lasso_result["sqrd_err"], lasso_result["L1_loss"],
+                            lasso_result["iou_lasso"], lasso_result["min_dosage_present_lasso"],
+                            lasso_result["best_policy_error_lasso"]]
+            lasso_list.append(lasso_list_i)
 
-            # MSE
-            sqrd_err = mean_squared_error(y_tva, y)
-            L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
-
-            # IOU
-            tva_best = metrics.find_best_policies(D, y_tva)
-            iou_tva = metrics.intersect_over_union(set(true_best), set(tva_best))
-
-            # Min dosage inclusion
-            min_dosage_present_tva = metrics.check_membership(min_dosage_best_policy, tva_best)
-
-            # Best policy MSE
-            best_policy_error_tva = np.max(mu) - np.max(y_tva)
-
-            this_list = [n_per_pol, sim_i, sqrd_err, L1_loss, iou_tva, min_dosage_present_tva, best_policy_error_tva]
-            lasso_list.append(this_list)
+            # Run TVA regression
+            tva_result = run_lasso(y_puffer, D_puffer, reg, D, true_best, min_dosage_best_policy)
+            tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
+                          tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
+                          tva_result["best_policy_error_lasso"]]
+            tva_list.append(tva_list_i)
 
     rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
     rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
@@ -156,5 +226,9 @@ if __name__ == "__main__":
     lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
     lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
 
-    rashomon_df.to_csv("../Results/worst_case_rashomon.csv")
-    lasso_df.to_csv("../Results/worst_case_lasso.csv")
+    tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
+    tva_df = pd.DataFrame(tva_list, columns=tva_cols)
+
+    rashomon_df.to_csv("../Results/worst_case/worst_case_rashomon.csv")
+    lasso_df.to_csv("../Results/worst_case/worst_case_lasso.csv")
+    tva_df.to_csv("../Results/worst_case/worst_case_tva.csv")
