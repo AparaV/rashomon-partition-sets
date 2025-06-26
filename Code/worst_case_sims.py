@@ -29,12 +29,16 @@ def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarr
 
     U, S, Vh = np.linalg.svd(X, full_matrices=False)
     S_inv = np.diag(1 / S)
+    S_mat = np.diag(S)
 
     # start_1 = time.time()
     F = np.matmul(S_inv, U.T)
     F = np.matmul(U, F)
     # end_1 = time.time()
     # print(f"Method 1: Time for F: {end_1 - start_1:.4f} seconds")
+
+    F_inv = np.matmul(U, S_mat)
+    F_inv = np.matmul(F_inv, U.T)
 
     # start_2 = time.time()
     # F_2 = np.matmul(U, S_inv)
@@ -50,10 +54,11 @@ def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarr
     # print(y.shape, X.shape)
     # print(y_transformed.shape, X_transformed.shape)
 
-    return y_transformed, X_transformed
+    return y_transformed, X_transformed, F, F_inv
 
 
-def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy):
+def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy,
+              puffer_inv: np.ndarray = None) -> dict:
     """ Run Lasso regression on the data."""
 
     lasso = linear_model.Lasso(reg, fit_intercept=False)
@@ -61,22 +66,34 @@ def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best
     alpha_est = lasso.coef_
     y_lasso = lasso.predict(X)
 
+    if puffer_inv is not None:
+        y_outcome = np.matmul(puffer_inv, y)
+        y_lasso_outcome = np.matmul(puffer_inv, y_lasso)
+
+        mse = mean_squared_error(y_lasso_outcome, y_outcome)
+        sqrd_err = mean_squared_error(y_lasso, y)
+        # print(f"y_outcome_space shape: {y_lasso_outcome}")
+        # print(f"y_lasso shape: {y_lasso}")
+    else:
+        y_lasso_outcome = y_lasso
+        mse = mean_squared_error(y_lasso_outcome, y)
+        sqrd_err = mse
+
     # MSE
-    sqrd_err = mean_squared_error(y_lasso, y)
     L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
 
     # IOU
-    lasso_best = metrics.find_best_policies(D, y_lasso)
+    lasso_best = metrics.find_best_policies(D, y_lasso_outcome)
     iou_lasso = metrics.intersect_over_union(set(true_best), set(lasso_best))
 
     # Min dosage inclusion
     min_dosage_present_lasso = metrics.check_membership(min_dosage_best_policy, lasso_best)
 
     # Best policy MSE
-    best_policy_error_lasso = np.max(mu) - np.max(y_lasso)
+    best_policy_error_lasso = np.max(mu) - np.max(y_lasso_outcome)
 
     result = {
-     "sqrd_err": sqrd_err,
+     "sqrd_err": mse,
      "L1_loss": L1_loss,
      "iou_lasso": iou_lasso,
      "min_dosage_present_lasso": min_dosage_present_lasso,
@@ -144,6 +161,7 @@ if __name__ == "__main__":
 
     # Simulation parameters and variables
     samples_per_pol = [10, 20, 50, 100, 500, 1000]
+    # samples_per_pol = [10]
     num_sims = 100
     # num_sims = 2
 
@@ -174,7 +192,7 @@ if __name__ == "__main__":
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
 
-            y_puffer, D_puffer = puffer_transform(y, D_matrix)
+            y_puffer, D_puffer, F, F_inv = puffer_transform(y, D_matrix)
             # break
 
             #
@@ -207,14 +225,15 @@ if __name__ == "__main__":
 
             
             # Run Lasso regression
-            lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy)
+            lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy, puffer_inv=None)
             lasso_list_i = [n_per_pol, sim_i, lasso_result["sqrd_err"], lasso_result["L1_loss"],
                             lasso_result["iou_lasso"], lasso_result["min_dosage_present_lasso"],
                             lasso_result["best_policy_error_lasso"]]
             lasso_list.append(lasso_list_i)
 
             # Run TVA regression
-            tva_result = run_lasso(y_puffer, D_puffer, reg, D, true_best, min_dosage_best_policy)
+            tva_result = run_lasso(y_puffer, D_puffer, 1e-3 / n_per_pol, D, true_best, min_dosage_best_policy,
+                                   puffer_inv=F_inv)
             tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
                           tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
                           tva_result["best_policy_error_lasso"]]
