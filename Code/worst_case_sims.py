@@ -107,10 +107,12 @@ def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
     y = np.ndarray(shape=(num_data, 1))
 
     for idx, policy in enumerate(policies):
-        pool_i = pi_policies[idx]
-        mu_i = mu[pool_i]
-        var_i = var[pool_i]
-        y_i = np.random.normal(mu_i, var_i, size=(n_per_pol, 1))
+        # pool_i = pi_policies[idx]
+        # mu_i = mu[pool_i]
+        # var_i = var[pool_i]
+        # y_i = np.random.normal(mu_i, var_i, size=(n_per_pol, 1))
+
+        y_i = np.random.normal(mu[idx], var, size=(n_per_pol, 1))
 
         start_idx = idx * n_per_pol
         end_idx = (idx + 1) * n_per_pol
@@ -118,6 +120,8 @@ def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
         X[start_idx:end_idx, ] = policy
         D[start_idx:end_idx, ] = idx
         y[start_idx:end_idx, ] = y_i
+
+    # y = mu + np.random.normal(0, var, size=(num_data, 1))
 
     return X, D, y
 
@@ -129,8 +133,8 @@ if __name__ == "__main__":
     #
     # Fix ground truth
     #
-    sigma = np.array([[1, 1, 0],
-                      [0, 1, 0]], dtype='float64')
+    sigma = np.array([[1, 1, 1],
+                      [0, 0, 0]], dtype='float64')
     sigma_profile = (1, 1)
 
     M, _ = sigma.shape
@@ -142,29 +146,48 @@ if __name__ == "__main__":
     all_policies = hasse.enumerate_policies(M, R)
     policies = [x for x in all_policies if hasse.policy_to_profile(x) == sigma_profile]
     pi_pools, pi_policies = extract_pools(policies, sigma)
-    num_pools = len(pi_pools)
+    # num_pools = len(pi_pools)
 
     # The transformation matrix for Lasso
     G = hasse.alpha_matrix(policies)
+    # alpha = np.zeros((num_policies, 1))
+    # for i, pol in enumerate(policies):
+    #     if pol[0] <= 2 and pol[1] <= 2:
+    #         alpha[i, 0] = 0
+    #     else:
+    #         arm_a = pol[0]
+    #         arm_b = pol[1] - 1
+    #         alpha[i, 0] = -1 + 0.1 * arm_b  #+ np.random.normal(0, 0.01)
+    #     print(f"Policy {i}: {pol}, alpha: {alpha[i, 0]}")
+    # mu = np.matmul(G, alpha)[::-1]
+    # print(mu)
 
     # Set data parameters
-    mu = np.array([0, 1.5, 3, 3, 6, 4.5])
-    se = 1
-    var = se * np.ones_like(mu)
+    # mu = np.array([0, 1.5, 3, 3, 6, 4.5])
+    # se = 1
+    # var = se * np.ones_like(mu)
+    var = 1
 
-    true_best = pi_pools[np.argmax(mu)]
+    # true_best = pi_pools[np.argmax(mu)]
+    near_max_indices = np.where(np.abs(np.max(mu) - mu) <= 1e-6)[0]
+    print(near_max_indices)
+    true_best = near_max_indices
+    print(true_best)
+
     true_best_effect = np.max(mu)
     min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
 
     # Simulation parameters and variables
     samples_per_pol = [10, 20, 50, 100, 500, 1000]
-    # samples_per_pol = [10]
     num_sims = 100
-    # num_sims = 2
+    # samples_per_pol = [10, 20, 50, 100]
+    # num_sims = 10
 
-    H = 10
-    theta = 2
-    reg = 0.1
+    H = np.inf
+    theta = 1.1
+    reg = 1e-2
+    reg_rps = 1e-3
+    reg_tva = 1e-6
 
     # Simulation results data structure
     rashomon_list = []
@@ -195,9 +218,9 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            P_set = RAggregate_profile(M, R, H, D, y, theta, sigma_profile, reg)
-            if not P_set.seen(sigma):
-                print("P_set missing true sigma")
+            P_set = RAggregate_profile(M, R, H, D, y, theta, sigma_profile, reg_rps)
+            # if not P_set.seen(sigma):
+            #     print("P_set missing true sigma")
 
             for s_i in P_set:
                 pi_pools_i, pi_policies_i = extract_pools(policies, s_i)
@@ -228,7 +251,7 @@ if __name__ == "__main__":
             lasso_list.append(lasso_list_i)
 
             # Run TVA regression
-            tva_result = run_lasso(y_puffer, D_puffer, 1e-3 / n_per_pol, D, true_best, min_dosage_best_policy,
+            tva_result = run_lasso(y_puffer, D_puffer, reg_tva, D, true_best, min_dosage_best_policy,
                                    puffer_inv=F_inv)
             tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
                           tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
@@ -244,6 +267,6 @@ if __name__ == "__main__":
     tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
     tva_df = pd.DataFrame(tva_list, columns=tva_cols)
 
-    rashomon_df.to_csv("../Results/worst_case/worst_case_rashomon.csv")
-    lasso_df.to_csv("../Results/worst_case/worst_case_lasso.csv")
-    tva_df.to_csv("../Results/worst_case/worst_case_tva.csv")
+    rashomon_df.to_csv("../Results/worst_case/worst_case_rashomon_test.csv")
+    lasso_df.to_csv("../Results/worst_case/worst_case_lasso_test.csv")
+    tva_df.to_csv("../Results/worst_case/worst_case_tva_test.csv")
