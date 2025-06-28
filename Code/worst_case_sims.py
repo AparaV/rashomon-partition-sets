@@ -10,6 +10,8 @@ from rashomon import metrics
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
 
+from typing import Dict
+
 
 def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -55,7 +57,7 @@ def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarr
 
 
 def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy,
-              puffer_inv: np.ndarray = None) -> dict:
+              puff_details: Dict = None) -> dict:
     """ Run Lasso regression on the data."""
 
     lasso = linear_model.Lasso(reg, fit_intercept=False)
@@ -63,18 +65,25 @@ def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best
     alpha_est = lasso.coef_
     y_lasso = lasso.predict(X)
 
-    if puffer_inv is not None:
-        y_outcome = np.matmul(puffer_inv, y)
-        y_lasso_outcome = np.matmul(puffer_inv, y_lasso)
+    y_lasso_outcome = y_lasso.copy()
+    sqrd_err = mean_squared_error(y_lasso, y)
+    if puff_details is not None:
+        # X_outcome = np.matmul(puffer_inv, X)
+        # # alpha_outcome = np.matmul(puffer_inv, alpha_est)
+        # y_outcome = np.matmul(puffer_inv, y)
+        # # y_lasso_outcome = np.matmul(puffer_inv, y_lasso)
+        # y_lasso_outcome = np.matmul(X_outcome, alpha_est)
+        X_outcome = puff_details["X"]
+        y_outcome = puff_details["y"]
+        y_lasso_outcome = np.matmul(X_outcome, alpha_est)
 
         mse = mean_squared_error(y_lasso_outcome, y_outcome)
-        sqrd_err = mean_squared_error(y_lasso, y)
         # print(f"y_outcome_space shape: {y_lasso_outcome}")
         # print(f"y_lasso shape: {y_lasso}")
     else:
-        y_lasso_outcome = y_lasso
-        mse = mean_squared_error(y_lasso_outcome, y)
-        sqrd_err = mse
+        # y_lasso_outcome = y_lasso
+        # sqrd_err = mean_squared_error(y_lasso_outcome, y)
+        mse = sqrd_err
 
     # MSE
     L1_loss = sqrd_err + reg * np.linalg.norm(alpha_est, ord=1)
@@ -148,8 +157,13 @@ if __name__ == "__main__":
     pi_pools, pi_policies = extract_pools(policies, sigma)
     # num_pools = len(pi_pools)
 
+    for pool, policy_pools in pi_pools.items():
+        print(f"Pool {pool}: {policy_pools}")
+
     # The transformation matrix for Lasso
     G = hasse.alpha_matrix(policies)
+
+    # # Anirudh's method
     # alpha = np.zeros((num_policies, 1))
     # for i, pol in enumerate(policies):
     #     if pol[0] <= 2 and pol[1] <= 2:
@@ -163,16 +177,23 @@ if __name__ == "__main__":
     # print(mu)
 
     # Set data parameters
-    # mu = np.array([0, 1.5, 3, 3, 6, 4.5])
+    # # Original parameters
+    # mu_pools = np.array([0, 1.5, 3, 3, 6, 4.5])
+
+    # New parameters to break TVA
+    mu_pools = np.array([0, 1.5, 3, 4.5])
+    mu = np.zeros((num_policies, 1))
+    for idx, policy in enumerate(policies):
+        pool_i = pi_policies[idx]
+        mu[idx, 0] = mu_pools[pool_i]
+        # var_i = var[pool_i]
     # se = 1
     # var = se * np.ones_like(mu)
     var = 1
 
     # true_best = pi_pools[np.argmax(mu)]
     near_max_indices = np.where(np.abs(np.max(mu) - mu) <= 1e-6)[0]
-    print(near_max_indices)
     true_best = near_max_indices
-    print(true_best)
 
     true_best_effect = np.max(mu)
     min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
@@ -180,14 +201,14 @@ if __name__ == "__main__":
     # Simulation parameters and variables
     samples_per_pol = [10, 20, 50, 100, 500, 1000]
     num_sims = 100
-    # samples_per_pol = [10, 20, 50, 100]
-    # num_sims = 10
+    # samples_per_pol = [10, 20, 50, 100, 500, 1000]
+    # num_sims = 2
 
     H = np.inf
     theta = 1.1
-    reg = 1e-2
-    reg_rps = 1e-3
-    reg_tva = 1e-6
+    reg = 1e-3
+    reg_rps = 1e-2
+    reg_tva = 1e-3
 
     # Simulation results data structure
     rashomon_list = []
@@ -244,15 +265,18 @@ if __name__ == "__main__":
                 rashomon_list.append(this_list)
 
             # Run Lasso regression
-            lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy, puffer_inv=None)
+            lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy, puff_details=None)
             lasso_list_i = [n_per_pol, sim_i, lasso_result["sqrd_err"], lasso_result["L1_loss"],
                             lasso_result["iou_lasso"], lasso_result["min_dosage_present_lasso"],
                             lasso_result["best_policy_error_lasso"]]
             lasso_list.append(lasso_list_i)
 
             # Run TVA regression
-            tva_result = run_lasso(y_puffer, D_puffer, reg_tva, D, true_best, min_dosage_best_policy,
-                                   puffer_inv=F_inv)
+            gamma = -1
+            scaling = n_per_pol ** gamma
+            puff_details = {"F": F, "X": D_matrix, "y": y}
+            tva_result = run_lasso(y_puffer, D_puffer, reg_tva * scaling, D, true_best, min_dosage_best_policy,
+                                   puff_details=puff_details)
             tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
                           tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
                           tva_result["best_policy_error_lasso"]]
@@ -267,6 +291,6 @@ if __name__ == "__main__":
     tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
     tva_df = pd.DataFrame(tva_list, columns=tva_cols)
 
-    rashomon_df.to_csv("../Results/worst_case/worst_case_rashomon_test.csv")
-    lasso_df.to_csv("../Results/worst_case/worst_case_lasso_test.csv")
-    tva_df.to_csv("../Results/worst_case/worst_case_tva_test.csv")
+    rashomon_df.to_csv("../Results/worst_case/worst_case_rashomon.csv")
+    lasso_df.to_csv("../Results/worst_case/worst_case_lasso.csv")
+    tva_df.to_csv("../Results/worst_case/worst_case_tva.csv")
