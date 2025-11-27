@@ -81,7 +81,7 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta: floa
             rashomon_profiles[idx].sort()
 
     for idx, r in enumerate(rashomon_profiles):
-        _ = rashomon_profiles[idx].pools
+        _ = rashomon_profiles[idx].num_pools
 
     losses = [r.loss for r in rashomon_profiles]
 
@@ -104,7 +104,7 @@ def find_feasible_combinations(rashomon_profiles: list[RashomonSet], theta: floa
                 if rashomon_profiles[k].Q[idx] > 0:
                     pools += 1
             else:
-                pools += rashomon_profiles[k].pools[idx]
+                pools += rashomon_profiles[k].num_pools[idx]
         if pools <= H:
             feasible_combinations.append(comb)
 
@@ -144,6 +144,8 @@ def parallel_worker_RAggregat_profile(profile_k, eq_lb_k, M_k, R_k, H_profile,
         control_loss = eq_lb_k + reg
         rashomon_k.P_qe = [None]
         rashomon_k.Q = np.array([control_loss])
+        rashomon_k.H = np.array([1])
+        rashomon_k.pools = [None]
     else:
         # print(R_k, np.sum(R_k))
         if not bruteforce:

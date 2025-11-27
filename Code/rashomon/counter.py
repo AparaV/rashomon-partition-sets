@@ -221,6 +221,10 @@ def __num_pools_classic__(sigma: np.ndarray, R: int) -> int:
         sign = (-1) ** i
         H += sign * z_sums[i] * (R - 1) ** (m - i)
 
+    if H != int(H):
+        raise ValueError("Calculated number of pools is not an integer.")
+    H = int(H)
+
     return H
 
 
@@ -249,6 +253,10 @@ def __num_pools_complex__(sigma: np.ndarray, R: np.ndarray) -> int:
         z_sum = np.prod(z[comb])
         splits = R_prod / np.prod(R[comb])
         H += sign * z_sum * splits
+
+    if H != int(H):
+        raise ValueError("Calculated number of pools is not an integer.")
+    H = int(H)
 
     return H
 
