@@ -42,7 +42,7 @@ for i, profile in enumerate(profiles):
         # var_i = np.array([1, 2])
         mu_i = np.array([4.5])
         var_i = np.array([var_fixed * var_scale_i])
-        var_i = np.array([var_fixed * 1.5])
+        # var_i = np.array([var_fixed * 1.5])
     # (0, 1, 0, 1)
     elif i == 5:
         # sigma_i[1, 1] = 0
