@@ -13,6 +13,7 @@ from rashomon import metrics
 from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 from baselines import BayesianLasso
+from baselines import BootstrapLasso
 
 
 def parse_arguments():
@@ -86,6 +87,12 @@ if __name__ == "__main__":
     blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
     blasso_tau2_a = getattr(params, 'blasso_tau2_a', 1.0)
     blasso_tau2_b = getattr(params, 'blasso_tau2_b', 1.0)
+    
+    # Bootstrap Lasso parameters (with defaults)
+    bootstrap_n_iter = getattr(params, 'bootstrap_n_iter', 1000)
+    bootstrap_alpha = getattr(params, 'bootstrap_alpha', 1.0)
+    bootstrap_confidence_level = getattr(params, 'bootstrap_confidence_level', 0.95)
+    bootstrap_random_state = getattr(params, 'bootstrap_random_state', None)
 
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
@@ -104,6 +111,7 @@ if __name__ == "__main__":
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
     blasso_fname = args.output_prefix + "_blasso" + output_suffix
+    bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
 
     # Identify the pools
     policies_profiles = {}
@@ -156,12 +164,13 @@ if __name__ == "__main__":
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso", "blasso"]:
-        print(f"method should be one of [r, lasso, blasso]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso", "blasso", "bootstrap"]:
+        print(f"method should be one of [r, lasso, blasso, bootstrap]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
     blasso_list = []
+    bootstrap_list = []
 
     np.random.seed(3)
 
@@ -344,6 +353,45 @@ if __name__ == "__main__":
                 ]
                 this_list += best_profile_indicator_blasso
                 blasso_list.append(this_list)
+            
+            #
+            # Run Bootstrap Lasso
+            #
+            if method == "bootstrap":
+                bootstrap = BootstrapLasso(
+                    n_bootstrap=bootstrap_n_iter,
+                    alpha=bootstrap_alpha,
+                    confidence_level=bootstrap_confidence_level,
+                    fit_intercept=False,
+                    random_state=sim_i if bootstrap_random_state is None else bootstrap_random_state,
+                    verbose=False
+                )
+                bootstrap.fit(D_matrix, y)
+                
+                y_bootstrap = bootstrap.predict(D_matrix)
+                
+                bootstrap_results = metrics.compute_all_metrics(
+                    y, y_bootstrap, D, true_best, all_policies, profile_map,
+                    min_dosage_best_policy, true_best_effect)
+                sqrd_err_bootstrap = bootstrap_results["sqrd_err"]
+                iou_bootstrap = bootstrap_results["iou"]
+                best_profile_indicator_bootstrap = bootstrap_results["best_prof"]
+                min_dosage_present_bootstrap = bootstrap_results["min_dos_inc"]
+                best_policy_diff_bootstrap = bootstrap_results["best_pol_diff"]
+                
+                # Store bootstrap-specific diagnostics
+                coverage = bootstrap.coverage_
+                mean_ci_width = np.mean(bootstrap.coef_ci_[:, 1] - bootstrap.coef_ci_[:, 0])
+                feature_importance = bootstrap.get_feature_importance()
+                n_stable_features = np.sum(feature_importance > 0.5)  # Features selected in >50% of iterations
+                
+                this_list = [
+                    n_per_pol, sim_i, sqrd_err_bootstrap, iou_bootstrap,
+                    min_dosage_present_bootstrap, best_policy_diff_bootstrap,
+                    coverage, mean_ci_width, n_stable_features
+                ]
+                this_list += best_profile_indicator_bootstrap
+                bootstrap_list.append(this_list)
 
     profiles_str = [str(prof) for prof in profiles]
 
@@ -364,3 +412,10 @@ if __name__ == "__main__":
         blasso_cols += profiles_str
         blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
         blasso_df.to_csv(os.path.join(output_dir, blasso_fname))
+    
+    if method == "bootstrap":
+        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", 
+                         "coverage", "mean_ci_width", "n_stable_features"]
+        bootstrap_cols += profiles_str
+        bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
+        bootstrap_df.to_csv(os.path.join(output_dir, bootstrap_fname))

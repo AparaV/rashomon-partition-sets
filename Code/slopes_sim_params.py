@@ -70,3 +70,21 @@ H = np.inf
 # theta = 0.58
 theta = 0.46
 reg = 4e-3
+
+# Lasso regularization
+lasso_reg = 5e-3
+
+# Bayesian Lasso parameters
+blasso_n_iter = 2000
+blasso_burnin = 500
+blasso_thin = 2
+blasso_n_chains = 4
+blasso_lambda = 1.0
+blasso_tau2_a = 1.0
+blasso_tau2_b = 1.0
+
+# Bootstrap Lasso parameters
+bootstrap_n_iter = 1000
+bootstrap_alpha = 5e-3
+bootstrap_confidence_level = 0.95
+bootstrap_random_state = None

@@ -42,7 +42,7 @@ for i, profile in enumerate(profiles):
         # var_i = np.array([1, 2])
         mu_i = np.array([4.5])
         var_i = np.array([var_fixed * var_scale_i])
-        # var_i = np.array([var_fixed * 1.5])
+        var_i = np.array([var_fixed * 1.5])
     # (0, 1, 0, 1)
     elif i == 5:
         # sigma_i[1, 1] = 0
@@ -102,6 +102,12 @@ blasso_n_chains = 3      # Number of chains (reduced from 4)
 blasso_lambda = 5e-1      # Regularization strength (stronger for high-dim)
 blasso_tau2_a = 1e-1      # Inverse-Gamma prior shape
 blasso_tau2_b = 1e-1     # Inverse-Gamma prior scale
+
+# Bootstrap Lasso parameters
+bootstrap_n_iter = 1000          # Number of bootstrap iterations
+bootstrap_alpha = 5e-3           # Lasso regularization (same as lasso_reg)
+bootstrap_confidence_level = 0.95  # Confidence level for intervals
+bootstrap_random_state = None    # Random state (None uses sim_i)
 
 # # Profile 1: (0, 0, 1)
 # sigma_1 = np.array([[1, 1]])
