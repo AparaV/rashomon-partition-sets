@@ -95,11 +95,13 @@ lasso_reg = 5e-3
 # Bayesian Lasso parameters
 # Note: With n=2560, p=256, sampling is slow (~6s per 100 iterations)
 # Using reduced iterations for computational feasibility
-blasso_n_iter = 2000      # Total iterations (reduced from 2000)
+blasso_n_iter = 3000      # Total iterations (reduced from 2000)
 blasso_burnin = 1000      # Burn-in (reduced from 500)
 blasso_thin = 2          # Thinning
 blasso_n_chains = 3      # Number of chains (reduced from 4)
 blasso_lambda = 5e-1      # Regularization strength (stronger for high-dim)
+blasso_tau2_a = 1e-1      # Inverse-Gamma prior shape
+blasso_tau2_b = 1e-1     # Inverse-Gamma prior scale
 
 # # Profile 1: (0, 0, 1)
 # sigma_1 = np.array([[1, 1]])

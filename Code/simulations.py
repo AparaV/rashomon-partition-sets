@@ -84,6 +84,8 @@ if __name__ == "__main__":
     blasso_thin = getattr(params, 'blasso_thin', 2)
     blasso_n_chains = getattr(params, 'blasso_n_chains', 4)
     blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
+    blasso_tau2_a = getattr(params, 'blasso_tau2_a', 1.0)
+    blasso_tau2_b = getattr(params, 'blasso_tau2_b', 1.0)
 
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
@@ -313,6 +315,8 @@ if __name__ == "__main__":
                     burnin=blasso_burnin,
                     thin=blasso_thin,
                     lambda_prior=blasso_lambda,
+                    tau2_a=blasso_tau2_a,
+                    tau2_b=blasso_tau2_b,
                     random_state=sim_i,
                     verbose=False
                 )
