@@ -109,12 +109,12 @@ class BootstrapLasso:
         self : object
             Returns self for method chaining.
         """
+        # Flatten y before validation to avoid warning
+        if hasattr(y, 'ndim') and y.ndim > 1 and y.shape[1] == 1:
+            y = y.ravel()
+        
         # Validate input
         X, y = check_X_y(X, y, accept_sparse=False, y_numeric=True)
-        
-        # Flatten y if needed
-        if y.ndim > 1 and y.shape[1] == 1:
-            y = y.ravel()
         
         n_samples, n_features = X.shape
         self.n_features_in_ = n_features
@@ -134,6 +134,10 @@ class BootstrapLasso:
             indices = rng.choice(n_samples, size=n_samples, replace=True)
             X_boot = X[indices]
             y_boot = y[indices]
+            
+            # Ensure y_boot is 1D to avoid sklearn warning
+            if y_boot.ndim > 1:
+                y_boot = y_boot.ravel()
             
             # Fit Lasso on bootstrap sample
             lasso = Lasso(
