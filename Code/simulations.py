@@ -12,6 +12,7 @@ from rashomon import loss
 from rashomon import metrics
 from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
+from baselines import BayesianLasso
 
 
 def parse_arguments():
@@ -25,7 +26,7 @@ def parse_arguments():
     parser.add_argument("--output_prefix", type=str,
                         help="Prefix for output file name")
     parser.add_argument("--method", type=str,
-                        help="One of {r, lasso}")
+                        help="One of {r, lasso, blasso}")
     args = parser.parse_args()
     return args
 
@@ -76,6 +77,13 @@ if __name__ == "__main__":
     theta = params.theta
     reg = params.reg
     lasso_reg = params.lasso_reg
+    
+    # Bayesian Lasso parameters (with defaults)
+    blasso_n_iter = getattr(params, 'blasso_n_iter', 2000)
+    blasso_burnin = getattr(params, 'blasso_burnin', 500)
+    blasso_thin = getattr(params, 'blasso_thin', 2)
+    blasso_n_chains = getattr(params, 'blasso_n_chains', 4)
+    blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
 
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
@@ -93,6 +101,7 @@ if __name__ == "__main__":
     output_suffix = f"_{args.sample_size}_{args.iters}.csv"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
+    blasso_fname = args.output_prefix + "_blasso" + output_suffix
 
     # Identify the pools
     policies_profiles = {}
@@ -145,11 +154,12 @@ if __name__ == "__main__":
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso"]:
-        print(f"method should be one of [r, lasso]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso", "blasso"]:
+        print(f"method should be one of [r, lasso, blasso]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
+    blasso_list = []
 
     np.random.seed(3)
 
@@ -294,6 +304,43 @@ if __name__ == "__main__":
                 this_list += best_profile_indicator_tva
                 lasso_list.append(this_list)
 
+            #
+            # Run Bayesian Lasso
+            #
+            if method == "blasso":
+                blasso = BayesianLasso(
+                    n_iter=blasso_n_iter,
+                    burnin=blasso_burnin,
+                    thin=blasso_thin,
+                    lambda_prior=blasso_lambda,
+                    random_state=sim_i,
+                    verbose=False
+                )
+                blasso.fit(D_matrix, y, n_chains=blasso_n_chains)
+                
+                y_blasso = blasso.predict(D_matrix)
+                
+                blasso_results = metrics.compute_all_metrics(
+                    y, y_blasso, D, true_best, all_policies, profile_map, 
+                    min_dosage_best_policy, true_best_effect)
+                sqrd_err_blasso = blasso_results["sqrd_err"]
+                iou_blasso = blasso_results["iou"]
+                best_profile_indicator_blasso = blasso_results["best_prof"]
+                min_dosage_present_blasso = blasso_results["min_dos_inc"]
+                best_policy_diff_blasso = blasso_results["best_pol_diff"]
+                
+                # Store convergence information
+                converged = blasso.converged_
+                max_rhat = np.max(blasso.rhat_)
+                
+                this_list = [
+                    n_per_pol, sim_i, sqrd_err_blasso, iou_blasso, 
+                    min_dosage_present_blasso, best_policy_diff_blasso,
+                    converged, max_rhat
+                ]
+                this_list += best_profile_indicator_blasso
+                blasso_list.append(this_list)
+
     profiles_str = [str(prof) for prof in profiles]
 
     if method == "r":
@@ -307,3 +354,9 @@ if __name__ == "__main__":
         lasso_cols += profiles_str
         lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
         lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
+    
+    if method == "blasso":
+        blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat"]
+        blasso_cols += profiles_str
+        blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
+        blasso_df.to_csv(os.path.join(output_dir, blasso_fname))
