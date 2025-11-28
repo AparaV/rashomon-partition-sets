@@ -226,29 +226,41 @@ class BayesianLasso:
         where Σ_β = τ²(X'X + D_λ^(-1))^(-1)
               μ_β = Σ_β X'y / τ²
         and D_λ = diag(λ_1², ..., λ_p²)
+        
+        OPTIMIZED: Uses Cholesky solve without computing full covariance matrix.
+        This avoids O(p³) matrix inversion and O(p³) Cholesky in multivariate_normal.
         """
         n_features = len(lambda2)
 
-        # Covariance matrix: Σ_β = τ²(X'X + D_λ^(-1))^(-1)
-        D_lambda_inv = np.diag(1.0 / lambda2)
-        A = XtX + D_lambda_inv
+        # A = X'X + diag(1/λ²) - direct diagonal update (optimization 2)
+        A = XtX.copy()
+        A.flat[::n_features + 1] += 1.0 / lambda2  # Add to diagonal elements
 
         # Use Cholesky decomposition for numerical stability
         try:
             L = np.linalg.cholesky(A)
-            # Solve for Σ_β
-            Sigma_beta = np.linalg.solve(L @ L.T, np.eye(n_features)) * tau2
-            # Mean: μ_β = Σ_β X'y / τ²
-            mu_beta = Sigma_beta @ Xty / tau2
+            
+            # Solve for mean: L @ L.T @ μ = X'y / τ²
+            # More efficient than computing full Sigma_beta (optimization 1)
+            v = Xty / tau2
+            w = np.linalg.solve(L, v)  # Forward solve: L @ w = v
+            mu_beta = np.linalg.solve(L.T, w)  # Backward solve: L.T @ μ = w
+            
+            # Sample: β = μ + L^(-T) @ (√τ² * z) where z ~ N(0, I)
+            # This is equivalent to sampling from N(μ, τ²(L.T @ L)^(-1))
+            z = rng.standard_normal(n_features) * np.sqrt(tau2)
+            beta = mu_beta + np.linalg.solve(L.T, z)
+            
         except np.linalg.LinAlgError:
             # Fall back to regularized version if Cholesky fails
             warnings.warn("Cholesky decomposition failed, using regularized inversion")
             A_reg = A + 1e-6 * np.eye(n_features)
-            Sigma_beta = np.linalg.inv(A_reg) * tau2
-            mu_beta = Sigma_beta @ Xty / tau2
-
-        # Sample from multivariate normal
-        beta = rng.multivariate_normal(mu_beta, Sigma_beta)
+            L = np.linalg.cholesky(A_reg)
+            v = Xty / tau2
+            w = np.linalg.solve(L, v)
+            mu_beta = np.linalg.solve(L.T, w)
+            z = rng.standard_normal(n_features) * np.sqrt(tau2)
+            beta = mu_beta + np.linalg.solve(L.T, z)
 
         return beta
 
