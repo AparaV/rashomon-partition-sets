@@ -166,7 +166,7 @@ def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best
 def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
                        blasso_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
     """Run Bayesian Lasso regression on the data."""
-    
+
     blasso = BayesianLasso(
         n_iter=blasso_params["n_iter"],
         burnin=blasso_params["burnin"],
@@ -178,27 +178,27 @@ def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, m
         random_state=sim_seed,
         verbose=verbose
     )
-    
+
     blasso.fit(X, y, n_chains=blasso_params["n_chains"])
     y_blasso = blasso.predict(X)
-    
+
     # Compute metrics
     mse = mean_squared_error(y, y_blasso)
-    
+
     # IOU
     blasso_best = metrics.find_best_policies(D, y_blasso)
     iou_blasso = metrics.intersect_over_union(set(true_best), set(blasso_best))
-    
+
     # Min dosage inclusion
     min_dosage_present_blasso = metrics.check_membership(min_dosage_best_policy, blasso_best)
-    
+
     # Best policy error
     best_policy_error_blasso = np.max(mu) - np.max(y_blasso)
-    
+
     # Convergence diagnostics
     converged = blasso.converged_
     max_rhat = np.max(blasso.rhat_)
-    
+
     result = {
         "sqrd_err": mse,
         "iou_blasso": iou_blasso,
@@ -207,14 +207,14 @@ def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, m
         "converged": converged,
         "max_rhat": max_rhat
     }
-    
+
     return result
 
 
 def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
                         bootstrap_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
     """Run Bootstrap Lasso regression on the data."""
-    
+
     bootstrap = BootstrapLasso(
         n_bootstrap=bootstrap_params["n_iter"],
         alpha=bootstrap_params["alpha"],
@@ -223,29 +223,29 @@ def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, 
         random_state=sim_seed,
         verbose=verbose
     )
-    
+
     bootstrap.fit(X, y)
     y_bootstrap = bootstrap.predict(X)
-    
+
     # Compute metrics
     mse = mean_squared_error(y, y_bootstrap)
-    
+
     # IOU
     bootstrap_best = metrics.find_best_policies(D, y_bootstrap)
     iou_bootstrap = metrics.intersect_over_union(set(true_best), set(bootstrap_best))
-    
+
     # Min dosage inclusion
     min_dosage_present_bootstrap = metrics.check_membership(min_dosage_best_policy, bootstrap_best)
-    
+
     # Best policy error
     best_policy_error_bootstrap = np.max(mu) - np.max(y_bootstrap)
-    
+
     # Bootstrap diagnostics
     coverage = bootstrap.coverage_
     mean_ci_width = np.mean(bootstrap.coef_ci_[:, 1] - bootstrap.coef_ci_[:, 0])
     feature_importance = bootstrap.get_feature_importance()
     n_stable_features = np.sum(feature_importance > 0.5)
-    
+
     result = {
         "sqrd_err": mse,
         "iou_bootstrap": iou_bootstrap,
@@ -255,7 +255,7 @@ def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, 
         "mean_ci_width": mean_ci_width,
         "n_stable_features": n_stable_features
     }
-    
+
     return result
 
 
@@ -288,7 +288,7 @@ def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
 if __name__ == "__main__":
 
     args = parse_arguments()
-    
+
     np.random.seed(3)
 
     #
@@ -353,7 +353,7 @@ if __name__ == "__main__":
     # Parse command line arguments
     methods_to_run = args.methods
     verbose = args.verbose
-    
+
     # Simulation parameters and variables
     if args.test:
         samples_per_pol = [10, 50]
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     else:
         samples_per_pol = args.samples if args.samples is not None else [10, 20, 50, 100, 500, 1000]
         num_sims = args.iters if args.iters is not None else 100
-    
+
     if verbose:
         print(f"Methods to run: {methods_to_run}")
         print(f"Sample sizes: {samples_per_pol}")
@@ -374,7 +374,7 @@ if __name__ == "__main__":
     reg = 1e-3
     reg_rps = 1e-2
     reg_tva = 1e-3
-    
+
     # Bayesian Lasso parameters
     if args.test:
         blasso_params = {
@@ -396,7 +396,7 @@ if __name__ == "__main__":
             "tau2_a": 1e-1,
             "tau2_b": 1e-1
         }
-    
+
     # Bootstrap Lasso parameters
     if args.test:
         bootstrap_params = {
@@ -488,32 +488,32 @@ if __name__ == "__main__":
                               tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
                               tva_result["best_policy_error_lasso"]]
                 tva_list.append(tva_list_i)
-            
+
             # Run Bayesian Lasso
             if "blasso" in methods_to_run:
                 blasso_result = run_bayesian_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
                                                    blasso_params, sim_i, verbose=False)
                 blasso_list_i = [n_per_pol, sim_i, blasso_result["sqrd_err"],
-                                blasso_result["iou_blasso"], blasso_result["min_dosage_present_blasso"],
-                                blasso_result["best_policy_error_blasso"], blasso_result["converged"],
-                                blasso_result["max_rhat"]]
+                                 blasso_result["iou_blasso"], blasso_result["min_dosage_present_blasso"],
+                                 blasso_result["best_policy_error_blasso"], blasso_result["converged"],
+                                 blasso_result["max_rhat"]]
                 blasso_list.append(blasso_list_i)
-            
+
             # Run Bootstrap Lasso
             if "bootstrap" in methods_to_run:
                 bootstrap_result = run_bootstrap_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
                                                        bootstrap_params, sim_i, verbose=False)
                 bootstrap_list_i = [n_per_pol, sim_i, bootstrap_result["sqrd_err"],
-                                   bootstrap_result["iou_bootstrap"], bootstrap_result["min_dosage_present_bootstrap"],
-                                   bootstrap_result["best_policy_error_bootstrap"], bootstrap_result["coverage"],
-                                   bootstrap_result["mean_ci_width"], bootstrap_result["n_stable_features"]]
+                                    bootstrap_result["iou_bootstrap"], bootstrap_result["min_dosage_present_bootstrap"],
+                                    bootstrap_result["best_policy_error_bootstrap"], bootstrap_result["coverage"],
+                                    bootstrap_result["mean_ci_width"], bootstrap_result["n_stable_features"]]
                 bootstrap_list.append(bootstrap_list_i)
 
     # Save results for methods that were run
     suffix = f"_{args.output_suffix}" if args.output_suffix else ""
     if args.test:
         suffix += "_test"
-    
+
     if "rashomon" in methods_to_run:
         rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
         rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
@@ -534,21 +534,21 @@ if __name__ == "__main__":
         tva_df.to_csv(f"../Results/worst_case/worst_case_tva{suffix}.csv")
         if verbose:
             print(f"Saved TVA results to worst_case_tva{suffix}.csv")
-    
+
     if "blasso" in methods_to_run:
         blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat"]
         blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
         blasso_df.to_csv(f"../Results/worst_case/worst_case_blasso{suffix}.csv")
         if verbose:
             print(f"Saved Bayesian Lasso results to worst_case_blasso{suffix}.csv")
-    
+
     if "bootstrap" in methods_to_run:
-        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", 
-                         "coverage", "mean_ci_width", "n_stable_features"]
+        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                          "coverage", "mean_ci_width", "n_stable_features"]
         bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
         bootstrap_df.to_csv(f"../Results/worst_case/worst_case_bootstrap{suffix}.csv")
         if verbose:
             print(f"Saved Bootstrap Lasso results to worst_case_bootstrap{suffix}.csv")
-    
+
     if verbose:
         print("\nSimulations complete!")
