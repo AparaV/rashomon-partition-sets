@@ -127,7 +127,7 @@ class BayesianLasso:
         y = self._validate_target(y)
         n_samples, n_features = X.shape
         self.n_features_in_ = n_features
-        
+
         # Pre-allocate workspace matrix (optimization 3)
         self._A_workspace = np.empty((n_features, n_features))
 
@@ -192,7 +192,7 @@ class BayesianLasso:
         for iter_idx in range(self.n_iter):
             # Sample β | τ², λ², y
             beta = self._sample_beta(y, XtX, Xty, tau2, lambda2, rng)
-            
+
             # Compute residuals once for tau2 sampling (optimization 2)
             residuals = y - X @ beta
 
@@ -225,7 +225,7 @@ class BayesianLasso:
         where Σ_β = τ²(X'X + D_λ^(-1))^(-1)
               μ_β = Σ_β X'y / τ²
         and D_λ = diag(λ_1², ..., λ_p²)
-        
+
         OPTIMIZED: Uses Cholesky solve without computing full covariance matrix.
         This avoids O(p³) matrix inversion and O(p³) Cholesky in multivariate_normal.
         Uses workspace matrix to avoid allocation (optimization 3).
@@ -240,18 +240,18 @@ class BayesianLasso:
         # Use Cholesky decomposition for numerical stability
         try:
             L = np.linalg.cholesky(A)
-            
+
             # Solve for mean: L @ L.T @ μ = X'y / τ²
             # More efficient than computing full Sigma_beta (optimization 1)
             v = Xty / tau2
             w = np.linalg.solve(L, v)  # Forward solve: L @ w = v
             mu_beta = np.linalg.solve(L.T, w)  # Backward solve: L.T @ μ = w
-            
+
             # Sample: β = μ + L^(-T) @ (√τ² * z) where z ~ N(0, I)
             # This is equivalent to sampling from N(μ, τ²(L.T @ L)^(-1))
             z = rng.standard_normal(n_features) * np.sqrt(tau2)
             beta = mu_beta + np.linalg.solve(L.T, z)
-            
+
         except np.linalg.LinAlgError:
             # Fall back to regularized version if Cholesky fails
             warnings.warn("Cholesky decomposition failed, using regularized inversion")
@@ -277,7 +277,7 @@ class BayesianLasso:
 
         τ² | β, y ~ InverseGamma(a + n/2 + p/2, b + RSS/2 + β'D_λ^(-1)β/2)
         where RSS = ||y - Xβ||²
-        
+
         OPTIMIZED: Accepts pre-computed residuals to avoid recomputation.
         """
         # Residual sum of squares
@@ -303,7 +303,7 @@ class BayesianLasso:
 
         λ_j² | β_j, τ² ~ InverseGaussian(μ = λ/|β_j|, λ = λ²)
         where λ is the prior scale parameter
-        
+
         OPTIMIZED: Uses vectorized sampling via chi-squared relationship.
         InverseGaussian(μ, λ) can be sampled using:
         ν = χ²(1), u = Uniform(0,1)
@@ -311,27 +311,27 @@ class BayesianLasso:
         with probability μ/(μ+x), return x, else return μ²/x
         """
         n_features = len(beta)
-        
+
         # Parameters for inverse-Gaussian: μ = λ/|β_j|, shape = λ²
         mu = self.lambda_prior / (np.abs(beta) + 1e-10)  # Vectorized
         lam = self.lambda_prior ** 2
-        
+
         # Sample using chi-squared relationship (vectorized)
         nu = rng.chisquare(1, size=n_features)  # χ²(1) samples
         y = mu + (mu**2 * nu) / (2 * lam) - (mu / (2 * lam)) * np.sqrt(4 * mu * lam * nu + mu**2 * nu**2)
-        
+
         # Accept with probability μ/(μ+y), otherwise return μ²/y
         u = rng.uniform(0, 1, size=n_features)
         accept = u <= mu / (mu + y)
-        
+
         # Compute rejected values safely (avoid division by zero)
         y_safe = np.maximum(y, 1e-12)  # Ensure y > 0
         rejected_vals = mu**2 / y_safe
-        
+
         lambda2 = np.where(accept, y, rejected_vals)
         # Clip to reasonable range to avoid numerical issues
         lambda2 = np.clip(lambda2, 1e-10, 1e10)
-        
+
         return lambda2
 
     def predict(self, X: np.ndarray) -> np.ndarray:
