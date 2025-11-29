@@ -78,7 +78,7 @@ if __name__ == "__main__":
     theta = params.theta
     reg = params.reg
     lasso_reg = params.lasso_reg
-    
+
     # Bayesian Lasso parameters (with defaults)
     blasso_n_iter = getattr(params, 'blasso_n_iter', 2000)
     blasso_burnin = getattr(params, 'blasso_burnin', 500)
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
     blasso_tau2_a = getattr(params, 'blasso_tau2_a', 1.0)
     blasso_tau2_b = getattr(params, 'blasso_tau2_b', 1.0)
-    
+
     # Bootstrap Lasso parameters (with defaults)
     bootstrap_n_iter = getattr(params, 'bootstrap_n_iter', 1000)
     bootstrap_alpha = getattr(params, 'bootstrap_alpha', 1.0)
@@ -330,30 +330,30 @@ if __name__ == "__main__":
                     verbose=False
                 )
                 blasso.fit(D_matrix, y, n_chains=blasso_n_chains)
-                
+
                 y_blasso = blasso.predict(D_matrix)
-                
+
                 blasso_results = metrics.compute_all_metrics(
-                    y, y_blasso, D, true_best, all_policies, profile_map, 
+                    y, y_blasso, D, true_best, all_policies, profile_map,
                     min_dosage_best_policy, true_best_effect)
                 sqrd_err_blasso = blasso_results["sqrd_err"]
                 iou_blasso = blasso_results["iou"]
                 best_profile_indicator_blasso = blasso_results["best_prof"]
                 min_dosage_present_blasso = blasso_results["min_dos_inc"]
                 best_policy_diff_blasso = blasso_results["best_pol_diff"]
-                
+
                 # Store convergence information
                 converged = blasso.converged_
                 max_rhat = np.max(blasso.rhat_)
-                
+
                 this_list = [
-                    n_per_pol, sim_i, sqrd_err_blasso, iou_blasso, 
+                    n_per_pol, sim_i, sqrd_err_blasso, iou_blasso,
                     min_dosage_present_blasso, best_policy_diff_blasso,
                     converged, max_rhat
                 ]
                 this_list += best_profile_indicator_blasso
                 blasso_list.append(this_list)
-            
+
             #
             # Run Bootstrap Lasso
             #
@@ -367,9 +367,9 @@ if __name__ == "__main__":
                     verbose=False
                 )
                 bootstrap.fit(D_matrix, y)
-                
+
                 y_bootstrap = bootstrap.predict(D_matrix)
-                
+
                 bootstrap_results = metrics.compute_all_metrics(
                     y, y_bootstrap, D, true_best, all_policies, profile_map,
                     min_dosage_best_policy, true_best_effect)
@@ -378,13 +378,13 @@ if __name__ == "__main__":
                 best_profile_indicator_bootstrap = bootstrap_results["best_prof"]
                 min_dosage_present_bootstrap = bootstrap_results["min_dos_inc"]
                 best_policy_diff_bootstrap = bootstrap_results["best_pol_diff"]
-                
+
                 # Store bootstrap-specific diagnostics
                 coverage = bootstrap.coverage_
                 mean_ci_width = np.mean(bootstrap.coef_ci_[:, 1] - bootstrap.coef_ci_[:, 0])
                 feature_importance = bootstrap.get_feature_importance()
                 n_stable_features = np.sum(feature_importance > 0.5)  # Features selected in >50% of iterations
-                
+
                 this_list = [
                     n_per_pol, sim_i, sqrd_err_bootstrap, iou_bootstrap,
                     min_dosage_present_bootstrap, best_policy_diff_bootstrap,
@@ -406,16 +406,16 @@ if __name__ == "__main__":
         lasso_cols += profiles_str
         lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
         lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
-    
+
     if method == "blasso":
         blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat"]
         blasso_cols += profiles_str
         blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
         blasso_df.to_csv(os.path.join(output_dir, blasso_fname))
-    
+
     if method == "bootstrap":
-        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", 
-                         "coverage", "mean_ci_width", "n_stable_features"]
+        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                          "coverage", "mean_ci_width", "n_stable_features"]
         bootstrap_cols += profiles_str
         bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
         bootstrap_df.to_csv(os.path.join(output_dir, bootstrap_fname))
