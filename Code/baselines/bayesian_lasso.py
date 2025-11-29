@@ -203,7 +203,7 @@ class BayesianLasso:
             lambda2 = self._sample_lambda2(beta, tau2, rng)
 
             # Store samples after burn-in with thinning
-            if iter_idx >= self.burnin and (iter_idx - self.burnin) % self.thin == 0:
+            if iter_idx >= self.burnin and (iter_idx - self.burnin) % self.thin == 0 and sample_idx < n_keep:
                 beta_samples[sample_idx] = beta
                 sample_idx += 1
 

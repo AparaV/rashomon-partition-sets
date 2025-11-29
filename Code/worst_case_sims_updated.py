@@ -388,8 +388,8 @@ if __name__ == "__main__":
         }
     else:
         blasso_params = {
-            "n_iter": 2000,
-            "burnin": 500,
+            "n_iter": 10000,
+            "burnin": 2000,
             "thin": 2,
             "n_chains": 3,
             "lambda_prior": 5e-1,
