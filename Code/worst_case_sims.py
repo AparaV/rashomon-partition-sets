@@ -10,7 +10,7 @@ from rashomon import hasse
 from rashomon import metrics
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
-from baselines import BayesianLasso, BootstrapLasso, PPMx
+from baselines import BayesianLasso, BootstrapLasso, PPMx, TVA
 
 from typing import Dict
 
@@ -65,49 +65,6 @@ def parse_arguments():
         help="Disable progress printing"
     )
     return parser.parse_args()
-
-
-def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Puffer transform the data to make it suitable for regression.
-
-    Arguments:
-    y (np.ndarray): Target variable
-    X (np.ndarray): Feature matrix
-
-    Returns:
-    y_transformed (np.ndarray): Transformed target variable
-    X_transformed (np.ndarray): Transformed feature matrix
-    """
-
-    U, S, Vh = np.linalg.svd(X, full_matrices=False)
-    S_inv = np.diag(1 / S)
-    S_mat = np.diag(S)
-
-    # start_1 = time.time()
-    F = np.matmul(S_inv, U.T)
-    F = np.matmul(U, F)
-    # end_1 = time.time()
-    # print(f"Method 1: Time for F: {end_1 - start_1:.4f} seconds")
-
-    F_inv = np.matmul(U, S_mat)
-    F_inv = np.matmul(F_inv, U.T)
-
-    # start_2 = time.time()
-    # F_2 = np.matmul(U, S_inv)
-    # F_2 = np.matmul(F_2, U.T)
-    # end_2 = time.time()
-    # print(f"Method 2: Time for F: {end_2 - start_2:.4f} seconds")
-
-    # print(f"F is equal: {np.allclose(F, F_2)}")
-
-    y_transformed = np.matmul(F, y)
-    X_transformed = np.matmul(U, Vh)
-
-    # print(y.shape, X.shape)
-    # print(y_transformed.shape, X_transformed.shape)
-
-    return y_transformed, X_transformed, F, F_inv
 
 
 def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy,
@@ -482,9 +439,6 @@ if __name__ == "__main__":
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
 
-            y_puffer, D_puffer, F, F_inv = puffer_transform(y, D_matrix)
-            # break
-
             #
             # Run Rashomon
             #
@@ -524,14 +478,27 @@ if __name__ == "__main__":
 
             # Run TVA regression
             if "tva" in methods_to_run:
-                gamma = -1
-                scaling = n_per_pol ** gamma
-                puff_details = {"F": F, "X": D_matrix, "y": y}
-                tva_result = run_lasso(y_puffer, D_puffer, reg_tva * scaling, D, true_best, min_dosage_best_policy,
-                                       puff_details=puff_details)
-                tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
-                              tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
-                              tva_result["best_policy_error_lasso"]]
+                tva = TVA(alpha=reg_tva, gamma=-1, fit_intercept=False)
+                tva.fit(D_matrix, y)
+                y_tva = tva.predict(D_matrix)
+
+                # Compute metrics
+                mse = mean_squared_error(y, y_tva)
+                L1_loss = mse + reg_tva * np.linalg.norm(tva.coef_, ord=1)
+
+                # IOU
+                tva_best = metrics.find_best_policies(D, y_tva)
+                iou_tva = metrics.intersect_over_union(set(true_best), set(tva_best))
+
+                # Min dosage inclusion
+                min_dosage_present_tva = metrics.check_membership(min_dosage_best_policy, tva_best)
+
+                # Best policy error
+                best_policy_error_tva = np.max(mu) - np.max(y_tva)
+
+                tva_list_i = [n_per_pol, sim_i, mse, L1_loss,
+                              iou_tva, min_dosage_present_tva,
+                              best_policy_error_tva]
                 tva_list.append(tva_list_i)
 
             # Run Bayesian Lasso
