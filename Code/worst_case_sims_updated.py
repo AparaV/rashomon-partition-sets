@@ -113,36 +113,34 @@ def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarr
 def compute_iou_coverage(coef_samples: np.ndarray, X: np.ndarray, D: np.ndarray,
                          true_best, min_samples: int = 1) -> float:
     """
-    Compute IOU coverage: fraction of posterior/bootstrap samples where predicted best policies
-    overlap with true best policies.
+    Compute mean IOU across all posterior/bootstrap samples.
 
     Arguments:
     coef_samples (np.ndarray): Coefficient samples, shape (n_samples, n_features)
     X (np.ndarray): Design matrix
     D (np.ndarray): Policy assignments
     true_best: True best policies
-    min_samples (int): Minimum number of samples that must overlap (default: 1 for any overlap)
+    min_samples (int): Unused parameter, kept for compatibility
 
     Returns:
-    float: Fraction of samples with IOU > 0
+    float: Mean IOU across all samples
     """
     n_samples = coef_samples.shape[0]
-    iou_count = 0
+    iou_sum = 0.0
 
     for i in range(n_samples):
         y_pred = np.dot(X, coef_samples[i])
         pred_best = metrics.find_best_policies(D, y_pred)
         iou = metrics.intersect_over_union(set(true_best), set(pred_best))
-        if iou > 0:
-            iou_count += 1
+        iou_sum += iou
 
-    return iou_count / n_samples
+    return iou_sum / n_samples
 
 
 def compute_min_dosage_coverage(coef_samples: np.ndarray, X: np.ndarray, D: np.ndarray,
                                 min_dosage_best_policy, policies) -> float:
     """
-    Compute min dosage coverage: fraction of posterior/bootstrap samples where the minimum
+    Compute mean min dosage coverage: fraction of posterior/bootstrap samples where the minimum
     dosage best policy is included in the predicted best policies.
 
     Arguments:
@@ -153,18 +151,18 @@ def compute_min_dosage_coverage(coef_samples: np.ndarray, X: np.ndarray, D: np.n
     policies: List of all policies
 
     Returns:
-    float: Fraction of samples where min_dosage_best_policy is in predicted best
+    float: Mean fraction of samples where min_dosage_best_policy is in predicted best
     """
     n_samples = coef_samples.shape[0]
-    coverage_count = 0
+    coverage_sum = 0.0
 
     for i in range(n_samples):
         y_pred = np.dot(X, coef_samples[i])
         pred_best = metrics.find_best_policies(D, y_pred)
         if metrics.check_membership(min_dosage_best_policy, pred_best):
-            coverage_count += 1
+            coverage_sum += 1.0
 
-    return coverage_count / n_samples
+    return coverage_sum / n_samples
 
 
 def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy,
