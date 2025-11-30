@@ -28,7 +28,24 @@ def parse_arguments():
     parser.add_argument("--output_prefix", type=str,
                         help="Prefix for output file name")
     parser.add_argument("--method", type=str,
-                        help="One of {r, lasso, blasso}")
+                        help="One of {r, lasso, blasso, bootstrap, ppmx}")
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run in test mode with reduced iterations (5 iterations, reduced MCMC/bootstrap samples)"
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        default=True,
+        help="Print progress information (default: True)"
+    )
+    parser.add_argument(
+        "--no-verbose",
+        action="store_false",
+        dest="verbose",
+        help="Disable progress printing"
+    )
     args = parser.parse_args()
     return args
 
@@ -81,28 +98,52 @@ if __name__ == "__main__":
     lasso_reg = params.lasso_reg
 
     # Bayesian Lasso parameters (with defaults)
-    blasso_n_iter = getattr(params, 'blasso_n_iter', 2000)
-    blasso_burnin = getattr(params, 'blasso_burnin', 500)
-    blasso_thin = getattr(params, 'blasso_thin', 2)
-    blasso_n_chains = getattr(params, 'blasso_n_chains', 4)
-    blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
-    blasso_tau2_a = getattr(params, 'blasso_tau2_a', 1.0)
-    blasso_tau2_b = getattr(params, 'blasso_tau2_b', 1.0)
+    if args.test:
+        blasso_n_iter = 1000
+        blasso_burnin = 200
+        blasso_thin = 2
+        blasso_n_chains = 3
+        blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
+        blasso_tau2_a = getattr(params, 'blasso_tau2_a', 1.0)
+        blasso_tau2_b = getattr(params, 'blasso_tau2_b', 1.0)
+    else:
+        blasso_n_iter = getattr(params, 'blasso_n_iter', 2000)
+        blasso_burnin = getattr(params, 'blasso_burnin', 500)
+        blasso_thin = getattr(params, 'blasso_thin', 2)
+        blasso_n_chains = getattr(params, 'blasso_n_chains', 4)
+        blasso_lambda = getattr(params, 'blasso_lambda', 1.0)
+        blasso_tau2_a = getattr(params, 'blasso_tau2_a', 1.0)
+        blasso_tau2_b = getattr(params, 'blasso_tau2_b', 1.0)
 
     # Bootstrap Lasso parameters (with defaults)
-    bootstrap_n_iter = getattr(params, 'bootstrap_n_iter', 1000)
-    bootstrap_alpha = getattr(params, 'bootstrap_alpha', 1.0)
-    bootstrap_confidence_level = getattr(params, 'bootstrap_confidence_level', 0.95)
-    bootstrap_random_state = getattr(params, 'bootstrap_random_state', None)
+    if args.test:
+        bootstrap_n_iter = 100
+        bootstrap_alpha = getattr(params, 'bootstrap_alpha', 1.0)
+        bootstrap_confidence_level = getattr(params, 'bootstrap_confidence_level', 0.95)
+        bootstrap_random_state = getattr(params, 'bootstrap_random_state', None)
+    else:
+        bootstrap_n_iter = getattr(params, 'bootstrap_n_iter', 1000)
+        bootstrap_alpha = getattr(params, 'bootstrap_alpha', 1.0)
+        bootstrap_confidence_level = getattr(params, 'bootstrap_confidence_level', 0.95)
+        bootstrap_random_state = getattr(params, 'bootstrap_random_state', None)
 
     # PPMx parameters (with defaults)
-    ppmx_n_iter = getattr(params, 'ppmx_n_iter', 5000)
-    ppmx_burnin = getattr(params, 'ppmx_burnin', 1000)
-    ppmx_thin = getattr(params, 'ppmx_thin', 2)
-    ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
-    ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
-    ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
-    ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
+    if args.test:
+        ppmx_n_iter = 1000
+        ppmx_burnin = 200
+        ppmx_thin = 2
+        ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
+        ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
+        ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
+        ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
+    else:
+        ppmx_n_iter = getattr(params, 'ppmx_n_iter', 5000)
+        ppmx_burnin = getattr(params, 'ppmx_burnin', 1000)
+        ppmx_thin = getattr(params, 'ppmx_thin', 2)
+        ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
+        ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
+        ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
+        ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
 
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
@@ -110,19 +151,36 @@ if __name__ == "__main__":
     num_policies = len(all_policies)
 
     # Simulation parameters and variables
-    samples_per_pol = [args.sample_size]
-    num_sims = args.iters
+    if args.test:
+        # Override for test mode
+        samples_per_pol = [args.sample_size] if args.sample_size else [10]
+        num_sims = 5
+        verbose = args.verbose
+        if verbose:
+            print("Running in TEST mode: 5 iterations, reduced MCMC/bootstrap samples")
+    else:
+        samples_per_pol = [args.sample_size]
+        num_sims = args.iters
+        verbose = args.verbose
 
     # Output file names
     start_sim = 0
     output_dir = "../Results/"
     # output_suffix = f"_{args.sample_size}_{args.iters}_{start_sim}.csv"
-    output_suffix = f"_{args.sample_size}_{args.iters}.csv"
+    output_suffix = f"_{samples_per_pol[0]}_{num_sims}"
+    if args.test:
+        output_suffix += "_test"
+    output_suffix += ".csv"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
     blasso_fname = args.output_prefix + "_blasso" + output_suffix
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
     ppmx_fname = args.output_prefix + "_ppmx" + output_suffix
+
+    if verbose:
+        print(f"Method to run: {args.method}")
+        print(f"Sample size per policy: {samples_per_pol[0]}")
+        print(f"Number of iterations: {num_sims}")
 
     # Identify the pools
     policies_profiles = {}
@@ -191,13 +249,15 @@ if __name__ == "__main__":
     #
     for n_per_pol in samples_per_pol:
 
-        print(f"Number of samples: {n_per_pol}")
+        if verbose:
+            print(f"\nNumber of samples per policy: {n_per_pol}")
 
         for sim_i in range(start_sim, start_sim + num_sims):
-            print(sim_i)
+            if verbose:
+                print(f"Simulation {sim_i}")
             np.random.seed(sim_i)
 
-            if (sim_i + 1) % 20 == 0:
+            if verbose and (sim_i + 1) % 20 == 0:
                 print(f"\tSimulation {sim_i+1}")
 
             # Generate data
@@ -231,12 +291,13 @@ if __name__ == "__main__":
                 this_theta = theta
 
                 while not found_best_profile:
-                    if (counter + 1) % 10 == 0:
+                    if verbose and (counter + 1) % 10 == 0:
                         print(f"\tSimulation {sim_i}. Tried {counter} times. Theta = {this_theta}")
 
                     current_results = []
                     R_set, rashomon_profiles = RAggregate(M, R, H, D, y, this_theta, reg)
-                    print(f"\t\t{this_theta},{len(R_set)}")
+                    if verbose:
+                        print(f"\t\t{this_theta},{len(R_set)}")
 
                     best_loss = np.inf
 
@@ -280,7 +341,7 @@ if __name__ == "__main__":
                             found_best_profile = True
                             # print("Found", this_loss)
 
-                    if found_best_profile:
+                    if found_best_profile and verbose:
                         print("\tFound best profile")
 
                     eps = 0.2
@@ -513,12 +574,16 @@ if __name__ == "__main__":
         rashomon_cols += profiles_str
         rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
         rashomon_df.to_csv(os.path.join(output_dir, rashomon_fname))
+        if verbose:
+            print(f"\nSaved Rashomon results to {rashomon_fname}")
 
     if method == "lasso":
         lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
         lasso_cols += profiles_str
         lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
         lasso_df.to_csv(os.path.join(output_dir, lasso_fname))
+        if verbose:
+            print(f"\nSaved Lasso results to {lasso_fname}")
 
     if method == "blasso":
         blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat",
@@ -526,6 +591,8 @@ if __name__ == "__main__":
         blasso_cols += profiles_str
         blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
         blasso_df.to_csv(os.path.join(output_dir, blasso_fname))
+        if verbose:
+            print(f"\nSaved Bayesian Lasso results to {blasso_fname}")
 
     if method == "bootstrap":
         bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
@@ -534,6 +601,8 @@ if __name__ == "__main__":
         bootstrap_cols += profiles_str
         bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
         bootstrap_df.to_csv(os.path.join(output_dir, bootstrap_fname))
+        if verbose:
+            print(f"\nSaved Bootstrap Lasso results to {bootstrap_fname}")
 
     if method == "ppmx":
         ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
@@ -542,3 +611,8 @@ if __name__ == "__main__":
         ppmx_cols += profiles_str
         ppmx_df = pd.DataFrame(ppmx_list, columns=ppmx_cols)
         ppmx_df.to_csv(os.path.join(output_dir, ppmx_fname))
+        if verbose:
+            print(f"\nSaved PPMx results to {ppmx_fname}")
+
+    if verbose:
+        print("\nSimulations complete!")
