@@ -48,7 +48,7 @@ print("Testing PPMx Implementation")
 print("="*60)
 print(f"Data shape: {len(D)} observations, {n_policies} policies")
 print(f"Policy features shape: {X.shape}")
-print(f"True structure: Policies [0,1] in cluster 1 (mean≈0), Policies [2,3] in cluster 2 (mean≈2)")
+print("True structure: Policies [0,1] in cluster 1 (mean≈0), Policies [2,3] in cluster 2 (mean≈2)")
 print()
 
 # Test 1: PPMx without covariates
@@ -113,14 +113,16 @@ print()
 print("Test 3: Partition structure analysis")
 print("-"*60)
 
+
 # Check if policies 0,1 are in same cluster and 2,3 are in same cluster
 def check_structure(partition):
     """Check if partition matches true structure."""
     cluster_01_same = partition[0] == partition[1]
     cluster_23_same = partition[2] == partition[3]
     cluster_01_diff_23 = partition[0] != partition[2]
-    
+
     return cluster_01_same and cluster_23_same and cluster_01_diff_23
+
 
 correct_structure_no_cov = check_structure(map_partition)
 correct_structure_with_cov = check_structure(map_partition_cov)
