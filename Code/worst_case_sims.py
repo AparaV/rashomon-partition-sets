@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import pandas as pd
 
@@ -9,8 +10,61 @@ from rashomon import hasse
 from rashomon import metrics
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
+from baselines import BayesianLasso, BootstrapLasso, PPMx
 
 from typing import Dict
+
+
+def parse_arguments():
+    """Parse command line arguments for simulation control."""
+    parser = argparse.ArgumentParser(
+        description="Run worst case simulations with selected baseline methods"
+    )
+    parser.add_argument(
+        "--methods",
+        type=str,
+        nargs="+",
+        choices=["rashomon", "lasso", "tva", "blasso", "bootstrap", "ppmx"],
+        default=["rashomon", "lasso", "tva", "blasso", "bootstrap"],
+        help="Methods to run (default: all methods)"
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Sample sizes per policy (default: [10, 20, 50, 100, 500, 1000])"
+    )
+    parser.add_argument(
+        "--iters",
+        type=int,
+        default=None,
+        help="Number of simulation iterations (default: 100)"
+    )
+    parser.add_argument(
+        "--output_suffix",
+        type=str,
+        default="",
+        help="Suffix to add to output filenames"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run in test mode with reduced iterations (2 sample sizes, 5 iterations, 100 bootstrap/MCMC samples)"
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        default=True,
+        help="Print progress information (default: True)"
+    )
+    parser.add_argument(
+        "--no-verbose",
+        action="store_false",
+        dest="verbose",
+        help="Disable progress printing"
+    )
+    return parser.parse_args()
 
 
 def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -109,6 +163,124 @@ def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best
     return result
 
 
+def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
+                       blasso_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
+    """Run Bayesian Lasso regression on the data."""
+
+    blasso = BayesianLasso(
+        n_iter=blasso_params["n_iter"],
+        burnin=blasso_params["burnin"],
+        thin=blasso_params["thin"],
+        lambda_prior=blasso_params["lambda_prior"],
+        tau2_a=blasso_params["tau2_a"],
+        tau2_b=blasso_params["tau2_b"],
+        fit_intercept=False,
+        random_state=sim_seed,
+        verbose=verbose
+    )
+
+    blasso.fit(X, y, n_chains=blasso_params["n_chains"])
+    y_blasso = blasso.predict(X)
+
+    # Compute point estimate metrics (using mean predictions)
+    mse = mean_squared_error(y, y_blasso)
+
+    # IOU (point estimate)
+    blasso_best = metrics.find_best_policies(D, y_blasso)
+    iou_blasso = metrics.intersect_over_union(set(true_best), set(blasso_best))
+
+    # Min dosage inclusion (point estimate)
+    min_dosage_present_blasso = metrics.check_membership(min_dosage_best_policy, blasso_best)
+
+    # Best policy error (point estimate)
+    best_policy_error_blasso = np.max(mu) - np.max(y_blasso)
+
+    # Convergence diagnostics
+    converged = blasso.converged_
+    max_rhat = np.max(blasso.rhat_)
+
+    # Extract posterior samples and compute coverage metrics
+    # blasso.chains_ has shape (n_chains, n_samples, n_features)
+    # Reshape to (n_chains * n_samples, n_features)
+    n_chains, n_samples, n_features = blasso.chains_.shape
+    coef_samples = blasso.chains_.reshape(n_chains * n_samples, n_features)
+
+    # Compute distribution-based metrics
+    iou_coverage = metrics.compute_iou_coverage(coef_samples, X, D, true_best)
+    min_dosage_coverage = metrics.compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy)
+
+    result = {
+        "sqrd_err": mse,
+        "iou_blasso": iou_blasso,
+        "min_dosage_present_blasso": min_dosage_present_blasso,
+        "best_policy_error_blasso": best_policy_error_blasso,
+        "converged": converged,
+        "max_rhat": max_rhat,
+        "iou_coverage": iou_coverage,
+        "min_dosage_coverage": min_dosage_coverage
+    }
+
+    return result
+
+
+def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
+                        bootstrap_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
+    """Run Bootstrap Lasso regression on the data."""
+
+    bootstrap = BootstrapLasso(
+        n_bootstrap=bootstrap_params["n_iter"],
+        alpha=bootstrap_params["alpha"],
+        confidence_level=bootstrap_params["confidence_level"],
+        fit_intercept=False,
+        random_state=sim_seed,
+        verbose=verbose
+    )
+
+    bootstrap.fit(X, y)
+    y_bootstrap = bootstrap.predict(X)
+
+    # Compute point estimate metrics (using mean predictions)
+    mse = mean_squared_error(y, y_bootstrap)
+
+    # IOU (point estimate)
+    bootstrap_best = metrics.find_best_policies(D, y_bootstrap)
+    iou_bootstrap = metrics.intersect_over_union(set(true_best), set(bootstrap_best))
+
+    # Min dosage inclusion (point estimate)
+    min_dosage_present_bootstrap = metrics.check_membership(min_dosage_best_policy, bootstrap_best)
+
+    # Best policy error (point estimate)
+    best_policy_error_bootstrap = np.max(mu) - np.max(y_bootstrap)
+
+    # Bootstrap diagnostics
+    coverage = bootstrap.coverage_
+    mean_ci_width = np.mean(bootstrap.coef_ci_[:, 1] - bootstrap.coef_ci_[:, 0])
+    feature_importance = bootstrap.get_feature_importance()
+    n_stable_features = np.sum(feature_importance > 0.5)
+
+    # Extract bootstrap samples and compute coverage metrics
+    # bootstrap.bootstrap_coefs_ has shape (n_bootstrap, n_features)
+    coef_samples = bootstrap.bootstrap_coefs_
+
+    # Compute distribution-based metrics
+    iou_coverage = metrics.compute_iou_coverage(coef_samples, X, D, true_best)
+    min_dosage_coverage = metrics.compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy)
+
+    result = {
+        "sqrd_err": mse,
+        "iou_bootstrap": iou_bootstrap,
+        "min_dosage_present_bootstrap": min_dosage_present_bootstrap,
+        "best_policy_error_bootstrap": best_policy_error_bootstrap,
+        "coverage": coverage,
+        "mean_ci_width": mean_ci_width,
+        "n_stable_features": n_stable_features,
+        "iou_coverage": iou_coverage,
+        "min_dosage_coverage": min_dosage_coverage
+    }
+
+    return result
+
+
 def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
     num_data = len(policies) * n_per_pol
     X = np.ndarray(shape=(num_data, M))
@@ -136,6 +308,8 @@ def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
 
 
 if __name__ == "__main__":
+
+    args = parse_arguments()
 
     np.random.seed(3)
 
@@ -198,11 +372,24 @@ if __name__ == "__main__":
     true_best_effect = np.max(mu)
     min_dosage_best_policy = metrics.find_min_dosage(true_best, policies)
 
+    # Parse command line arguments
+    methods_to_run = args.methods
+    verbose = args.verbose
+
     # Simulation parameters and variables
-    samples_per_pol = [10, 20, 50, 100, 500, 1000]
-    num_sims = 100
-    # samples_per_pol = [10, 20, 50, 100, 500, 1000]
-    # num_sims = 2
+    if args.test:
+        samples_per_pol = [10, 50]
+        num_sims = 5
+        if verbose:
+            print("Running in TEST mode: 2 sample sizes, 5 iterations, reduced MCMC/bootstrap samples")
+    else:
+        samples_per_pol = args.samples if args.samples is not None else [10, 20, 50, 100, 500, 1000]
+        num_sims = args.iters if args.iters is not None else 100
+
+    if verbose:
+        print(f"Methods to run: {methods_to_run}")
+        print(f"Sample sizes: {samples_per_pol}")
+        print(f"Iterations: {num_sims}")
 
     H = np.inf
     theta = 1.1
@@ -210,21 +397,83 @@ if __name__ == "__main__":
     reg_rps = 1e-2
     reg_tva = 1e-3
 
-    # Simulation results data structure
-    rashomon_list = []
-    lasso_list = []
-    tva_list = []
+    # Bayesian Lasso parameters
+    if args.test:
+        blasso_params = {
+            "n_iter": 5000,
+            "burnin": 2000,
+            "thin": 2,
+            "n_chains": 3,
+            "lambda_prior": 5,
+            "tau2_a": 1,
+            "tau2_b": 1
+        }
+    else:
+        blasso_params = {
+            "n_iter": 5000,
+            "burnin": 2000,
+            "thin": 2,
+            "n_chains": 3,
+            "lambda_prior": 5e-1,
+            "tau2_a": 1e-1,
+            "tau2_b": 1e-1
+        }
+
+    # Bootstrap Lasso parameters
+    if args.test:
+        bootstrap_params = {
+            "n_iter": 100,
+            "alpha": 1e-3,
+            "confidence_level": 0.95
+        }
+    else:
+        bootstrap_params = {
+            "n_iter": 500,
+            "alpha": 1e-3,
+            "confidence_level": 0.95
+        }
+
+    # PPMx parameters
+    if args.test:
+        ppmx_params = {
+            "n_iter": 1000,
+            "burnin": 200,
+            "thin": 2,
+            "alpha": 1.0,
+            "cohesion": 'gaussian',
+            "similarity_weight": 0.5,
+            "similarity_bandwidth": 1.0
+        }
+    else:
+        ppmx_params = {
+            "n_iter": 5000,
+            "burnin": 1000,
+            "thin": 2,
+            "alpha": 1.0,
+            "cohesion": 'gaussian',
+            "similarity_weight": 0.5,
+            "similarity_bandwidth": 1.0
+        }
+
+    # Simulation results data structure (initialize only for selected methods)
+    rashomon_list = [] if "rashomon" in methods_to_run else None
+    lasso_list = [] if "lasso" in methods_to_run else None
+    tva_list = [] if "tva" in methods_to_run else None
+    blasso_list = [] if "blasso" in methods_to_run else None
+    bootstrap_list = [] if "bootstrap" in methods_to_run else None
+    ppmx_list = [] if "ppmx" in methods_to_run else None
 
     #
     # Simulations
     #
     for n_per_pol in samples_per_pol:
 
-        print(f"Number of samples: {n_per_pol}")
+        if verbose:
+            print(f"Number of samples: {n_per_pol}")
 
         for sim_i in range(num_sims):
 
-            if (sim_i + 1) % 20 == 0:
+            if verbose and (sim_i + 1) % 20 == 0:
                 print(f"\tSimulation {sim_i+1}")
 
             # Generate data
@@ -239,58 +488,190 @@ if __name__ == "__main__":
             #
             # Run Rashomon
             #
-            P_set = RAggregate_profile(M, R, H, D, y, theta, sigma_profile, reg_rps)
-            # if not P_set.seen(sigma):
-            #     print("P_set missing true sigma")
+            if "rashomon" in methods_to_run:
+                P_set = RAggregate_profile(M, R, H, D, y, theta, sigma_profile, reg_rps)
+                # if not P_set.seen(sigma):
+                #     print("P_set missing true sigma")
 
-            for s_i in P_set:
-                pi_pools_i, pi_policies_i = extract_pools(policies, s_i)
-                pool_means_i = loss.compute_pool_means(pol_means, pi_pools_i)
+                for s_i in P_set:
+                    pi_pools_i, pi_policies_i = extract_pools(policies, s_i)
+                    pool_means_i = loss.compute_pool_means(pol_means, pi_pools_i)
 
-                Q = loss.compute_Q(D, y, s_i, policies, pol_means, reg=0.1)
-                y_pred = metrics.make_predictions(D, pi_policies_i, pool_means_i)
-                sqrd_err = mean_squared_error(y, y_pred)
+                    Q = loss.compute_Q(D, y, s_i, policies, pol_means, reg=0.1)
+                    y_pred = metrics.make_predictions(D, pi_policies_i, pool_means_i)
+                    sqrd_err = mean_squared_error(y, y_pred)
 
-                # IOU
-                pol_max = metrics.find_best_policies(D, y_pred)
-                iou = metrics.intersect_over_union(set(true_best), set(pol_max))
+                    # IOU
+                    pol_max = metrics.find_best_policies(D, y_pred)
+                    iou = metrics.intersect_over_union(set(true_best), set(pol_max))
 
-                # Min dosage membership
-                min_dosage_present = metrics.check_membership(min_dosage_best_policy, pol_max)
+                    # Min dosage membership
+                    min_dosage_present = metrics.check_membership(min_dosage_best_policy, pol_max)
 
-                # Best policy difference
-                best_pol_diff = np.max(mu) - np.max(pool_means_i)
+                    # Best policy difference
+                    best_pol_diff = np.max(mu) - np.max(pool_means_i)
 
-                this_list = [n_per_pol, sim_i, len(pi_pools_i), sqrd_err, iou, min_dosage_present, best_pol_diff]
-                rashomon_list.append(this_list)
+                    this_list = [n_per_pol, sim_i, len(pi_pools_i), sqrd_err, iou, min_dosage_present, best_pol_diff]
+                    rashomon_list.append(this_list)
 
             # Run Lasso regression
-            lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy, puff_details=None)
-            lasso_list_i = [n_per_pol, sim_i, lasso_result["sqrd_err"], lasso_result["L1_loss"],
-                            lasso_result["iou_lasso"], lasso_result["min_dosage_present_lasso"],
-                            lasso_result["best_policy_error_lasso"]]
-            lasso_list.append(lasso_list_i)
+            if "lasso" in methods_to_run:
+                lasso_result = run_lasso(y, D_matrix, reg, D, true_best, min_dosage_best_policy, puff_details=None)
+                lasso_list_i = [n_per_pol, sim_i, lasso_result["sqrd_err"], lasso_result["L1_loss"],
+                                lasso_result["iou_lasso"], lasso_result["min_dosage_present_lasso"],
+                                lasso_result["best_policy_error_lasso"]]
+                lasso_list.append(lasso_list_i)
 
             # Run TVA regression
-            gamma = -1
-            scaling = n_per_pol ** gamma
-            puff_details = {"F": F, "X": D_matrix, "y": y}
-            tva_result = run_lasso(y_puffer, D_puffer, reg_tva * scaling, D, true_best, min_dosage_best_policy,
-                                   puff_details=puff_details)
-            tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
-                          tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
-                          tva_result["best_policy_error_lasso"]]
-            tva_list.append(tva_list_i)
+            if "tva" in methods_to_run:
+                gamma = -1
+                scaling = n_per_pol ** gamma
+                puff_details = {"F": F, "X": D_matrix, "y": y}
+                tva_result = run_lasso(y_puffer, D_puffer, reg_tva * scaling, D, true_best, min_dosage_best_policy,
+                                       puff_details=puff_details)
+                tva_list_i = [n_per_pol, sim_i, tva_result["sqrd_err"], tva_result["L1_loss"],
+                              tva_result["iou_lasso"], tva_result["min_dosage_present_lasso"],
+                              tva_result["best_policy_error_lasso"]]
+                tva_list.append(tva_list_i)
 
-    rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-    rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
+            # Run Bayesian Lasso
+            if "blasso" in methods_to_run:
+                blasso_result = run_bayesian_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
+                                                   blasso_params, sim_i, verbose=False)
+                blasso_list_i = [n_per_pol, sim_i, blasso_result["sqrd_err"],
+                                 blasso_result["iou_blasso"], blasso_result["min_dosage_present_blasso"],
+                                 blasso_result["best_policy_error_blasso"], blasso_result["converged"],
+                                 blasso_result["max_rhat"], blasso_result["iou_coverage"],
+                                 blasso_result["min_dosage_coverage"]]
+                blasso_list.append(blasso_list_i)
 
-    lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
-    lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+            # Run Bootstrap Lasso
+            if "bootstrap" in methods_to_run:
+                bootstrap_result = run_bootstrap_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
+                                                       bootstrap_params, sim_i, verbose=False)
+                bootstrap_list_i = [n_per_pol, sim_i, bootstrap_result["sqrd_err"],
+                                    bootstrap_result["iou_bootstrap"], bootstrap_result["min_dosage_present_bootstrap"],
+                                    bootstrap_result["best_policy_error_bootstrap"], bootstrap_result["coverage"],
+                                    bootstrap_result["mean_ci_width"], bootstrap_result["n_stable_features"],
+                                    bootstrap_result["iou_coverage"], bootstrap_result["min_dosage_coverage"]]
+                bootstrap_list.append(bootstrap_list_i)
 
-    tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
-    tva_df = pd.DataFrame(tva_list, columns=tva_cols)
+            # Run PPMx
+            if "ppmx" in methods_to_run:
+                ppmx = PPMx(
+                    n_iter=ppmx_params["n_iter"],
+                    burnin=ppmx_params["burnin"],
+                    thin=ppmx_params["thin"],
+                    alpha=ppmx_params["alpha"],
+                    cohesion=ppmx_params["cohesion"],
+                    similarity_weight=ppmx_params["similarity_weight"],
+                    similarity_bandwidth=ppmx_params["similarity_bandwidth"],
+                    random_state=sim_i,
+                    verbose=False
+                )
 
-    rashomon_df.to_csv("../Results/worst_case/worst_case_rashomon.csv")
-    lasso_df.to_csv("../Results/worst_case/worst_case_lasso.csv")
-    tva_df.to_csv("../Results/worst_case/worst_case_tva.csv")
+                # X contains policy features, D contains policy assignments
+                ppmx.fit(X, y, D)
+                y_ppmx = ppmx.predict(X)
+
+                # Compute point estimate metrics (using mean predictions)
+                mse = mean_squared_error(y, y_ppmx)
+
+                # IOU (point estimate)
+                ppmx_best = metrics.find_best_policies(D, y_ppmx)
+                iou_ppmx = metrics.intersect_over_union(set(true_best), set(ppmx_best))
+
+                # Min dosage inclusion (point estimate)
+                min_dosage_present_ppmx = metrics.check_membership(min_dosage_best_policy, ppmx_best)
+
+                # Best policy error (point estimate)
+                best_policy_error_ppmx = np.max(mu) - np.max(y_ppmx)
+
+                # PPMx diagnostics
+                mean_n_clusters = np.mean([len(np.unique(partition)) for partition in ppmx.partition_samples_])
+                acceptance_rate = ppmx.acceptance_rate_
+
+                # Extract posterior samples and convert to coefficient matrix
+                # For each partition sample, compute cluster means and map to coefficients
+                n_samples = len(ppmx.partition_samples_)
+                n_policies = len(policies)
+                coef_samples = np.zeros((n_samples, n_policies))
+
+                for sample_idx, (partition, cluster_means) in enumerate(zip(ppmx.partition_samples_, ppmx.cluster_means_samples_)):
+                    # Map cluster means to policies based on partition
+                    for policy_idx in range(n_policies):
+                        cluster_id = partition[policy_idx]
+                        coef_samples[sample_idx, policy_idx] = cluster_means[cluster_id]
+
+                # For coverage metrics, create one-hot encoding of policy assignments
+                # This maps observations to policies for prediction
+                n_obs = len(D)
+                policy_indicator = np.zeros((n_obs, n_policies))
+                for obs_idx in range(n_obs):
+                    policy_id = D[obs_idx, 0]
+                    policy_indicator[obs_idx, policy_id] = 1.0
+
+                # Compute distribution-based metrics
+                iou_coverage = metrics.compute_iou_coverage(coef_samples, policy_indicator, D, true_best)
+                min_dosage_coverage = metrics.compute_min_dosage_coverage(
+                    coef_samples, policy_indicator, D, min_dosage_best_policy)
+
+                ppmx_list_i = [n_per_pol, sim_i, mse, iou_ppmx, min_dosage_present_ppmx,
+                               best_policy_error_ppmx, mean_n_clusters, acceptance_rate,
+                               iou_coverage, min_dosage_coverage]
+                ppmx_list.append(ppmx_list_i)
+
+    # Save results for methods that were run
+    suffix = f"_{args.output_suffix}" if args.output_suffix else ""
+    if args.test:
+        suffix += "_test"
+
+    if "rashomon" in methods_to_run:
+        rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+        rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
+        rashomon_df.to_csv(f"../Results/worst_case/worst_case_rashomon{suffix}.csv")
+        if verbose:
+            print(f"Saved Rashomon results to worst_case_rashomon{suffix}.csv")
+
+    if "lasso" in methods_to_run:
+        lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
+        lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+        lasso_df.to_csv(f"../Results/worst_case/worst_case_lasso{suffix}.csv")
+        if verbose:
+            print(f"Saved Lasso results to worst_case_lasso{suffix}.csv")
+
+    if "tva" in methods_to_run:
+        tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
+        tva_df = pd.DataFrame(tva_list, columns=tva_cols)
+        tva_df.to_csv(f"../Results/worst_case/worst_case_tva{suffix}.csv")
+        if verbose:
+            print(f"Saved TVA results to worst_case_tva{suffix}.csv")
+
+    if "blasso" in methods_to_run:
+        blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat",
+                       "IOU_coverage", "min_dosage_coverage"]
+        blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
+        blasso_df.to_csv(f"../Results/worst_case/worst_case_blasso{suffix}.csv")
+        if verbose:
+            print(f"Saved Bayesian Lasso results to worst_case_blasso{suffix}.csv")
+
+    if "bootstrap" in methods_to_run:
+        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                          "coverage", "mean_ci_width", "n_stable_features",
+                          "IOU_coverage", "min_dosage_coverage"]
+        bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
+        bootstrap_df.to_csv(f"../Results/worst_case/worst_case_bootstrap{suffix}.csv")
+        if verbose:
+            print(f"Saved Bootstrap Lasso results to worst_case_bootstrap{suffix}.csv")
+
+    if "ppmx" in methods_to_run:
+        ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                     "mean_n_clusters", "acceptance_rate",
+                     "IOU_coverage", "min_dosage_coverage"]
+        ppmx_df = pd.DataFrame(ppmx_list, columns=ppmx_cols)
+        ppmx_df.to_csv(f"../Results/worst_case/worst_case_ppmx{suffix}.csv")
+        if verbose:
+            print(f"Saved PPMx results to worst_case_ppmx{suffix}.csv")
+
+    if verbose:
+        print("\nSimulations complete!")
