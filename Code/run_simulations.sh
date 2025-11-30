@@ -21,7 +21,8 @@ SAMPLE_SIZES=(30)
 ITERS=100
 
 # Methods to run
-METHODS=("lasso" "blasso" "bootstrap" "ppmx" "r")
+# METHODS=("lasso" "blasso" "bootstrap" "ppmx" "r")
+METHODS=("blasso" "bootstrap")
 
 echo "================================"
 echo "Starting simulations"
