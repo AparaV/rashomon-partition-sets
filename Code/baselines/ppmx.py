@@ -100,7 +100,7 @@ class PPMx:
             b_0 = 1.0
 
             kappa_n = kappa_0 + n
-            mu_n = (kappa_0 * mu_0 + n * np.mean(y_cluster)) / kappa_n
+            # mu_n = (kappa_0 * mu_0 + n * np.mean(y_cluster)) / kappa_n
             a_n = a_0 + n
 
             ss = np.sum((y_cluster - np.mean(y_cluster)) ** 2) if n > 1 else 0

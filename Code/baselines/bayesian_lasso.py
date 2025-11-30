@@ -64,6 +64,8 @@ class BayesianLasso:
     ----------
     coef_ : ndarray of shape (n_features,)
         Posterior mean of regression coefficients
+    coef_map_ : ndarray of shape (n_features,)
+        MAP (Maximum A Posteriori) estimate of regression coefficients
     chains_ : ndarray of shape (n_chains, n_samples, n_features)
         MCMC samples for all chains (after burn-in and thinning)
     rhat_ : ndarray of shape (n_features,)
@@ -99,6 +101,7 @@ class BayesianLasso:
 
         # Attributes set during fit
         self.coef_ = None
+        self.coef_map_ = None
         self.chains_ = None
         self.rhat_ = None
         self.converged_ = None
@@ -154,6 +157,14 @@ class BayesianLasso:
 
         # Compute posterior mean across all chains
         self.coef_ = np.mean(self.chains_.reshape(-1, n_features), axis=0)
+        
+        # Compute MAP estimate (coefficient vector with highest posterior density)
+        # For regression with normal likelihood, we approximate by finding the sample
+        # that minimizes the loss function (y - X*beta)^2 + penalty
+        all_samples = self.chains_.reshape(-1, n_features)
+        posterior_densities = self._compute_posterior_densities(X, y, all_samples)
+        map_idx = np.argmax(posterior_densities)
+        self.coef_map_ = all_samples[map_idx]
 
         # Compute Gelman-Rubin diagnostic
         from .diagnostics import gelman_rubin, check_convergence
@@ -375,3 +386,51 @@ class BayesianLasso:
         if y.ndim != 1:
             raise ValueError(f"Expected 1D array for y, got {y.ndim}D array instead")
         return y
+    
+    def _compute_posterior_densities(self, X: np.ndarray, y: np.ndarray, 
+                                     samples: np.ndarray) -> np.ndarray:
+        """Compute (unnormalized) posterior density for each sample.
+        
+        For Bayesian Lasso, the posterior is proportional to:
+        p(β|y) ∝ p(y|β) * p(β)
+        
+        Where:
+        - p(y|β) = N(Xβ, τ²I) [likelihood]
+        - p(β) = product of Laplace priors [regularization]
+        
+        We compute log posterior for numerical stability.
+        """
+        n_samples = samples.shape[0]
+        log_posteriors = np.zeros(n_samples)
+        
+        for i in range(n_samples):
+            beta = samples[i]
+            # Log likelihood: -0.5 * ||y - X*beta||^2 / tau^2 (ignoring constants)
+            residuals = y - X @ beta
+            log_likelihood = -0.5 * np.sum(residuals ** 2)
+            
+            # Log prior: Laplace prior is proportional to exp(-lambda * |beta|)
+            log_prior = -self.lambda_prior * np.sum(np.abs(beta))
+            
+            log_posteriors[i] = log_likelihood + log_prior
+        
+        return log_posteriors
+    
+    def predict_map(self, X: np.ndarray) -> np.ndarray:
+        """Predict using the MAP estimate of coefficients.
+        
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            Samples
+        
+        Returns
+        -------
+        y_pred : ndarray of shape (n_samples,)
+            Predicted values using MAP estimate
+        """
+        if self.coef_map_ is None:
+            raise ValueError("Model has not been fitted yet. Call fit() first.")
+        
+        X = self._validate_data(X, reset=False)
+        return X @ self.coef_map_

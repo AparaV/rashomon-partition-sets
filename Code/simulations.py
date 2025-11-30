@@ -404,8 +404,12 @@ if __name__ == "__main__":
                 )
                 blasso.fit(D_matrix, y, n_chains=blasso_n_chains)
 
+                # Predictions using posterior mean
                 y_blasso = blasso.predict(D_matrix)
+                # Predictions using MAP estimate
+                y_blasso_map = blasso.predict_map(D_matrix)
 
+                # Compute metrics for posterior mean
                 blasso_results = metrics.compute_all_metrics(
                     y, y_blasso, D, true_best, all_policies, profile_map,
                     min_dosage_best_policy, true_best_effect)
@@ -414,6 +418,16 @@ if __name__ == "__main__":
                 best_profile_indicator_blasso = blasso_results["best_prof"]
                 min_dosage_present_blasso = blasso_results["min_dos_inc"]
                 best_policy_diff_blasso = blasso_results["best_pol_diff"]
+                
+                # Compute metrics for MAP estimate
+                blasso_map_results = metrics.compute_all_metrics(
+                    y, y_blasso_map, D, true_best, all_policies, profile_map,
+                    min_dosage_best_policy, true_best_effect)
+                sqrd_err_blasso_map = blasso_map_results["sqrd_err"]
+                iou_blasso_map = blasso_map_results["iou"]
+                best_profile_indicator_blasso_map = blasso_map_results["best_prof"]
+                min_dosage_present_blasso_map = blasso_map_results["min_dos_inc"]
+                best_policy_diff_blasso_map = blasso_map_results["best_pol_diff"]
 
                 # Store convergence information
                 converged = blasso.converged_
@@ -437,10 +451,14 @@ if __name__ == "__main__":
                 avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
                 this_list = [
-                    n_per_pol, sim_i, sqrd_err_blasso, iou_blasso,
-                    min_dosage_present_blasso, best_policy_diff_blasso,
+                    n_per_pol, sim_i, 
+                    sqrd_err_blasso, iou_blasso, min_dosage_present_blasso, best_policy_diff_blasso,
+                    sqrd_err_blasso_map, iou_blasso_map, min_dosage_present_blasso_map, best_policy_diff_blasso_map,
                     converged, max_rhat, iou_coverage, min_dosage_coverage
                 ]
+                # Add profile indicators: mean, then MAP, then average across all samples
+                this_list += best_profile_indicator_blasso
+                this_list += best_profile_indicator_blasso_map
                 this_list += avg_profile_indicators
                 blasso_list.append(this_list)
 
@@ -586,9 +604,16 @@ if __name__ == "__main__":
             print(f"\nSaved Lasso results to {lasso_fname}")
 
     if method == "blasso":
-        blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat",
-                       "IOU_coverage", "min_dosage_coverage"]
-        blasso_cols += profiles_str
+        blasso_cols = [
+            "n_per_pol", "sim_num", 
+            "MSE_mean", "IOU_mean", "min_dosage_mean", "best_pol_diff_mean",
+            "MSE_map", "IOU_map", "min_dosage_map", "best_pol_diff_map",
+            "converged", "max_rhat", "IOU_coverage", "min_dosage_coverage"
+        ]
+        # Add profile columns for posterior mean, MAP, and average
+        blasso_cols += [f"{prof}_mean" for prof in profiles_str]
+        blasso_cols += [f"{prof}_map" for prof in profiles_str]
+        blasso_cols += [f"{prof}_avg" for prof in profiles_str]
         blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
         blasso_df.to_csv(os.path.join(output_dir, blasso_fname))
         if verbose:
