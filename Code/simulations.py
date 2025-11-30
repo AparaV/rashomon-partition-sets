@@ -365,12 +365,22 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
+                # Compute average profile indicators across MCMC samples
+                profile_indicators_sum = np.zeros(len(profiles))
+                n_posterior_samples = coef_samples.shape[0]
+                for sample_idx in range(n_posterior_samples):
+                    y_sample = np.dot(D_matrix, coef_samples[sample_idx])
+                    best_policies_sample = metrics.find_best_policies(D, y_sample)
+                    profile_indicator_sample = metrics.find_profiles(best_policies_sample, all_policies, profile_map)
+                    profile_indicators_sum += np.array(profile_indicator_sample)
+                avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
+
                 this_list = [
                     n_per_pol, sim_i, sqrd_err_blasso, iou_blasso,
                     min_dosage_present_blasso, best_policy_diff_blasso,
                     converged, max_rhat, iou_coverage, min_dosage_coverage
                 ]
-                this_list += best_profile_indicator_blasso
+                this_list += avg_profile_indicators
                 blasso_list.append(this_list)
 
             #
@@ -410,13 +420,23 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
+                # Compute average profile indicators across bootstrap samples
+                profile_indicators_sum = np.zeros(len(profiles))
+                n_bootstrap_samples = coef_samples.shape[0]
+                for sample_idx in range(n_bootstrap_samples):
+                    y_sample = np.dot(D_matrix, coef_samples[sample_idx])
+                    best_policies_sample = metrics.find_best_policies(D, y_sample)
+                    profile_indicator_sample = metrics.find_profiles(best_policies_sample, all_policies, profile_map)
+                    profile_indicators_sum += np.array(profile_indicator_sample)
+                avg_profile_indicators = (profile_indicators_sum / n_bootstrap_samples).tolist()
+
                 this_list = [
                     n_per_pol, sim_i, sqrd_err_bootstrap, iou_bootstrap,
                     min_dosage_present_bootstrap, best_policy_diff_bootstrap,
                     coverage, mean_ci_width, n_stable_features,
                     iou_coverage, min_dosage_coverage
                 ]
-                this_list += best_profile_indicator_bootstrap
+                this_list += avg_profile_indicators
                 bootstrap_list.append(this_list)
 
             #
@@ -468,13 +488,22 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
+                # Compute average profile indicators across posterior samples
+                profile_indicators_sum = np.zeros(len(profiles))
+                for sample_idx in range(n_posterior_samples):
+                    y_sample = np.dot(D_matrix, coef_samples[sample_idx])
+                    best_policies_sample = metrics.find_best_policies(D, y_sample)
+                    profile_indicator_sample = metrics.find_profiles(best_policies_sample, all_policies, profile_map)
+                    profile_indicators_sum += np.array(profile_indicator_sample)
+                avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
+
                 this_list = [
                     n_per_pol, sim_i, sqrd_err_ppmx, iou_ppmx,
                     min_dosage_present_ppmx, best_policy_diff_ppmx,
                     mean_n_clusters, ppmx.acceptance_rate_,
                     iou_coverage, min_dosage_coverage
                 ]
-                this_list += best_profile_indicator_ppmx
+                this_list += avg_profile_indicators
                 ppmx_list.append(this_list)
 
     profiles_str = [str(prof) for prof in profiles]
