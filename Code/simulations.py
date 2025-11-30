@@ -14,6 +14,7 @@ from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 from baselines import BayesianLasso
 from baselines import BootstrapLasso
+from baselines import PPMx
 
 
 def parse_arguments():
@@ -94,6 +95,15 @@ if __name__ == "__main__":
     bootstrap_confidence_level = getattr(params, 'bootstrap_confidence_level', 0.95)
     bootstrap_random_state = getattr(params, 'bootstrap_random_state', None)
 
+    # PPMx parameters (with defaults)
+    ppmx_n_iter = getattr(params, 'ppmx_n_iter', 5000)
+    ppmx_burnin = getattr(params, 'ppmx_burnin', 1000)
+    ppmx_thin = getattr(params, 'ppmx_thin', 2)
+    ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
+    ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
+    ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
+    ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
+
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
     all_policies = hasse.enumerate_policies(M, R)
@@ -112,6 +122,7 @@ if __name__ == "__main__":
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
     blasso_fname = args.output_prefix + "_blasso" + output_suffix
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
+    ppmx_fname = args.output_prefix + "_ppmx" + output_suffix
 
     # Identify the pools
     policies_profiles = {}
@@ -164,13 +175,14 @@ if __name__ == "__main__":
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso", "blasso", "bootstrap"]:
-        print(f"method should be one of [r, lasso, blasso, bootstrap]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso", "blasso", "bootstrap", "ppmx"]:
+        print(f"method should be one of [r, lasso, blasso, bootstrap, ppmx]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
     blasso_list = []
     bootstrap_list = []
+    ppmx_list = []
 
     np.random.seed(3)
 
@@ -407,6 +419,64 @@ if __name__ == "__main__":
                 this_list += best_profile_indicator_bootstrap
                 bootstrap_list.append(this_list)
 
+            #
+            # Run PPMx
+            #
+            if method == "ppmx":
+                ppmx = PPMx(
+                    n_iter=ppmx_n_iter,
+                    burnin=ppmx_burnin,
+                    thin=ppmx_thin,
+                    alpha=ppmx_alpha,
+                    cohesion=ppmx_cohesion,
+                    similarity_weight=ppmx_similarity_weight,
+                    similarity_bandwidth=ppmx_similarity_bandwidth,
+                    random_state=sim_i,
+                    verbose=False
+                )
+                ppmx.fit(X, y, D)
+
+                y_ppmx = ppmx.predict(X)
+
+                ppmx_results = metrics.compute_all_metrics(
+                    y, y_ppmx, D, true_best, all_policies, profile_map,
+                    min_dosage_best_policy, true_best_effect)
+                sqrd_err_ppmx = ppmx_results["sqrd_err"]
+                iou_ppmx = ppmx_results["iou"]
+                best_profile_indicator_ppmx = ppmx_results["best_prof"]
+                min_dosage_present_ppmx = ppmx_results["min_dos_inc"]
+                best_policy_diff_ppmx = ppmx_results["best_pol_diff"]
+
+                # Compute mean number of clusters
+                mean_n_clusters = np.mean(ppmx.n_clusters_samples_)
+
+                # Extract posterior samples and compute coverage metrics
+                n_posterior_samples = len(ppmx.partition_samples_)
+                coef_samples = np.zeros((n_posterior_samples, num_policies))
+
+                for sample_idx in range(n_posterior_samples):
+                    partition = ppmx.partition_samples_[sample_idx]
+                    cluster_means = ppmx.cluster_means_samples_[sample_idx]
+
+                    # Convert partition to coefficient vector
+                    for policy_id in range(num_policies):
+                        cluster_id = partition[policy_id]
+                        coef_samples[sample_idx, policy_id] = cluster_means[cluster_id]
+
+                # Compute coverage metrics
+                iou_coverage = metrics.compute_iou_coverage(coef_samples, D_matrix, D, true_best)
+                min_dosage_coverage = metrics.compute_min_dosage_coverage(
+                    coef_samples, D_matrix, D, min_dosage_best_policy)
+
+                this_list = [
+                    n_per_pol, sim_i, sqrd_err_ppmx, iou_ppmx,
+                    min_dosage_present_ppmx, best_policy_diff_ppmx,
+                    mean_n_clusters, ppmx.acceptance_rate_,
+                    iou_coverage, min_dosage_coverage
+                ]
+                this_list += best_profile_indicator_ppmx
+                ppmx_list.append(this_list)
+
     profiles_str = [str(prof) for prof in profiles]
 
     if method == "r":
@@ -435,3 +505,11 @@ if __name__ == "__main__":
         bootstrap_cols += profiles_str
         bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
         bootstrap_df.to_csv(os.path.join(output_dir, bootstrap_fname))
+
+    if method == "ppmx":
+        ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                     "mean_n_clusters", "acceptance_rate",
+                     "IOU_coverage", "min_dosage_coverage"]
+        ppmx_cols += profiles_str
+        ppmx_df = pd.DataFrame(ppmx_list, columns=ppmx_cols)
+        ppmx_df.to_csv(os.path.join(output_dir, ppmx_fname))

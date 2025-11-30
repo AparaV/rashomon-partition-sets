@@ -8,6 +8,7 @@ This module provides alternative regression methods including:
 
 from .bayesian_lasso import BayesianLasso
 from .bootstrap_lasso import BootstrapLasso
+from .ppmx import PPMx
 from .diagnostics import (
     gelman_rubin,
     check_convergence,
@@ -19,6 +20,7 @@ from .diagnostics import (
 __all__ = [
     'BayesianLasso',
     'BootstrapLasso',
+    'PPMx',
     'gelman_rubin',
     'check_convergence',
     'plot_traces',
