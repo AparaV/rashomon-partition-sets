@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
     # Output file names
     start_sim = 0
-    output_dir = "../Results/"
+    output_dir = "../Results/4arms/"
     # output_suffix = f"_{args.sample_size}_{args.iters}_{start_sim}.csv"
     output_suffix = f"_{samples_per_pol[0]}_{num_sims}"
     if args.test:
