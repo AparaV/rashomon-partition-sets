@@ -133,3 +133,54 @@ def compute_te_het_metrics(te_true, te_est, max_te, max_te_policies,
     }
 
     return metrics_results
+
+
+def compute_iou_coverage(coef_samples, X, D, true_best):
+    """
+    Compute mean IOU across all posterior/bootstrap samples.
+
+    Arguments:
+    coef_samples (np.ndarray): Coefficient samples, shape (n_samples, n_features)
+    X (np.ndarray): Design matrix
+    D (np.ndarray): Policy assignments
+    true_best: True best policies
+
+    Returns:
+    float: Mean IOU across all samples
+    """
+    n_samples = coef_samples.shape[0]
+    iou_sum = 0.0
+
+    for i in range(n_samples):
+        y_pred = np.dot(X, coef_samples[i])
+        pred_best = find_best_policies(D, y_pred)
+        iou = intersect_over_union(set(true_best), set(pred_best))
+        iou_sum += iou
+
+    return iou_sum / n_samples
+
+
+def compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy):
+    """
+    Compute mean min dosage coverage: fraction of posterior/bootstrap samples where the minimum
+    dosage best policy is included in the predicted best policies.
+
+    Arguments:
+    coef_samples (np.ndarray): Coefficient samples, shape (n_samples, n_features)
+    X (np.ndarray): Design matrix
+    D (np.ndarray): Policy assignments
+    min_dosage_best_policy: Minimum dosage policy among true best policies
+
+    Returns:
+    float: Mean fraction of samples where min_dosage_best_policy is in predicted best
+    """
+    n_samples = coef_samples.shape[0]
+    coverage_sum = 0.0
+
+    for i in range(n_samples):
+        y_pred = np.dot(X, coef_samples[i])
+        pred_best = find_best_policies(D, y_pred)
+        if check_membership(min_dosage_best_policy, pred_best):
+            coverage_sum += 1.0
+
+    return coverage_sum / n_samples

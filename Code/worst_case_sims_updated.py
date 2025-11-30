@@ -110,61 +110,6 @@ def puffer_transform(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return y_transformed, X_transformed, F, F_inv
 
 
-def compute_iou_coverage(coef_samples: np.ndarray, X: np.ndarray, D: np.ndarray,
-                         true_best, min_samples: int = 1) -> float:
-    """
-    Compute mean IOU across all posterior/bootstrap samples.
-
-    Arguments:
-    coef_samples (np.ndarray): Coefficient samples, shape (n_samples, n_features)
-    X (np.ndarray): Design matrix
-    D (np.ndarray): Policy assignments
-    true_best: True best policies
-    min_samples (int): Unused parameter, kept for compatibility
-
-    Returns:
-    float: Mean IOU across all samples
-    """
-    n_samples = coef_samples.shape[0]
-    iou_sum = 0.0
-
-    for i in range(n_samples):
-        y_pred = np.dot(X, coef_samples[i])
-        pred_best = metrics.find_best_policies(D, y_pred)
-        iou = metrics.intersect_over_union(set(true_best), set(pred_best))
-        iou_sum += iou
-
-    return iou_sum / n_samples
-
-
-def compute_min_dosage_coverage(coef_samples: np.ndarray, X: np.ndarray, D: np.ndarray,
-                                min_dosage_best_policy, policies) -> float:
-    """
-    Compute mean min dosage coverage: fraction of posterior/bootstrap samples where the minimum
-    dosage best policy is included in the predicted best policies.
-
-    Arguments:
-    coef_samples (np.ndarray): Coefficient samples, shape (n_samples, n_features)
-    X (np.ndarray): Design matrix
-    D (np.ndarray): Policy assignments
-    min_dosage_best_policy: Minimum dosage policy among true best policies
-    policies: List of all policies
-
-    Returns:
-    float: Mean fraction of samples where min_dosage_best_policy is in predicted best
-    """
-    n_samples = coef_samples.shape[0]
-    coverage_sum = 0.0
-
-    for i in range(n_samples):
-        y_pred = np.dot(X, coef_samples[i])
-        pred_best = metrics.find_best_policies(D, y_pred)
-        if metrics.check_membership(min_dosage_best_policy, pred_best):
-            coverage_sum += 1.0
-
-    return coverage_sum / n_samples
-
-
 def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best, min_dosage_best_policy,
               puff_details: Dict = None) -> dict:
     """ Run Lasso regression on the data."""
@@ -219,7 +164,7 @@ def run_lasso(y: np.ndarray, X: np.ndarray, reg: float, D: np.ndarray, true_best
 
 
 def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
-                       blasso_params: Dict, policies, sim_seed: int, verbose: bool = False) -> dict:
+                       blasso_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
     """Run Bayesian Lasso regression on the data."""
 
     blasso = BayesianLasso(
@@ -261,8 +206,8 @@ def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, m
     coef_samples = blasso.chains_.reshape(n_chains * n_samples, n_features)
 
     # Compute distribution-based metrics
-    iou_coverage = compute_iou_coverage(coef_samples, X, D, true_best)
-    min_dosage_coverage = compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy, policies)
+    iou_coverage = metrics.compute_iou_coverage(coef_samples, X, D, true_best)
+    min_dosage_coverage = metrics.compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy)
 
     result = {
         "sqrd_err": mse,
@@ -279,7 +224,7 @@ def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, m
 
 
 def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
-                        bootstrap_params: Dict, policies, sim_seed: int, verbose: bool = False) -> dict:
+                        bootstrap_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
     """Run Bootstrap Lasso regression on the data."""
 
     bootstrap = BootstrapLasso(
@@ -318,8 +263,8 @@ def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, 
     coef_samples = bootstrap.bootstrap_coefs_
 
     # Compute distribution-based metrics
-    iou_coverage = compute_iou_coverage(coef_samples, X, D, true_best)
-    min_dosage_coverage = compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy, policies)
+    iou_coverage = metrics.compute_iou_coverage(coef_samples, X, D, true_best)
+    min_dosage_coverage = metrics.compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy)
 
     result = {
         "sqrd_err": mse,
@@ -569,7 +514,7 @@ if __name__ == "__main__":
             # Run Bayesian Lasso
             if "blasso" in methods_to_run:
                 blasso_result = run_bayesian_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
-                                                   blasso_params, policies, sim_i, verbose=False)
+                                                   blasso_params, sim_i, verbose=False)
                 blasso_list_i = [n_per_pol, sim_i, blasso_result["sqrd_err"],
                                  blasso_result["iou_blasso"], blasso_result["min_dosage_present_blasso"],
                                  blasso_result["best_policy_error_blasso"], blasso_result["converged"],
@@ -580,7 +525,7 @@ if __name__ == "__main__":
             # Run Bootstrap Lasso
             if "bootstrap" in methods_to_run:
                 bootstrap_result = run_bootstrap_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
-                                                       bootstrap_params, policies, sim_i, verbose=False)
+                                                       bootstrap_params, sim_i, verbose=False)
                 bootstrap_list_i = [n_per_pol, sim_i, bootstrap_result["sqrd_err"],
                                     bootstrap_result["iou_bootstrap"], bootstrap_result["min_dosage_present_bootstrap"],
                                     bootstrap_result["best_policy_error_bootstrap"], bootstrap_result["coverage"],
