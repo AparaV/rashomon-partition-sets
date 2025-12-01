@@ -19,15 +19,15 @@ from baselines import PPMx
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Parse command line arguments")
-    parser.add_argument("--params", type=str,
+    parser.add_argument("--params", type=str, required=True,
                         help=".py file where parameters are stored")
-    parser.add_argument("--sample_size", type=int,
+    parser.add_argument("--sample_size", type=int, required=True,
                         help="Number of samples per feature combination")
-    parser.add_argument("--iters", type=int,
+    parser.add_argument("--iters", type=int, required=True,
                         help="Number of iterations")
-    parser.add_argument("--output_prefix", type=str,
+    parser.add_argument("--output_prefix", type=str, required=True,
                         help="Prefix for output file name")
-    parser.add_argument("--method", type=str,
+    parser.add_argument("--method", type=str, required=True,
                         help="One of {r, lasso, blasso, bootstrap, ppmx}")
     parser.add_argument(
         "--test",
@@ -78,6 +78,33 @@ def generate_data(mu, var, n_per_pol, all_policies, pi_policies, M):
             idx_ctr += 1
 
     return X, D, y
+
+
+def hash_best_policies(y_pred, D, all_policies, profile_map):
+    """Create a hashable identifier for a model based on its predicted best policies.
+
+    Parameters
+    ----------
+    y_pred : array-like
+        Predictions from the model
+    D : array-like
+        Policy assignment vector
+    all_policies : list
+        List of all possible policies
+    profile_map : dict
+        Mapping from policies to profiles
+
+    Returns
+    -------
+    tuple
+        Hashable tuple of (best_policy_indices, profile_indicators)
+    """
+    best_policies = metrics.find_best_policies(D, y_pred)
+    profile_indicators = metrics.find_profiles(best_policies, all_policies, profile_map)
+    # Create hashable representation: tuple of best policy indices sorted
+    best_policy_tuple = tuple(sorted(best_policies))
+    profile_tuple = tuple(profile_indicators)
+    return (best_policy_tuple, profile_tuple)
 
 
 if __name__ == "__main__":
@@ -174,7 +201,9 @@ if __name__ == "__main__":
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
     blasso_fname = args.output_prefix + "_blasso" + output_suffix
+    blasso_samples_fname = args.output_prefix + "_blasso_samples" + output_suffix
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
+    bootstrap_samples_fname = args.output_prefix + "_bootstrap_samples" + output_suffix
     ppmx_fname = args.output_prefix + "_ppmx" + output_suffix
 
     if verbose:
@@ -239,7 +268,9 @@ if __name__ == "__main__":
     rashomon_list = []
     lasso_list = []
     blasso_list = []
+    blasso_samples_list = []
     bootstrap_list = []
+    bootstrap_samples_list = []
     ppmx_list = []
 
     np.random.seed(3)
@@ -418,7 +449,7 @@ if __name__ == "__main__":
                 best_profile_indicator_blasso = blasso_results["best_prof"]
                 min_dosage_present_blasso = blasso_results["min_dos_inc"]
                 best_policy_diff_blasso = blasso_results["best_pol_diff"]
-                
+
                 # Compute metrics for MAP estimate
                 blasso_map_results = metrics.compute_all_metrics(
                     y, y_blasso_map, D, true_best, all_policies, profile_map,
@@ -440,18 +471,46 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
-                # Compute average profile indicators across MCMC samples
+                # Compute average profile indicators and store individual sample results
                 profile_indicators_sum = np.zeros(len(profiles))
                 n_posterior_samples = coef_samples.shape[0]
+
+                # Compute negative log posterior (loss) for all samples at once
+                log_posteriors = blasso._compute_posterior_densities(D_matrix, y, coef_samples)
+                neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
+
                 for sample_idx in range(n_posterior_samples):
-                    y_sample = np.dot(D_matrix, coef_samples[sample_idx])
-                    best_policies_sample = metrics.find_best_policies(D, y_sample)
-                    profile_indicator_sample = metrics.find_profiles(best_policies_sample, all_policies, profile_map)
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    # Compute metrics for this sample
+                    sample_results = metrics.compute_all_metrics(
+                        y, y_sample, D, true_best, all_policies, profile_map,
+                        min_dosage_best_policy, true_best_effect)
+
+                    sqrd_err_sample = sample_results["sqrd_err"]
+                    iou_sample = sample_results["iou"]
+                    profile_indicator_sample = sample_results["best_prof"]
+                    min_dosage_sample = sample_results["min_dos_inc"]
+                    best_pol_diff_sample = sample_results["best_pol_diff"]
+
+                    # Store individual sample results
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        neg_log_posteriors[sample_idx],  # loss (negative log posterior)
+                        sqrd_err_sample,  # MSE component of loss
+                        iou_sample, min_dosage_sample, best_pol_diff_sample
+                    ]
+                    sample_list += profile_indicator_sample
+                    blasso_samples_list.append(sample_list)
+
+                    # Accumulate for average
                     profile_indicators_sum += np.array(profile_indicator_sample)
+
                 avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
                 this_list = [
-                    n_per_pol, sim_i, 
+                    n_per_pol, sim_i,
                     sqrd_err_blasso, iou_blasso, min_dosage_present_blasso, best_policy_diff_blasso,
                     sqrd_err_blasso_map, iou_blasso_map, min_dosage_present_blasso_map, best_policy_diff_blasso_map,
                     converged, max_rhat, iou_coverage, min_dosage_coverage
@@ -499,14 +558,42 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
-                # Compute average profile indicators across bootstrap samples
+                # Compute average profile indicators and store individual sample results
                 profile_indicators_sum = np.zeros(len(profiles))
                 n_bootstrap_samples = coef_samples.shape[0]
+
                 for sample_idx in range(n_bootstrap_samples):
-                    y_sample = np.dot(D_matrix, coef_samples[sample_idx])
-                    best_policies_sample = metrics.find_best_policies(D, y_sample)
-                    profile_indicator_sample = metrics.find_profiles(best_policies_sample, all_policies, profile_map)
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    # Compute metrics for this sample
+                    sample_results = metrics.compute_all_metrics(
+                        y, y_sample, D, true_best, all_policies, profile_map,
+                        min_dosage_best_policy, true_best_effect)
+
+                    sqrd_err_sample = sample_results["sqrd_err"]
+                    iou_sample = sample_results["iou"]
+                    profile_indicator_sample = sample_results["best_prof"]
+                    min_dosage_sample = sample_results["min_dos_inc"]
+                    best_pol_diff_sample = sample_results["best_pol_diff"]
+
+                    # Compute penalized loss: MSE + regularization * L1 norm
+                    l1_norm = np.sum(np.abs(coef_sample))
+                    penalized_loss = sqrd_err_sample + reg * l1_norm
+
+                    # Store individual sample results
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        penalized_loss,  # loss (MSE + reg * L1)
+                        sqrd_err_sample,  # MSE component of loss
+                        iou_sample, min_dosage_sample, best_pol_diff_sample
+                    ]
+                    sample_list += profile_indicator_sample
+                    bootstrap_samples_list.append(sample_list)
+
+                    # Accumulate for average
                     profile_indicators_sum += np.array(profile_indicator_sample)
+
                 avg_profile_indicators = (profile_indicators_sum / n_bootstrap_samples).tolist()
 
                 this_list = [
@@ -619,6 +706,17 @@ if __name__ == "__main__":
         if verbose:
             print(f"\nSaved Bayesian Lasso results to {blasso_fname}")
 
+        # Save sample-level results
+        blasso_samples_cols = [
+            "n_per_pol", "sim_num", "sample_idx",
+            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff"
+        ]
+        blasso_samples_cols += profiles_str
+        blasso_samples_df = pd.DataFrame(blasso_samples_list, columns=blasso_samples_cols)
+        blasso_samples_df.to_csv(os.path.join(output_dir, blasso_samples_fname))
+        if verbose:
+            print(f"Saved Bayesian Lasso sample-level results to {blasso_samples_fname}")
+
     if method == "bootstrap":
         bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
                           "coverage", "mean_ci_width", "n_stable_features",
@@ -628,6 +726,17 @@ if __name__ == "__main__":
         bootstrap_df.to_csv(os.path.join(output_dir, bootstrap_fname))
         if verbose:
             print(f"\nSaved Bootstrap Lasso results to {bootstrap_fname}")
+
+        # Save sample-level results
+        bootstrap_samples_cols = [
+            "n_per_pol", "sim_num", "sample_idx",
+            "penalized_loss", "MSE", "IOU", "min_dosage", "best_pol_diff"
+        ]
+        bootstrap_samples_cols += profiles_str
+        bootstrap_samples_df = pd.DataFrame(bootstrap_samples_list, columns=bootstrap_samples_cols)
+        bootstrap_samples_df.to_csv(os.path.join(output_dir, bootstrap_samples_fname))
+        if verbose:
+            print(f"Saved Bootstrap Lasso sample-level results to {bootstrap_samples_fname}")
 
     if method == "ppmx":
         ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
