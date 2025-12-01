@@ -389,7 +389,7 @@ class BayesianLasso:
     
     def _compute_posterior_densities(self, X: np.ndarray, y: np.ndarray, 
                                      samples: np.ndarray) -> np.ndarray:
-        """Compute (unnormalized) posterior density for each sample.
+        """Compute (unnormalized) log posterior density for each sample.
         
         For Bayesian Lasso, the posterior is proportional to:
         p(β|y) ∝ p(y|β) * p(β)
@@ -398,21 +398,37 @@ class BayesianLasso:
         - p(y|β) = N(Xβ, τ²I) [likelihood]
         - p(β) = product of Laplace priors [regularization]
         
-        We compute log posterior for numerical stability.
-        """
-        n_samples = samples.shape[0]
-        log_posteriors = np.zeros(n_samples)
+        OPTIMIZED: Vectorized computation across all samples.
         
-        for i in range(n_samples):
-            beta = samples[i]
-            # Log likelihood: -0.5 * ||y - X*beta||^2 / tau^2 (ignoring constants)
-            residuals = y - X @ beta
-            log_likelihood = -0.5 * np.sum(residuals ** 2)
-            
-            # Log prior: Laplace prior is proportional to exp(-lambda * |beta|)
-            log_prior = -self.lambda_prior * np.sum(np.abs(beta))
-            
-            log_posteriors[i] = log_likelihood + log_prior
+        Parameters
+        ----------
+        X : ndarray of shape (n, p)
+            Design matrix
+        y : ndarray of shape (n,)
+            Response vector
+        samples : ndarray of shape (n_samples, p)
+            MCMC samples of coefficients
+        
+        Returns
+        -------
+        log_posteriors : ndarray of shape (n_samples,)
+            Log posterior density for each sample
+        """
+        # Vectorized predictions: (n, n_samples) = (n, p) @ (p, n_samples)
+        predictions = X @ samples.T  # Shape: (n, n_samples)
+        
+        # Vectorized residuals: broadcast y to (n, n_samples)
+        residuals = y[:, np.newaxis] - predictions  # Shape: (n, n_samples)
+        
+        # Log likelihood: -0.5 * ||residuals||^2 for each sample
+        # Sum over observations (axis=0) to get (n_samples,)
+        log_likelihood = -0.5 * np.sum(residuals ** 2, axis=0)
+        
+        # Log prior: -lambda * ||beta||_1 for each sample
+        # Sum over features (axis=1) to get (n_samples,)
+        log_prior = -self.lambda_prior * np.sum(np.abs(samples), axis=1)
+        
+        log_posteriors = log_likelihood + log_prior
         
         return log_posteriors
     
