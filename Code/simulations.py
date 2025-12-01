@@ -475,8 +475,8 @@ if __name__ == "__main__":
                 profile_indicators_sum = np.zeros(len(profiles))
                 n_posterior_samples = coef_samples.shape[0]
 
-                # Compute negative log posterior (loss) for all samples at once
-                log_posteriors = blasso._compute_posterior_densities(D_matrix, y, coef_samples)
+                # Get cached log posterior densities (computed during fit)
+                log_posteriors = blasso.get_log_posteriors()
                 neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
 
                 for sample_idx in range(n_posterior_samples):

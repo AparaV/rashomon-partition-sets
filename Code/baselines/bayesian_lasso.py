@@ -59,6 +59,8 @@ class BayesianLasso:
         Random seed for reproducibility
     verbose : bool, default=False
         Whether to print progress information
+    cache_posteriors : bool, default=True
+        Whether to cache log posterior densities during fit for reuse
 
     Attributes
     ----------
@@ -74,6 +76,8 @@ class BayesianLasso:
         Whether all chains converged (max R-hat < 1.1)
     n_features_in_ : int
         Number of features seen during fit
+    log_posteriors_ : ndarray of shape (n_samples,) or None
+        Cached log posterior densities for all MCMC samples (if cache_posteriors=True)
     """
 
     def __init__(
@@ -86,7 +90,8 @@ class BayesianLasso:
         tau2_b: float = 0.1,
         fit_intercept: bool = False,
         random_state: Optional[int] = None,
-        verbose: bool = False
+        verbose: bool = False,
+        cache_posteriors: bool = True
     ):
         self.n_iter = n_iter
         self.burnin = burnin
@@ -97,6 +102,7 @@ class BayesianLasso:
         self.fit_intercept = fit_intercept
         self.random_state = random_state
         self.verbose = verbose
+        self.cache_posteriors = cache_posteriors
         self._A_workspace = None  # Workspace matrix for optimization
 
         # Attributes set during fit
@@ -106,6 +112,9 @@ class BayesianLasso:
         self.rhat_ = None
         self.converged_ = None
         self.n_features_in_ = None
+        self.log_posteriors_ = None
+        self._X_fit = None  # Reference to training data for cache validation
+        self._y_fit = None
 
     def fit(self, X: np.ndarray, y: np.ndarray, n_chains: int = 4) -> 'BayesianLasso':
         """
@@ -165,6 +174,12 @@ class BayesianLasso:
         posterior_densities = self._compute_posterior_densities(X, y, all_samples)
         map_idx = np.argmax(posterior_densities)
         self.coef_map_ = all_samples[map_idx]
+        
+        # Cache posterior densities and training data references if enabled
+        if self.cache_posteriors:
+            self.log_posteriors_ = posterior_densities
+            self._X_fit = X
+            self._y_fit = y
 
         # Compute Gelman-Rubin diagnostic
         from .diagnostics import gelman_rubin, check_convergence
@@ -399,6 +414,7 @@ class BayesianLasso:
         - p(β) = product of Laplace priors [regularization]
         
         OPTIMIZED: Vectorized computation across all samples.
+        Uses cached values if available and data matches.
         
         Parameters
         ----------
@@ -414,6 +430,17 @@ class BayesianLasso:
         log_posteriors : ndarray of shape (n_samples,)
             Log posterior density for each sample
         """
+        # Check if we can use cached posteriors
+        if (self.cache_posteriors and 
+            self.log_posteriors_ is not None and
+            self._X_fit is X and 
+            self._y_fit is y and
+            samples.shape[0] == self.log_posteriors_.shape[0]):
+            # Verify samples match (check if samples is reshaped chains)
+            all_samples = self.chains_.reshape(-1, self.n_features_in_)
+            if samples is all_samples or np.array_equal(samples, all_samples):
+                return self.log_posteriors_
+        
         # Vectorized predictions: (n, n_samples) = (n, p) @ (p, n_samples)
         predictions = X @ samples.T  # Shape: (n, n_samples)
         
@@ -450,3 +477,33 @@ class BayesianLasso:
         
         X = self._validate_data(X, reset=False)
         return X @ self.coef_map_
+    
+    def get_log_posteriors(self) -> np.ndarray:
+        """Get cached log posterior densities for MCMC samples.
+        
+        Returns the cached log posterior densities computed during fit.
+        This is useful for external analysis without recomputing.
+        
+        Returns
+        -------
+        log_posteriors : ndarray of shape (n_samples,)
+            Log posterior density for each MCMC sample
+        
+        Raises
+        ------
+        ValueError
+            If model has not been fitted or posteriors were not cached
+        """
+        if self.coef_ is None:
+            raise ValueError("Model has not been fitted yet. Call fit() first.")
+        
+        if not self.cache_posteriors:
+            raise ValueError(
+                "Posteriors were not cached. Set cache_posteriors=True when "
+                "initializing the model to enable caching."
+            )
+        
+        if self.log_posteriors_ is None:
+            raise ValueError("Cached posteriors not available.")
+        
+        return self.log_posteriors_
