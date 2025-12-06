@@ -191,12 +191,17 @@ if __name__ == "__main__":
         verbose = args.verbose
 
     # Output file names
-    start_sim = 0
+    start_sim = 50
     output_dir = "../Results/4arms/"
     # output_suffix = f"_{args.sample_size}_{args.iters}_{start_sim}.csv"
-    output_suffix = f"_{samples_per_pol[0]}_{num_sims}"
+    if start_sim != 0:
+        start_idx_suffix = str(start_sim) + "_"
+    else:
+        start_idx_suffix = ""
+    output_suffix = f"_{samples_per_pol[0]}_{start_idx_suffix}{num_sims}"
     if args.test:
         output_suffix += "_test"
+
     output_suffix += ".csv"
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
