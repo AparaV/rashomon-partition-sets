@@ -166,6 +166,9 @@ def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, m
     iou_coverage = metrics.compute_iou_coverage(coef_samples, X, D, true_best)
     min_dosage_coverage = metrics.compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy)
 
+    # Get log posteriors for sample-level analysis
+    log_posteriors = blasso.get_log_posteriors()
+
     result = {
         "sqrd_err": mse,
         "iou_blasso": iou_blasso,
@@ -174,7 +177,9 @@ def run_bayesian_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, m
         "converged": converged,
         "max_rhat": max_rhat,
         "iou_coverage": iou_coverage,
-        "min_dosage_coverage": min_dosage_coverage
+        "min_dosage_coverage": min_dosage_coverage,
+        "coef_samples": coef_samples,
+        "log_posteriors": log_posteriors
     }
 
     return result
@@ -232,7 +237,8 @@ def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, 
         "mean_ci_width": mean_ci_width,
         "n_stable_features": n_stable_features,
         "iou_coverage": iou_coverage,
-        "min_dosage_coverage": min_dosage_coverage
+        "min_dosage_coverage": min_dosage_coverage,
+        "coef_samples": coef_samples
     }
 
     return result
@@ -417,7 +423,9 @@ if __name__ == "__main__":
     lasso_list = [] if "lasso" in methods_to_run else None
     tva_list = [] if "tva" in methods_to_run else None
     blasso_list = [] if "blasso" in methods_to_run else None
+    blasso_samples_list = [] if "blasso" in methods_to_run else None
     bootstrap_list = [] if "bootstrap" in methods_to_run else None
+    bootstrap_samples_list = [] if "bootstrap" in methods_to_run else None
     ppmx_list = [] if "ppmx" in methods_to_run else None
 
     #
@@ -512,6 +520,40 @@ if __name__ == "__main__":
                                  blasso_result["min_dosage_coverage"]]
                 blasso_list.append(blasso_list_i)
 
+                # Store per-sample results
+                coef_samples = blasso_result["coef_samples"]
+                log_posteriors = blasso_result["log_posteriors"]
+                neg_log_posteriors = -log_posteriors
+
+                for sample_idx in range(coef_samples.shape[0]):
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    # Compute metrics for this sample
+                    sqrd_err_sample = mean_squared_error(y, y_sample)
+
+                    # IOU for this sample
+                    sample_best = metrics.find_best_policies(D, y_sample)
+                    iou_sample = metrics.intersect_over_union(set(true_best), set(sample_best))
+
+                    # Min dosage for this sample
+                    min_dosage_sample = metrics.check_membership(min_dosage_best_policy, sample_best)
+
+                    # Best policy difference for this sample
+                    best_pol_diff_sample = np.max(mu) - np.max(y_sample)
+
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        neg_log_posteriors[sample_idx],
+                        sqrd_err_sample,
+                        iou_sample,
+                        min_dosage_sample,
+                        best_pol_diff_sample,
+                        blasso_result["converged"],
+                        blasso_result["max_rhat"]
+                    ]
+                    blasso_samples_list.append(sample_list)
+
             # Run Bootstrap Lasso
             if "bootstrap" in methods_to_run:
                 bootstrap_result = run_bootstrap_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
@@ -522,6 +564,40 @@ if __name__ == "__main__":
                                     bootstrap_result["mean_ci_width"], bootstrap_result["n_stable_features"],
                                     bootstrap_result["iou_coverage"], bootstrap_result["min_dosage_coverage"]]
                 bootstrap_list.append(bootstrap_list_i)
+
+                # Store per-sample results
+                coef_samples = bootstrap_result["coef_samples"]
+
+                for sample_idx in range(coef_samples.shape[0]):
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    # Compute metrics for this sample
+                    sqrd_err_sample = mean_squared_error(y, y_sample)
+
+                    # Compute penalized loss
+                    l1_norm = np.sum(np.abs(coef_sample))
+                    penalized_loss = sqrd_err_sample + reg * l1_norm
+
+                    # IOU for this sample
+                    sample_best = metrics.find_best_policies(D, y_sample)
+                    iou_sample = metrics.intersect_over_union(set(true_best), set(sample_best))
+
+                    # Min dosage for this sample
+                    min_dosage_sample = metrics.check_membership(min_dosage_best_policy, sample_best)
+
+                    # Best policy difference for this sample
+                    best_pol_diff_sample = np.max(mu) - np.max(y_sample)
+
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        penalized_loss,
+                        sqrd_err_sample,
+                        iou_sample,
+                        min_dosage_sample,
+                        best_pol_diff_sample
+                    ]
+                    bootstrap_samples_list.append(sample_list)
 
             # Run PPMx
             if "ppmx" in methods_to_run:
@@ -615,19 +691,23 @@ if __name__ == "__main__":
             print(f"Saved TVA results to worst_case_tva{suffix}.csv")
 
     if "blasso" in methods_to_run:
-        blasso_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff", "converged", "max_rhat",
-                       "IOU_coverage", "min_dosage_coverage"]
-        blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
-        blasso_df.to_csv(f"../Results/worst_case/worst_case_blasso{suffix}.csv")
+        blasso_samples_cols = [
+            "n_per_pol", "sim_num", "sample_idx",
+            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
+            "converged", "max_rhat"
+        ]
+        blasso_samples_df = pd.DataFrame(blasso_samples_list, columns=blasso_samples_cols)
+        blasso_samples_df.to_csv(f"../Results/worst_case/worst_case_blasso{suffix}.csv")
         if verbose:
             print(f"Saved Bayesian Lasso results to worst_case_blasso{suffix}.csv")
 
     if "bootstrap" in methods_to_run:
-        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
-                          "coverage", "mean_ci_width", "n_stable_features",
-                          "IOU_coverage", "min_dosage_coverage"]
-        bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
-        bootstrap_df.to_csv(f"../Results/worst_case/worst_case_bootstrap{suffix}.csv")
+        bootstrap_samples_cols = [
+            "n_per_pol", "sim_num", "sample_idx",
+            "penalized_loss", "MSE", "IOU", "min_dosage", "best_pol_diff"
+        ]
+        bootstrap_samples_df = pd.DataFrame(bootstrap_samples_list, columns=bootstrap_samples_cols)
+        bootstrap_samples_df.to_csv(f"../Results/worst_case/worst_case_bootstrap{suffix}.csv")
         if verbose:
             print(f"Saved Bootstrap Lasso results to worst_case_bootstrap{suffix}.csv")
 
