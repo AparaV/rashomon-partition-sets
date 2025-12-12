@@ -3,12 +3,14 @@ Baseline methods for comparison with Rashomon Partition Sets.
 
 This module provides alternative regression methods including:
 - BayesianLasso: Bayesian Lasso with Laplace priors via Gibbs sampling
+- SpikeSlabLasso: Spike and Slab Lasso for Bayesian variable selection
 - BootstrapLasso: Bootstrap Lasso for empirical uncertainty quantification
 - TVA: Treatment Variance Analysis using Puffer transform
 - PPMx: Product Partition Model with Covariates
 """
 
 from .bayesian_lasso import BayesianLasso
+from .spike_slab_lasso import SpikeSlabLasso
 from .bootstrap_lasso import BootstrapLasso
 from .tva import TVA
 from .ppmx import PPMx
@@ -22,6 +24,7 @@ from .diagnostics import (
 
 __all__ = [
     'BayesianLasso',
+    'SpikeSlabLasso',
     'BootstrapLasso',
     'TVA',
     'PPMx',
