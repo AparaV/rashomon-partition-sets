@@ -108,3 +108,17 @@ bootstrap_n_iter = 1000          # Number of bootstrap iterations
 bootstrap_alpha = 5e-3           # Lasso regularization (same as lasso_reg)
 bootstrap_confidence_level = 0.95  # Confidence level for intervals
 bootstrap_random_state = None    # Random state (None uses sim_i)
+
+# Spike-Slab Lasso parameters
+# High-dimensional setting: n=2560 samples, p=256 features (policies)
+# Use strong spike and low prior inclusion for sparse selection
+ssl_n_iter = 3000           # Total iterations (more for complex sampling)
+ssl_burnin = 800            # Burn-in iterations
+ssl_thin = 2                # Thinning
+ssl_n_chains = 4            # Number of chains
+ssl_lambda0 = 20.0          # Spike precision (strong shrinkage near zero)
+ssl_lambda1 = 0.5           # Slab scale (Laplace regularization for non-zero)
+ssl_theta_init = 0.3        # Initial prior inclusion probability (expect ~30% non-zero)
+ssl_update_theta = True     # Adapt theta from data
+ssl_theta_a = 1.0           # Beta prior shape parameter a
+ssl_theta_b = 1.0           # Beta prior shape parameter b

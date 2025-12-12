@@ -14,6 +14,7 @@ from rashomon import extract_pools
 from rashomon.aggregate import RAggregate
 from baselines import BayesianLasso
 from baselines import BootstrapLasso
+from baselines import SpikeSlabLasso
 from baselines import PPMx
 
 
@@ -28,7 +29,7 @@ def parse_arguments():
     parser.add_argument("--output_prefix", type=str, required=True,
                         help="Prefix for output file name")
     parser.add_argument("--method", type=str, required=True,
-                        help="One of {r, lasso, blasso, bootstrap, ppmx}")
+                        help="One of {r, lasso, blasso, bootstrap, ssl, ppmx}")
     parser.add_argument(
         "--test",
         action="store_true",
@@ -172,6 +173,30 @@ if __name__ == "__main__":
         ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
         ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
 
+    # Spike-Slab Lasso parameters (with defaults)
+    if args.test:
+        ssl_n_iter = 1000
+        ssl_burnin = 200
+        ssl_thin = 2
+        ssl_n_chains = 3
+        ssl_lambda0 = getattr(params, 'ssl_lambda0', 15.0)
+        ssl_lambda1 = getattr(params, 'ssl_lambda1', 1.0)
+        ssl_theta_init = getattr(params, 'ssl_theta_init', 0.5)
+        ssl_update_theta = getattr(params, 'ssl_update_theta', True)
+        ssl_theta_a = getattr(params, 'ssl_theta_a', 1.0)
+        ssl_theta_b = getattr(params, 'ssl_theta_b', 1.0)
+    else:
+        ssl_n_iter = getattr(params, 'ssl_n_iter', 2000)
+        ssl_burnin = getattr(params, 'ssl_burnin', 500)
+        ssl_thin = getattr(params, 'ssl_thin', 2)
+        ssl_n_chains = getattr(params, 'ssl_n_chains', 4)
+        ssl_lambda0 = getattr(params, 'ssl_lambda0', 15.0)
+        ssl_lambda1 = getattr(params, 'ssl_lambda1', 1.0)
+        ssl_theta_init = getattr(params, 'ssl_theta_init', 0.5)
+        ssl_update_theta = getattr(params, 'ssl_update_theta', True)
+        ssl_theta_a = getattr(params, 'ssl_theta_a', 1.0)
+        ssl_theta_b = getattr(params, 'ssl_theta_b', 1.0)
+
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
     all_policies = hasse.enumerate_policies(M, R)
@@ -209,6 +234,8 @@ if __name__ == "__main__":
     blasso_samples_fname = args.output_prefix + "_blasso_samples" + output_suffix
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
     bootstrap_samples_fname = args.output_prefix + "_bootstrap_samples" + output_suffix
+    ssl_fname = args.output_prefix + "_ssl" + output_suffix
+    ssl_samples_fname = args.output_prefix + "_ssl_samples" + output_suffix
     ppmx_fname = args.output_prefix + "_ppmx" + output_suffix
 
     if verbose:
@@ -267,8 +294,8 @@ if __name__ == "__main__":
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso", "blasso", "bootstrap", "ppmx"]:
-        print(f"method should be one of [r, lasso, blasso, bootstrap, ppmx]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso", "blasso", "bootstrap", "ssl", "ppmx"]:
+        print(f"method should be one of [r, lasso, blasso, bootstrap, ssl, ppmx]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
@@ -276,6 +303,8 @@ if __name__ == "__main__":
     blasso_samples_list = []
     bootstrap_list = []
     bootstrap_samples_list = []
+    ssl_list = []
+    ssl_samples_list = []
     ppmx_list = []
 
     np.random.seed(3)
@@ -611,6 +640,115 @@ if __name__ == "__main__":
                 bootstrap_list.append(this_list)
 
             #
+            # Run Spike-Slab Lasso
+            #
+            if method == "ssl":
+                ssl = SpikeSlabLasso(
+                    n_iter=ssl_n_iter,
+                    burnin=ssl_burnin,
+                    thin=ssl_thin,
+                    lambda0=ssl_lambda0,
+                    lambda1=ssl_lambda1,
+                    theta_init=ssl_theta_init,
+                    update_theta=ssl_update_theta,
+                    theta_a=ssl_theta_a,
+                    theta_b=ssl_theta_b,
+                    random_state=sim_i,
+                    verbose=False
+                )
+                ssl.fit(D_matrix, y, n_chains=ssl_n_chains)
+
+                # Predictions using posterior mean
+                y_ssl = ssl.predict(D_matrix)
+                # Predictions using MAP estimate
+                y_ssl_map = ssl.predict_map(D_matrix)
+
+                # Compute metrics for posterior mean
+                ssl_results = metrics.compute_all_metrics(
+                    y, y_ssl, D, true_best, all_policies, profile_map,
+                    min_dosage_best_policy, true_best_effect)
+                sqrd_err_ssl = ssl_results["sqrd_err"]
+                iou_ssl = ssl_results["iou"]
+                best_profile_indicator_ssl = ssl_results["best_prof"]
+                min_dosage_present_ssl = ssl_results["min_dos_inc"]
+                best_policy_diff_ssl = ssl_results["best_pol_diff"]
+
+                # Compute metrics for MAP estimate
+                ssl_map_results = metrics.compute_all_metrics(
+                    y, y_ssl_map, D, true_best, all_policies, profile_map,
+                    min_dosage_best_policy, true_best_effect)
+                sqrd_err_ssl_map = ssl_map_results["sqrd_err"]
+                iou_ssl_map = ssl_map_results["iou"]
+                best_profile_indicator_ssl_map = ssl_map_results["best_prof"]
+                min_dosage_present_ssl_map = ssl_map_results["min_dos_inc"]
+                best_policy_diff_ssl_map = ssl_map_results["best_pol_diff"]
+
+                # Store convergence information
+                converged = ssl.converged_
+                max_rhat = np.max(ssl.rhat_)
+
+                # Variable selection metrics
+                mean_inclusion_prob = np.mean(ssl.inclusion_probs_)
+                n_selected_features = len(ssl.get_selected_features(threshold=0.5))
+
+                # Extract posterior samples and compute coverage metrics
+                n_chains, n_samples_mcmc, n_features = ssl.chains_.shape
+                coef_samples = ssl.chains_.reshape(n_chains * n_samples_mcmc, n_features)
+                iou_coverage = metrics.compute_iou_coverage(coef_samples, D_matrix, D, true_best)
+                min_dosage_coverage = metrics.compute_min_dosage_coverage(
+                    coef_samples, D_matrix, D, min_dosage_best_policy)
+
+                # Compute average profile indicators and store individual sample results
+                profile_indicators_sum = np.zeros(len(profiles))
+                n_posterior_samples = coef_samples.shape[0]
+
+                # Get cached log posterior densities (computed during fit)
+                log_posteriors = ssl.get_log_posteriors()
+                neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
+
+                for sample_idx in range(n_posterior_samples):
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    sample_results = metrics.compute_all_metrics(
+                        y, y_sample, D, true_best, all_policies, profile_map,
+                        min_dosage_best_policy, true_best_effect)
+
+                    sqrd_err_sample = sample_results["sqrd_err"]
+                    iou_sample = sample_results["iou"]
+                    min_dosage_sample = sample_results["min_dos_inc"]
+                    best_pol_diff_sample = sample_results["best_pol_diff"]
+                    profile_indicators_sample = sample_results["best_prof"]
+
+                    profile_indicators_sum += np.array(profile_indicators_sample)
+
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        neg_log_posteriors[sample_idx],
+                        sqrd_err_sample,
+                        iou_sample,
+                        min_dosage_sample,
+                        best_pol_diff_sample
+                    ]
+                    sample_list += profile_indicators_sample
+                    ssl_samples_list.append(sample_list)
+
+                avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
+
+                this_list = [
+                    n_per_pol, sim_i,
+                    sqrd_err_ssl, iou_ssl, min_dosage_present_ssl, best_policy_diff_ssl,
+                    sqrd_err_ssl_map, iou_ssl_map, min_dosage_present_ssl_map, best_policy_diff_ssl_map,
+                    converged, max_rhat, iou_coverage, min_dosage_coverage,
+                    mean_inclusion_prob, n_selected_features
+                ]
+                # Add profile indicators: mean, then MAP, then average across all samples
+                this_list += best_profile_indicator_ssl
+                this_list += best_profile_indicator_ssl_map
+                this_list += avg_profile_indicators
+                ssl_list.append(this_list)
+
+            #
             # Run PPMx
             #
             if method == "ppmx":
@@ -742,6 +880,34 @@ if __name__ == "__main__":
         bootstrap_samples_df.to_csv(os.path.join(output_dir, bootstrap_samples_fname))
         if verbose:
             print(f"Saved Bootstrap Lasso sample-level results to {bootstrap_samples_fname}")
+
+    if method == "ssl":
+        ssl_cols = [
+            "n_per_pol", "sim_num",
+            "MSE_mean", "IOU_mean", "min_dosage_mean", "best_pol_diff_mean",
+            "MSE_map", "IOU_map", "min_dosage_map", "best_pol_diff_map",
+            "converged", "max_rhat", "IOU_coverage", "min_dosage_coverage",
+            "mean_inclusion_prob", "n_selected_features"
+        ]
+        # Add profile columns for posterior mean, MAP, and average
+        ssl_cols += [f"{prof}_mean" for prof in profiles_str]
+        ssl_cols += [f"{prof}_map" for prof in profiles_str]
+        ssl_cols += [f"{prof}_avg" for prof in profiles_str]
+        ssl_df = pd.DataFrame(ssl_list, columns=ssl_cols)
+        ssl_df.to_csv(os.path.join(output_dir, ssl_fname))
+        if verbose:
+            print(f"\nSaved Spike-Slab Lasso results to {ssl_fname}")
+
+        # Save sample-level results
+        ssl_samples_cols = [
+            "n_per_pol", "sim_num", "sample_idx",
+            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff"
+        ]
+        ssl_samples_cols += profiles_str
+        ssl_samples_df = pd.DataFrame(ssl_samples_list, columns=ssl_samples_cols)
+        ssl_samples_df.to_csv(os.path.join(output_dir, ssl_samples_fname))
+        if verbose:
+            print(f"Saved Spike-Slab Lasso sample-level results to {ssl_samples_fname}")
 
     if method == "ppmx":
         ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
