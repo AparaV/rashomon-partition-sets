@@ -231,11 +231,9 @@ if __name__ == "__main__":
     rashomon_fname = args.output_prefix + "_rashomon" + output_suffix
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
     blasso_fname = args.output_prefix + "_blasso" + output_suffix
-    blasso_samples_fname = args.output_prefix + "_blasso_samples" + output_suffix
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
     bootstrap_samples_fname = args.output_prefix + "_bootstrap_samples" + output_suffix
     ssl_fname = args.output_prefix + "_ssl" + output_suffix
-    ssl_samples_fname = args.output_prefix + "_ssl_samples" + output_suffix
     ppmx_fname = args.output_prefix + "_ppmx" + output_suffix
 
     if verbose:
@@ -300,11 +298,9 @@ if __name__ == "__main__":
     rashomon_list = []
     lasso_list = []
     blasso_list = []
-    blasso_samples_list = []
     bootstrap_list = []
     bootstrap_samples_list = []
     ssl_list = []
-    ssl_samples_list = []
     ppmx_list = []
 
     np.random.seed(3)
@@ -528,32 +524,29 @@ if __name__ == "__main__":
                     min_dosage_sample = sample_results["min_dos_inc"]
                     best_pol_diff_sample = sample_results["best_pol_diff"]
 
-                    # Store individual sample results
+                    # Accumulate for average
+                    profile_indicators_sum += np.array(profile_indicator_sample)
+
+                    # Store individual sample results with summary metrics
                     sample_list = [
                         n_per_pol, sim_i, sample_idx,
                         neg_log_posteriors[sample_idx],  # loss (negative log posterior)
                         sqrd_err_sample,  # MSE component of loss
-                        iou_sample, min_dosage_sample, best_pol_diff_sample
+                        iou_sample,
+                        min_dosage_sample,
+                        best_pol_diff_sample,
+                        converged,
+                        max_rhat,
+                        iou_coverage,
+                        min_dosage_coverage
                     ]
                     sample_list += profile_indicator_sample
-                    blasso_samples_list.append(sample_list)
-
-                    # Accumulate for average
-                    profile_indicators_sum += np.array(profile_indicator_sample)
+                    blasso_list.append(sample_list)
 
                 avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
-                this_list = [
-                    n_per_pol, sim_i,
-                    sqrd_err_blasso, iou_blasso, min_dosage_present_blasso, best_policy_diff_blasso,
-                    sqrd_err_blasso_map, iou_blasso_map, min_dosage_present_blasso_map, best_policy_diff_blasso_map,
-                    converged, max_rhat, iou_coverage, min_dosage_coverage
-                ]
-                # Add profile indicators: mean, then MAP, then average across all samples
-                this_list += best_profile_indicator_blasso
-                this_list += best_profile_indicator_blasso_map
-                this_list += avg_profile_indicators
-                blasso_list.append(this_list)
+                # Store summary info in first sample row via special fields
+                # (we only keep sample-level output now)
 
             #
             # Run Bootstrap Lasso
@@ -728,25 +721,21 @@ if __name__ == "__main__":
                         sqrd_err_sample,
                         iou_sample,
                         min_dosage_sample,
-                        best_pol_diff_sample
+                        best_pol_diff_sample,
+                        converged,
+                        max_rhat,
+                        iou_coverage,
+                        min_dosage_coverage,
+                        mean_inclusion_prob,
+                        n_selected_features
                     ]
                     sample_list += profile_indicators_sample
-                    ssl_samples_list.append(sample_list)
+                    ssl_list.append(sample_list)
 
                 avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
-                this_list = [
-                    n_per_pol, sim_i,
-                    sqrd_err_ssl, iou_ssl, min_dosage_present_ssl, best_policy_diff_ssl,
-                    sqrd_err_ssl_map, iou_ssl_map, min_dosage_present_ssl_map, best_policy_diff_ssl_map,
-                    converged, max_rhat, iou_coverage, min_dosage_coverage,
-                    mean_inclusion_prob, n_selected_features
-                ]
-                # Add profile indicators: mean, then MAP, then average across all samples
-                this_list += best_profile_indicator_ssl
-                this_list += best_profile_indicator_ssl_map
-                this_list += avg_profile_indicators
-                ssl_list.append(this_list)
+                # Store summary info in first sample row via special fields
+                # (we only keep sample-level output now)
 
             #
             # Run PPMx
@@ -835,30 +824,15 @@ if __name__ == "__main__":
 
     if method == "blasso":
         blasso_cols = [
-            "n_per_pol", "sim_num", 
-            "MSE_mean", "IOU_mean", "min_dosage_mean", "best_pol_diff_mean",
-            "MSE_map", "IOU_map", "min_dosage_map", "best_pol_diff_map",
+            "n_per_pol", "sim_num", "sample_idx",
+            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
             "converged", "max_rhat", "IOU_coverage", "min_dosage_coverage"
         ]
-        # Add profile columns for posterior mean, MAP, and average
-        blasso_cols += [f"{prof}_mean" for prof in profiles_str]
-        blasso_cols += [f"{prof}_map" for prof in profiles_str]
-        blasso_cols += [f"{prof}_avg" for prof in profiles_str]
+        blasso_cols += profiles_str
         blasso_df = pd.DataFrame(blasso_list, columns=blasso_cols)
         blasso_df.to_csv(os.path.join(output_dir, blasso_fname))
         if verbose:
             print(f"\nSaved Bayesian Lasso results to {blasso_fname}")
-
-        # Save sample-level results
-        blasso_samples_cols = [
-            "n_per_pol", "sim_num", "sample_idx",
-            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff"
-        ]
-        blasso_samples_cols += profiles_str
-        blasso_samples_df = pd.DataFrame(blasso_samples_list, columns=blasso_samples_cols)
-        blasso_samples_df.to_csv(os.path.join(output_dir, blasso_samples_fname))
-        if verbose:
-            print(f"Saved Bayesian Lasso sample-level results to {blasso_samples_fname}")
 
     if method == "bootstrap":
         bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
@@ -883,31 +857,16 @@ if __name__ == "__main__":
 
     if method == "ssl":
         ssl_cols = [
-            "n_per_pol", "sim_num",
-            "MSE_mean", "IOU_mean", "min_dosage_mean", "best_pol_diff_mean",
-            "MSE_map", "IOU_map", "min_dosage_map", "best_pol_diff_map",
+            "n_per_pol", "sim_num", "sample_idx",
+            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
             "converged", "max_rhat", "IOU_coverage", "min_dosage_coverage",
             "mean_inclusion_prob", "n_selected_features"
         ]
-        # Add profile columns for posterior mean, MAP, and average
-        ssl_cols += [f"{prof}_mean" for prof in profiles_str]
-        ssl_cols += [f"{prof}_map" for prof in profiles_str]
-        ssl_cols += [f"{prof}_avg" for prof in profiles_str]
+        ssl_cols += profiles_str
         ssl_df = pd.DataFrame(ssl_list, columns=ssl_cols)
         ssl_df.to_csv(os.path.join(output_dir, ssl_fname))
         if verbose:
             print(f"\nSaved Spike-Slab Lasso results to {ssl_fname}")
-
-        # Save sample-level results
-        ssl_samples_cols = [
-            "n_per_pol", "sim_num", "sample_idx",
-            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff"
-        ]
-        ssl_samples_cols += profiles_str
-        ssl_samples_df = pd.DataFrame(ssl_samples_list, columns=ssl_samples_cols)
-        ssl_samples_df.to_csv(os.path.join(output_dir, ssl_samples_fname))
-        if verbose:
-            print(f"Saved Spike-Slab Lasso sample-level results to {ssl_samples_fname}")
 
     if method == "ppmx":
         ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
