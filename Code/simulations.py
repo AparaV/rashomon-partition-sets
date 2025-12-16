@@ -20,11 +20,11 @@ from baselines import PPMx
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Parse command line arguments")
-    parser.add_argument("--params", type=str, required=True,
+    parser.add_argument("--params", type=str, default="reff_4",
                         help=".py file where parameters are stored")
-    parser.add_argument("--sample_size", type=int, required=True,
+    parser.add_argument("--sample_size", type=int, default=10,
                         help="Number of samples per feature combination")
-    parser.add_argument("--iters", type=int, required=True,
+    parser.add_argument("--iters", type=int, default=5,
                         help="Number of iterations")
     parser.add_argument("--output_prefix", type=str, required=True,
                         help="Prefix for output file name")
@@ -206,7 +206,7 @@ if __name__ == "__main__":
     if args.test:
         # Override for test mode
         samples_per_pol = [args.sample_size] if args.sample_size else [10]
-        num_sims = 5
+        num_sims = args.iters if args.iters else 5
         verbose = args.verbose
         if verbose:
             print("Running in TEST mode: 5 iterations, reduced MCMC/bootstrap samples")
