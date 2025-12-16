@@ -122,3 +122,14 @@ ssl_theta_init = 0.3        # Initial prior inclusion probability (expect ~30% n
 ssl_update_theta = True     # Adapt theta from data
 ssl_theta_a = 1.0           # Beta prior shape parameter a
 ssl_theta_b = 1.0           # Beta prior shape parameter b
+
+
+# PPMX
+ppmx_n_iter = 2000
+ppmx_burnin = 1000
+ppmx_thin = 2
+ppmx_n_chains = 2
+ppmx_alpha = 0.5
+ppmx_cohesion = 'gaussian'
+ppmx_similarity_weight = 0.8
+ppmx_similarity_bandwidth = 2

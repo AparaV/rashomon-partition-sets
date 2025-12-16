@@ -166,8 +166,8 @@ if __name__ == "__main__":
         ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
         ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
     else:
-        ppmx_n_iter = getattr(params, 'ppmx_n_iter', 3000)
-        ppmx_burnin = getattr(params, 'ppmx_burnin', 1000)
+        ppmx_n_iter = getattr(params, 'ppmx_n_iter', 1000)
+        ppmx_burnin = getattr(params, 'ppmx_burnin', 500)
         ppmx_thin = getattr(params, 'ppmx_thin', 2)
         ppmx_n_chains = getattr(params, 'ppmx_n_chains', 4)
         ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)

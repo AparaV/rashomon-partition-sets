@@ -65,6 +65,77 @@ class PPMx:
         self.rhat_ = None
         self.coef_samples_ = None  # Flattened coefficient samples
 
+    def _compute_cluster_stats(self, obs_indices):
+        """
+        Compute statistics for observations in a cluster.
+
+        Parameters
+        ----------
+        obs_indices : np.ndarray
+            Indices of observations in this cluster
+
+        Returns
+        -------
+        stats : dict
+            Dictionary with 'n', 'sum', 'sum_sq', 'mean'
+        """
+        if len(obs_indices) == 0:
+            return {'n': 0, 'sum': 0.0, 'sum_sq': 0.0, 'mean': 0.0}
+        
+        y_cluster = self.y_[obs_indices].flatten()
+        n = len(y_cluster)
+        y_sum = np.sum(y_cluster)
+        y_mean = y_sum / n
+        y_sum_sq = np.sum(y_cluster ** 2)
+        
+        return {'n': n, 'sum': y_sum, 'sum_sq': y_sum_sq, 'mean': y_mean}
+
+    def _cohesion_from_stats(self, stats):
+        """
+        Compute cohesion from precomputed cluster statistics.
+
+        Parameters
+        ----------
+        stats : dict
+            Cluster statistics from _compute_cluster_stats
+
+        Returns
+        -------
+        cohesion : float
+            Log cohesion value
+        """
+        n = stats['n']
+        if n == 0:
+            return 0.0
+        
+        if self.cohesion == 'gaussian':
+            if n == 1:
+                return 0.0
+            
+            # Compute SS from statistics: SS = sum(y^2) - n*mean^2
+            ss = stats['sum_sq'] - n * stats['mean']**2
+            cohesion = -(n/2) * np.log(2*np.pi) - ((n-1)/2) * np.log(ss/n + 1e-10) - n/2
+            
+        elif self.cohesion == 'normal-gamma':
+            mu_0 = 0.0
+            kappa_0 = 0.01
+            a_0 = 2.0
+            b_0 = 1.0
+
+            kappa_n = kappa_0 + n
+            a_n = a_0 + n
+
+            ss = stats['sum_sq'] - n * stats['mean']**2 if n > 1 else 0
+            b_n = b_0 + 0.5 * ss + (kappa_0 * n * (stats['mean'] - mu_0)**2) / (2 * kappa_n)
+
+            cohesion = (gammaln(a_n/2) - gammaln(a_0/2)
+                        + (a_0/2)*np.log(b_0 + 1e-10) - (a_n/2)*np.log(b_n + 1e-10)
+                        + 0.5*np.log(kappa_0/(kappa_n + 1e-10)) - (n/2)*np.log(2*np.pi))
+        else:
+            raise ValueError(f"Unknown cohesion type: {self.cohesion}")
+        
+        return cohesion
+
     def _cohesion_function(self, y_cluster):
         """
         Compute cohesion for a cluster (higher = more cohesive).
@@ -118,6 +189,25 @@ class PPMx:
 
         return cohesion
 
+    def _compute_similarity_matrix(self, X):
+        """
+        Compute pairwise similarity matrix for all policies (vectorized).
+
+        Parameters
+        ----------
+        X : np.ndarray, shape (n_policies, n_features)
+            Policy features
+
+        Returns
+        -------
+        similarity_matrix : np.ndarray, shape (n_policies, n_policies)
+            Pairwise similarity values
+        """
+        # Vectorized computation: ||x_i - x_j||^2 for all pairs
+        dists_sq = np.sum((X[:, None, :] - X[None, :, :])**2, axis=2)
+        similarity_matrix = np.exp(-dists_sq / (2 * self.similarity_bandwidth**2))
+        return similarity_matrix
+
     def _similarity_kernel(self, X_i, X_j):
         """
         Compute similarity between two policies based on features.
@@ -169,8 +259,8 @@ class PPMx:
             # Get policies in this cluster
             policies_in_cluster = np.where(partition == cluster_id)[0]
 
-            # Get outcomes for observations from these policies
-            obs_in_cluster = np.where(np.isin(self.D_, policies_in_cluster))[0]
+            # Get outcomes for observations from these policies (use cached lookup)
+            obs_in_cluster = np.concatenate([self.policy_to_obs_[p] for p in policies_in_cluster])
             y_cluster = y[obs_in_cluster].flatten()
 
             # Add cohesion for this cluster
@@ -179,15 +269,104 @@ class PPMx:
 
             # Add similarity weights if using covariates
             if self.similarity_weight > 0 and len(policies_in_cluster) > 1:
+                # Use cached similarity matrix for efficiency
                 for i in range(len(policies_in_cluster)):
                     for j in range(i+1, len(policies_in_cluster)):
-                        sim = self._similarity_kernel(
-                            X[policies_in_cluster[i]],
-                            X[policies_in_cluster[j]]
-                        )
+                        sim = self.similarity_matrix_[policies_in_cluster[i], policies_in_cluster[j]]
                         log_likelihood += self.similarity_weight * np.log(sim + 1e-10)
 
         return log_prior + log_likelihood
+
+    def _incremental_log_prob_change(self, partition, policy_idx, new_cluster_id, cluster_stats):
+        """
+        Compute change in log probability when moving one policy to a new cluster.
+        
+        This is much faster than recomputing the full partition probability.
+        
+        Parameters
+        ----------
+        partition : np.ndarray
+            Current partition
+        policy_idx : int
+            Policy being moved
+        new_cluster_id : int
+            Target cluster
+        cluster_stats : dict
+            Current cluster statistics
+            
+        Returns
+        -------
+        delta_log_prob : float
+            Change in log probability
+        """
+        old_cluster_id = partition[policy_idx]
+        
+        if old_cluster_id == new_cluster_id:
+            return 0.0
+        
+        delta_log_prob = 0.0
+        
+        # Get observations for this policy
+        policy_obs = self.policy_to_obs_[policy_idx]
+        
+        # Change in number of clusters (if creating new or emptying old)
+        old_cluster_policies = np.where(partition == old_cluster_id)[0]
+        new_cluster_policies = np.where(partition == new_cluster_id)[0]
+        
+        if len(old_cluster_policies) == 1:
+            # Removing last policy from old cluster (cluster disappears)
+            delta_log_prob -= np.log(self.alpha)
+        if len(new_cluster_policies) == 0:
+            # Creating new cluster
+            delta_log_prob += np.log(self.alpha)
+        
+        # Cohesion change for old cluster (remove policy)
+        old_stats_before = cluster_stats[old_cluster_id]
+        cohesion_old_before = self._cohesion_from_stats(old_stats_before)
+        
+        if len(old_cluster_policies) == 1:
+            # Cluster becomes empty
+            cohesion_old_after = 0.0
+        else:
+            # Recompute stats without this policy
+            old_obs = np.concatenate([self.policy_to_obs_[p] for p in old_cluster_policies if p != policy_idx])
+            old_stats_after = self._compute_cluster_stats(old_obs)
+            cohesion_old_after = self._cohesion_from_stats(old_stats_after)
+        
+        delta_log_prob += cohesion_old_after - cohesion_old_before
+        
+        # Cohesion change for new cluster (add policy)
+        if new_cluster_id in cluster_stats:
+            new_stats_before = cluster_stats[new_cluster_id]
+            cohesion_new_before = self._cohesion_from_stats(new_stats_before)
+        else:
+            # New cluster being created
+            cohesion_new_before = 0.0
+        
+        # Recompute stats with this policy added
+        if len(new_cluster_policies) == 0:
+            new_obs = policy_obs
+        else:
+            new_obs = np.concatenate([self.policy_to_obs_[p] for p in new_cluster_policies] + [policy_obs])
+        new_stats_after = self._compute_cluster_stats(new_obs)
+        cohesion_new_after = self._cohesion_from_stats(new_stats_after)
+        
+        delta_log_prob += cohesion_new_after - cohesion_new_before
+        
+        # Similarity weight changes (if using covariates)
+        if self.similarity_weight > 0:
+            # Remove similarities with old cluster members
+            for other_policy in old_cluster_policies:
+                if other_policy != policy_idx:
+                    sim = self.similarity_matrix_[policy_idx, other_policy]
+                    delta_log_prob -= self.similarity_weight * np.log(sim + 1e-10)
+            
+            # Add similarities with new cluster members
+            for other_policy in new_cluster_policies:
+                sim = self.similarity_matrix_[policy_idx, other_policy]
+                delta_log_prob += self.similarity_weight * np.log(sim + 1e-10)
+        
+        return delta_log_prob
 
     def _relabel_partition(self, partition):
         """Relabel cluster IDs to be contiguous 0, 1, 2, ..."""
@@ -227,11 +406,17 @@ class PPMx:
 
         return new_partition, 0.0
 
-    def _gibbs_step(self, partition, y, X):
+    def _gibbs_step(self, partition, y, X, cluster_stats=None):
         """
         Single Gibbs sampling step with split-merge moves.
 
         Alternates between split, merge, and reassignment moves.
+        Uses incremental updates for reassignment (most common move).
+        
+        Parameters
+        ----------
+        cluster_stats : dict, optional
+            Cached cluster statistics for incremental updates
         """
         unique_clusters = np.unique(partition)
         n_clusters = len(unique_clusters)
@@ -247,40 +432,71 @@ class PPMx:
         if move_type == 'split' and n_clusters < len(partition):
             cluster_to_split = np.random.choice(unique_clusters)
             proposed_partition, log_q = self._propose_split(partition, cluster_to_split)
+            
+            # Use full probability for split
+            log_prob_current = self._partition_log_probability(partition, y, X)
+            log_prob_proposed = self._partition_log_probability(proposed_partition, y, X)
+            log_accept_ratio = log_prob_proposed - log_prob_current + log_q
 
         elif move_type == 'merge' and n_clusters > 1:
             cluster_i, cluster_j = np.random.choice(unique_clusters, size=2, replace=False)
             proposed_partition, log_q = self._propose_merge(partition, cluster_i, cluster_j)
+            
+            # Use full probability for merge
+            log_prob_current = self._partition_log_probability(partition, y, X)
+            log_prob_proposed = self._partition_log_probability(proposed_partition, y, X)
+            log_accept_ratio = log_prob_proposed - log_prob_current + log_q
 
         elif move_type == 'reassign':
             policy_idx = np.random.randint(len(partition))
-            proposed_partition = partition.copy()
-
+            
             # Randomly choose to create new cluster or join existing
             if np.random.rand() < 0.2 and n_clusters < len(partition):
                 # Create new cluster
                 new_cluster = np.max(partition) + 1
-                proposed_partition[policy_idx] = new_cluster
             else:
                 # Join existing cluster
                 new_cluster = np.random.choice(unique_clusters)
+            
+            # Use incremental update for efficiency (no need to create proposed partition yet)
+            if cluster_stats is not None:
+                delta_log_prob = self._incremental_log_prob_change(
+                    partition, policy_idx, new_cluster, cluster_stats
+                )
+                log_accept_ratio = delta_log_prob
+            else:
+                # Fallback to full computation if stats not provided
+                proposed_partition = partition.copy()
                 proposed_partition[policy_idx] = new_cluster
-
+                proposed_partition = self._relabel_partition(proposed_partition)
+                log_prob_current = self._partition_log_probability(partition, y, X)
+                log_prob_proposed = self._partition_log_probability(proposed_partition, y, X)
+                log_accept_ratio = log_prob_proposed - log_prob_current
+            
+            # Early rejection check
+            if np.log(np.random.rand()) >= log_accept_ratio:
+                return partition, False, cluster_stats
+            
+            # If accepted, create the actual proposed partition
+            proposed_partition = partition.copy()
+            proposed_partition[policy_idx] = new_cluster
             proposed_partition = self._relabel_partition(proposed_partition)
-            log_q = 0.0
         else:
-            return partition, False
+            return partition, False, cluster_stats
 
         # Metropolis-Hastings acceptance
-        log_prob_current = self._partition_log_probability(partition, y, X)
-        log_prob_proposed = self._partition_log_probability(proposed_partition, y, X)
-
-        log_accept_ratio = log_prob_proposed - log_prob_current + log_q
-
         if np.log(np.random.rand()) < log_accept_ratio:
-            return proposed_partition, True
+            # Update cluster stats if accepted
+            if cluster_stats is not None:
+                new_cluster_stats = {}
+                for cluster_id in np.unique(proposed_partition):
+                    policies_in_cluster = np.where(proposed_partition == cluster_id)[0]
+                    obs_in_cluster = np.concatenate([self.policy_to_obs_[p] for p in policies_in_cluster])
+                    new_cluster_stats[cluster_id] = self._compute_cluster_stats(obs_in_cluster)
+                return proposed_partition, True, new_cluster_stats
+            return proposed_partition, True, cluster_stats
         else:
-            return partition, False
+            return partition, False, cluster_stats
 
     def _compute_rhat(self, chains):
         """
@@ -357,6 +573,22 @@ class PPMx:
 
         self.X_policy_ = X
         self.n_policies_ = n_policies
+        self.y_ = y  # Store for cluster stats computation
+        
+        # OPTIMIZATION 1: Precompute similarity matrix (vectorized)
+        if self.similarity_weight > 0:
+            if self.verbose:
+                print("Precomputing similarity matrix...")
+            self.similarity_matrix_ = self._compute_similarity_matrix(X)
+        else:
+            self.similarity_matrix_ = None
+        
+        # OPTIMIZATION 2: Precompute observation-to-policy lookup
+        if self.verbose:
+            print("Building observation index...")
+        self.policy_to_obs_ = {}
+        for policy_id in range(n_policies):
+            self.policy_to_obs_[policy_id] = np.where(self.D_ == policy_id)[0]
 
         # Run multiple chains
         all_chains = []
@@ -375,6 +607,11 @@ class PPMx:
 
             # Initialize partition: all policies in one cluster
             partition = np.zeros(n_policies, dtype=int)
+            
+            # OPTIMIZATION 3: Initialize cluster statistics cache
+            cluster_stats = {}
+            obs_all = np.concatenate([self.policy_to_obs_[p] for p in range(n_policies)])
+            cluster_stats[0] = self._compute_cluster_stats(obs_all)
 
             # Storage for this chain
             chain_samples = []
@@ -385,8 +622,8 @@ class PPMx:
 
             # MCMC sampling
             for iter_i in range(self.n_iter):
-                # Gibbs step
-                partition, accepted = self._gibbs_step(partition, y, X)
+                # Gibbs step with cluster statistics cache
+                partition, accepted, cluster_stats = self._gibbs_step(partition, y, X, cluster_stats)
                 if accepted:
                     n_accepted += 1
 
@@ -401,7 +638,7 @@ class PPMx:
                     coef_vector = np.zeros(n_policies)
                     for cluster_id in unique_clusters:
                         policies_in_cluster = np.where(partition == cluster_id)[0]
-                        obs_in_cluster = np.where(np.isin(self.D_, policies_in_cluster))[0]
+                        obs_in_cluster = np.concatenate([self.policy_to_obs_[p] for p in policies_in_cluster])
                         mean_val = np.mean(y[obs_in_cluster])
                         cluster_means[cluster_id] = mean_val
                         coef_vector[policies_in_cluster] = mean_val
@@ -409,7 +646,7 @@ class PPMx:
                     cluster_means_samples.append(cluster_means)
                     chain_samples.append(coef_vector)
 
-                if self.verbose and (iter_i + 1) % 500 == 0:
+                if self.verbose and (iter_i + 1) % 1000 == 0:
                     print(f"  Chain {chain_idx + 1}, Iteration {iter_i + 1}/{self.n_iter}, "
                           f"n_clusters={len(np.unique(partition))}, "
                           f"acceptance_rate={n_accepted/(iter_i+1):.3f}")
@@ -435,9 +672,6 @@ class PPMx:
         # Compute R-hat for convergence diagnostics
         self.rhat_ = self._compute_rhat(self.chains_)
         self.converged_ = np.all(self.rhat_ < 1.1)
-
-        # Store data for log posterior computation
-        self.y_ = y
 
         return self
 
