@@ -60,6 +60,10 @@ class PPMx:
         self.n_clusters_samples_ = None
         self.cluster_means_samples_ = None
         self.acceptance_rate_ = None
+        self.chains_ = None  # Store coefficient chains for R-hat
+        self.converged_ = None
+        self.rhat_ = None
+        self.coef_samples_ = None  # Flattened coefficient samples
 
     def _cohesion_function(self, y_cluster):
         """
@@ -278,9 +282,44 @@ class PPMx:
         else:
             return partition, False
 
-    def fit(self, X, y, D=None):
+    def _compute_rhat(self, chains):
         """
-        Fit PPMx model using MCMC sampling.
+        Compute Gelman-Rubin R-hat convergence diagnostic.
+
+        Parameters
+        ----------
+        chains : np.ndarray, shape (n_chains, n_samples, n_features)
+            MCMC chains
+
+        Returns
+        -------
+        rhat : np.ndarray, shape (n_features,)
+            R-hat values for each feature
+        """
+        n_chains, n_samples, n_features = chains.shape
+
+        # Compute between-chain and within-chain variance
+        chain_means = np.mean(chains, axis=1)  # (n_chains, n_features)
+        overall_mean = np.mean(chain_means, axis=0)  # (n_features,)
+
+        # Between-chain variance
+        B = n_samples * np.var(chain_means, axis=0, ddof=1)
+
+        # Within-chain variance
+        chain_vars = np.var(chains, axis=1, ddof=1)  # (n_chains, n_features)
+        W = np.mean(chain_vars, axis=0)
+
+        # Estimated variance
+        var_est = ((n_samples - 1) / n_samples) * W + (1 / n_samples) * B
+
+        # R-hat
+        rhat = np.sqrt(var_est / (W + 1e-10))
+
+        return rhat
+
+    def fit(self, X, y, D=None, n_chains=4):
+        """
+        Fit PPMx model using MCMC sampling with multiple chains.
 
         Parameters
         ----------
@@ -290,6 +329,8 @@ class PPMx:
             Outcomes
         D : np.ndarray, shape (n_data, 1), optional
             Policy assignments. If None, assumes X already at policy level.
+        n_chains : int, default=4
+            Number of MCMC chains to run
 
         Returns
         -------
@@ -315,46 +356,88 @@ class PPMx:
             self.D_ = np.arange(n_policies)
 
         self.X_policy_ = X
+        self.n_policies_ = n_policies
 
-        # Initialize partition: all policies in one cluster
-        partition = np.zeros(n_policies, dtype=int)
+        # Run multiple chains
+        all_chains = []
+        all_partition_samples = []
+        all_n_clusters = []
+        all_cluster_means = []
+        total_accepted = 0
 
-        # Storage for posterior samples
-        partition_samples = []
-        n_clusters_samples = []
-        cluster_means_samples = []
-        n_accepted = 0
+        for chain_idx in range(n_chains):
+            if self.verbose:
+                print(f"Running chain {chain_idx + 1}/{n_chains}...")
 
-        # MCMC sampling
-        for iter_i in range(self.n_iter):
-            # Gibbs step
-            partition, accepted = self._gibbs_step(partition, y, X)
-            if accepted:
-                n_accepted += 1
+            # Set different seed for each chain
+            if self.random_state is not None:
+                np.random.seed(self.random_state + chain_idx * 1000)
 
-            # Store sample after burn-in with thinning
-            if iter_i >= self.burnin and (iter_i - self.burnin) % self.thin == 0:
-                partition_samples.append(partition.copy())
-                n_clusters_samples.append(len(np.unique(partition)))
+            # Initialize partition: all policies in one cluster
+            partition = np.zeros(n_policies, dtype=int)
 
-                # Compute cluster means for this partition
-                unique_clusters = np.unique(partition)
-                cluster_means = {}
-                for cluster_id in unique_clusters:
-                    policies_in_cluster = np.where(partition == cluster_id)[0]
-                    obs_in_cluster = np.where(np.isin(self.D_, policies_in_cluster))[0]
-                    cluster_means[cluster_id] = np.mean(y[obs_in_cluster])
-                cluster_means_samples.append(cluster_means)
+            # Storage for this chain
+            chain_samples = []
+            partition_samples = []
+            n_clusters_samples = []
+            cluster_means_samples = []
+            n_accepted = 0
 
-            if self.verbose and (iter_i + 1) % 500 == 0:
-                print(f"Iteration {iter_i + 1}/{self.n_iter}, "
-                      f"n_clusters={len(np.unique(partition))}, "
-                      f"acceptance_rate={n_accepted/(iter_i+1):.3f}")
+            # MCMC sampling
+            for iter_i in range(self.n_iter):
+                # Gibbs step
+                partition, accepted = self._gibbs_step(partition, y, X)
+                if accepted:
+                    n_accepted += 1
 
-        self.partition_samples_ = partition_samples
-        self.n_clusters_samples_ = np.array(n_clusters_samples)
-        self.cluster_means_samples_ = cluster_means_samples
-        self.acceptance_rate_ = n_accepted / self.n_iter
+                # Store sample after burn-in with thinning
+                if iter_i >= self.burnin and (iter_i - self.burnin) % self.thin == 0:
+                    partition_samples.append(partition.copy())
+                    n_clusters_samples.append(len(np.unique(partition)))
+
+                    # Compute cluster means and convert to coefficient vector
+                    unique_clusters = np.unique(partition)
+                    cluster_means = {}
+                    coef_vector = np.zeros(n_policies)
+                    for cluster_id in unique_clusters:
+                        policies_in_cluster = np.where(partition == cluster_id)[0]
+                        obs_in_cluster = np.where(np.isin(self.D_, policies_in_cluster))[0]
+                        mean_val = np.mean(y[obs_in_cluster])
+                        cluster_means[cluster_id] = mean_val
+                        coef_vector[policies_in_cluster] = mean_val
+
+                    cluster_means_samples.append(cluster_means)
+                    chain_samples.append(coef_vector)
+
+                if self.verbose and (iter_i + 1) % 500 == 0:
+                    print(f"  Chain {chain_idx + 1}, Iteration {iter_i + 1}/{self.n_iter}, "
+                          f"n_clusters={len(np.unique(partition))}, "
+                          f"acceptance_rate={n_accepted/(iter_i+1):.3f}")
+
+            # Store chain results
+            all_chains.append(np.array(chain_samples))
+            all_partition_samples.extend(partition_samples)
+            all_n_clusters.extend(n_clusters_samples)
+            all_cluster_means.extend(cluster_means_samples)
+            total_accepted += n_accepted
+
+        # Combine all chains
+        self.chains_ = np.array(all_chains)  # (n_chains, n_samples, n_features)
+        self.partition_samples_ = all_partition_samples
+        self.n_clusters_samples_ = np.array(all_n_clusters)
+        self.cluster_means_samples_ = all_cluster_means
+        self.acceptance_rate_ = total_accepted / (self.n_iter * n_chains)
+
+        # Flatten chains for easy access
+        n_chains_actual, n_samples_per_chain, n_features = self.chains_.shape
+        self.coef_samples_ = self.chains_.reshape(n_chains_actual * n_samples_per_chain, n_features)
+
+        # Compute R-hat for convergence diagnostics
+        self.rhat_ = self._compute_rhat(self.chains_)
+        self.converged_ = np.all(self.rhat_ < 1.1)
+
+        # Store data for log posterior computation
+        self.y_ = y
 
         return self
 
@@ -407,3 +490,22 @@ class PPMx:
         map_partition = np.array(partition_counts.most_common(1)[0][0])
 
         return map_partition
+
+    def get_log_posteriors(self):
+        """
+        Compute log posterior for each stored sample.
+
+        Returns
+        -------
+        log_posteriors : np.ndarray, shape (n_samples,)
+            Log posterior values for each sample
+        """
+        n_samples = len(self.partition_samples_)
+        log_posteriors = np.zeros(n_samples)
+
+        for sample_idx in range(n_samples):
+            partition = self.partition_samples_[sample_idx]
+            log_prob = self._partition_log_probability(partition, self.y_, self.X_policy_)
+            log_posteriors[sample_idx] = log_prob
+
+        return log_posteriors

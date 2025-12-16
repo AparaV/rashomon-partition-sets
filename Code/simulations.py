@@ -160,6 +160,7 @@ if __name__ == "__main__":
         ppmx_n_iter = 1000
         ppmx_burnin = 200
         ppmx_thin = 2
+        ppmx_n_chains = 2
         ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
         ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
         ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
@@ -168,6 +169,7 @@ if __name__ == "__main__":
         ppmx_n_iter = getattr(params, 'ppmx_n_iter', 5000)
         ppmx_burnin = getattr(params, 'ppmx_burnin', 1000)
         ppmx_thin = getattr(params, 'ppmx_thin', 2)
+        ppmx_n_chains = getattr(params, 'ppmx_n_chains', 4)
         ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
         ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
         ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
@@ -752,7 +754,7 @@ if __name__ == "__main__":
                     random_state=sim_i,
                     verbose=False
                 )
-                ppmx.fit(X, y, D)
+                ppmx.fit(X, y, D, n_chains=ppmx_n_chains)
 
                 y_ppmx = ppmx.predict(X)
 
@@ -765,44 +767,69 @@ if __name__ == "__main__":
                 min_dosage_present_ppmx = ppmx_results["min_dos_inc"]
                 best_policy_diff_ppmx = ppmx_results["best_pol_diff"]
 
-                # Compute mean number of clusters
-                mean_n_clusters = np.mean(ppmx.n_clusters_samples_)
+                # Store convergence information
+                converged = ppmx.converged_
+                max_rhat = np.max(ppmx.rhat_)
 
-                # Extract posterior samples and compute coverage metrics
-                n_posterior_samples = len(ppmx.partition_samples_)
-                coef_samples = np.zeros((n_posterior_samples, num_policies))
-
-                for sample_idx in range(n_posterior_samples):
-                    partition = ppmx.partition_samples_[sample_idx]
-                    cluster_means = ppmx.cluster_means_samples_[sample_idx]
-
-                    # Convert partition to coefficient vector
-                    for policy_id in range(num_policies):
-                        cluster_id = partition[policy_id]
-                        coef_samples[sample_idx, policy_id] = cluster_means[cluster_id]
+                # Extract posterior samples (coefficient samples already computed)
+                coef_samples = ppmx.coef_samples_
+                n_posterior_samples = coef_samples.shape[0]
 
                 # Compute coverage metrics
                 iou_coverage = metrics.compute_iou_coverage(coef_samples, D_matrix, D, true_best)
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
-                # Compute average profile indicators across posterior samples
+                # Get cached log posterior densities (computed during fit)
+                log_posteriors = ppmx.get_log_posteriors()
+                neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
+
+                # Compute average profile indicators and store individual sample results
                 profile_indicators_sum = np.zeros(len(profiles))
+
                 for sample_idx in range(n_posterior_samples):
-                    y_sample = np.dot(D_matrix, coef_samples[sample_idx])
-                    best_policies_sample = metrics.find_best_policies(D, y_sample)
-                    profile_indicator_sample = metrics.find_profiles(best_policies_sample, all_policies, profile_map)
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    # Get number of clusters for this specific sample
+                    n_clusters_sample = ppmx.n_clusters_samples_[sample_idx]
+
+                    # Compute metrics for this sample
+                    sample_results = metrics.compute_all_metrics(
+                        y, y_sample, D, true_best, all_policies, profile_map,
+                        min_dosage_best_policy, true_best_effect)
+
+                    sqrd_err_sample = sample_results["sqrd_err"]
+                    iou_sample = sample_results["iou"]
+                    profile_indicator_sample = sample_results["best_prof"]
+                    min_dosage_sample = sample_results["min_dos_inc"]
+                    best_pol_diff_sample = sample_results["best_pol_diff"]
+
+                    # Accumulate for average
                     profile_indicators_sum += np.array(profile_indicator_sample)
+
+                    # Store individual sample results with summary metrics
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        neg_log_posteriors[sample_idx],  # loss (negative log posterior)
+                        sqrd_err_sample,  # MSE component of loss
+                        iou_sample,
+                        min_dosage_sample,
+                        best_pol_diff_sample,
+                        converged,
+                        max_rhat,
+                        iou_coverage,
+                        min_dosage_coverage,
+                        n_clusters_sample,  # number of clusters for this sample
+                        ppmx.acceptance_rate_
+                    ]
+                    sample_list += profile_indicator_sample
+                    ppmx_list.append(sample_list)
+
                 avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
-                this_list = [
-                    n_per_pol, sim_i, sqrd_err_ppmx, iou_ppmx,
-                    min_dosage_present_ppmx, best_policy_diff_ppmx,
-                    mean_n_clusters, ppmx.acceptance_rate_,
-                    iou_coverage, min_dosage_coverage
-                ]
-                this_list += avg_profile_indicators
-                ppmx_list.append(this_list)
+                # Store summary info in first sample row via special fields
+                # (we only keep sample-level output now)
 
     profiles_str = [str(prof) for prof in profiles]
 
@@ -869,9 +896,12 @@ if __name__ == "__main__":
             print(f"\nSaved Spike-Slab Lasso results to {ssl_fname}")
 
     if method == "ppmx":
-        ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
-                     "mean_n_clusters", "acceptance_rate",
-                     "IOU_coverage", "min_dosage_coverage"]
+        ppmx_cols = [
+            "n_per_pol", "sim_num", "sample_idx",
+            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
+            "converged", "max_rhat", "IOU_coverage", "min_dosage_coverage",
+            "n_clusters", "acceptance_rate"
+        ]
         ppmx_cols += profiles_str
         ppmx_df = pd.DataFrame(ppmx_list, columns=ppmx_cols)
         ppmx_df.to_csv(os.path.join(output_dir, ppmx_fname))
