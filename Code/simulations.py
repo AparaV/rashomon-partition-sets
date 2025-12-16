@@ -794,6 +794,9 @@ if __name__ == "__main__":
                     # Get number of clusters for this specific sample
                     n_clusters_sample = ppmx.n_clusters_samples_[sample_idx]
 
+                    if sample_idx == 0:
+                        print(coef_sample)
+
                     # Compute metrics for this sample
                     sample_results = metrics.compute_all_metrics(
                         y, y_sample, D, true_best, all_policies, profile_map,
