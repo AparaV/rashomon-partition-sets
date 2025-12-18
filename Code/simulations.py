@@ -755,8 +755,10 @@ if __name__ == "__main__":
                     verbose=False
                 )
                 ppmx.fit(X, y, D, n_chains=ppmx_n_chains)
-
                 y_ppmx = ppmx.predict(X)
+
+                # ppmx.fit(D_matrix, y, D, n_chains=ppmx_n_chains)
+                # y_ppmx = ppmx.predict(D_matrix)
 
                 ppmx_results = metrics.compute_all_metrics(
                     y, y_ppmx, D, true_best, all_policies, profile_map,
