@@ -823,13 +823,15 @@ if __name__ == "__main__":
 
                 for sample_idx in range(n_posterior_samples):
                     coef_sample = coef_samples[sample_idx]
-                    y_sample = np.dot(D_matrix, coef_sample)
+                    # Map each observation to its policy's predicted outcome
+                    # D contains policy indices, coef_sample contains outcome for each unique policy
+                    y_sample = coef_sample[D.flatten()].reshape(-1, 1)
 
                     # Get number of clusters for this specific sample
                     n_clusters_sample = ppmx.n_clusters_samples_[sample_idx]
 
-                    if sample_idx == 0:
-                        print(coef_sample)
+                    # if sample_idx == 0:
+                    #     print(coef_sample)
 
                     # Compute metrics for this sample
                     sample_results = metrics.compute_all_metrics(
