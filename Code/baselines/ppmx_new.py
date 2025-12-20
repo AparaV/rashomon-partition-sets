@@ -291,6 +291,7 @@ def _log_marginal_x(stats: _GaussianStats, config: PPMxConfig) -> float:
     """Compute log marginal likelihood of observations in a cluster.
     
     Uses Normal-Inverse-Gamma conjugate prior with independence across dimensions.
+    Vectorized across dimensions for efficiency.
     
     Parameters
     ----------
@@ -314,30 +315,24 @@ def _log_marginal_x(stats: _GaussianStats, config: PPMxConfig) -> float:
     kappa_n = config.kappa0 + n
     a_n = config.a0 + n / 2
     
-    # Compute for each dimension independently and sum
-    log_lik = 0.0
+    # Vectorized computation across all dimensions
+    x_bar = stats.sum_x / n  # (d,)
+    ss = stats.sum_x2 - n * x_bar**2  # (d,)
     
-    for j in range(d):
-        # Sample mean
-        x_bar_j = stats.sum_x[j] / n if n > 0 else 0.0
-        
-        # Sum of squared deviations
-        ss_j = stats.sum_x2[j] - n * x_bar_j**2
-        
-        # Posterior scale parameter
-        b_n_j = config.b0 + 0.5 * ss_j + 0.5 * (config.kappa0 * n / kappa_n) * (x_bar_j - config.mu0)**2
-        
-        # Log marginal likelihood for dimension j
-        log_lik_j = (
-            0.5 * np.log(config.kappa0 / kappa_n)
-            + config.a0 * np.log(config.b0)
-            - a_n * np.log(b_n_j)
-            + gammaln(a_n)
-            - gammaln(config.a0)
-            - 0.5 * n * np.log(2 * np.pi)
-        )
-        
-        log_lik += log_lik_j
+    # Posterior scale parameter (vectorized)
+    b_n = config.b0 + 0.5 * ss + 0.5 * (config.kappa0 * n / kappa_n) * (x_bar - config.mu0)**2  # (d,)
+    
+    # Log marginal likelihood (vectorized then summed)
+    log_lik_per_dim = (
+        0.5 * np.log(config.kappa0 / kappa_n)
+        + config.a0 * np.log(config.b0)
+        - a_n * np.log(b_n)
+        + gammaln(a_n)
+        - gammaln(config.a0)
+        - 0.5 * n * np.log(2 * np.pi)
+    )  # (d,)
+    
+    log_lik = np.sum(log_lik_per_dim)
     
     return log_lik
 
@@ -542,6 +537,7 @@ class PPMxSampler:
         # Iterate over all observations in random order
         indices = np.random.permutation(self.data.n)
         
+        has_empty = False
         for i in indices:
             x_i = self.data.X[i]
             
@@ -549,6 +545,10 @@ class PPMxSampler:
             k_old = self.partition.assignments[i]
             self.partition.remove(i)
             self.partition.stats[k_old] = _remove_point(self.partition.stats[k_old], x_i)
+            
+            # Check if we created an empty cluster
+            if len(self.partition.clusters[k_old]) == 0:
+                has_empty = True
             
             # Compute log probabilities for each existing cluster and new cluster
             log_probs = []
@@ -586,8 +586,9 @@ class PPMxSampler:
             else:
                 self.partition.add(i, k_new, x_i)
             
-        # Cleanup empty clusters
-        self.partition.cleanup()
+        # Cleanup empty clusters only if needed
+        if has_empty:
+            self.partition.cleanup()
     
     def run(self):
         """Run the Gibbs sampler for specified iterations.
@@ -622,6 +623,8 @@ class PPMxSampler:
 def posterior_similarity_matrix(assignments_chain: np.ndarray) -> np.ndarray:
     """Compute posterior co-clustering probability matrix.
     
+    Vectorized implementation for efficiency.
+    
     Parameters
     ----------
     assignments_chain : np.ndarray
@@ -636,14 +639,12 @@ def posterior_similarity_matrix(assignments_chain: np.ndarray) -> np.ndarray:
     n_samples, n = assignments_chain.shape
     similarity = np.zeros((n, n))
     
+    # Vectorized approach: for each sample, compute similarity matrix via broadcasting
     for sample in range(n_samples):
         assignments = assignments_chain[sample]
-        for i in range(n):
-            for j in range(i, n):
-                if assignments[i] == assignments[j]:
-                    similarity[i, j] += 1
-                    if i != j:
-                        similarity[j, i] += 1
+        # Broadcasting: (n, 1) == (1, n) produces (n, n) boolean matrix
+        co_cluster = assignments[:, np.newaxis] == assignments[np.newaxis, :]
+        similarity += co_cluster.astype(float)
     
     similarity /= n_samples
     return similarity
