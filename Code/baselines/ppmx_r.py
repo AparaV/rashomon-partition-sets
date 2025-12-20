@@ -68,7 +68,8 @@ class PPMxR:
         self.burnin = burnin
         self.thin = thin
         self.alpha = alpha
-        self.cohesion = cohesion
+        # self.cohesion = cohesion
+        self.cohesion = 1
         self.similarity_weight = similarity_weight
         self.similarity_bandwidth = similarity_bandwidth
         self.use_adaptive_proposals = use_adaptive_proposals
@@ -313,12 +314,13 @@ class PPMxR:
             self.policy_to_obs_[policy_id] = np.where(self.D_ == policy_id)[0]
         
         # Map cohesion to R integer code
-        cohesion_int = self._cohesion_str_to_int(self.cohesion)
+        # cohesion_int = self._cohesion_str_to_int(self.cohesion)
+        cohesion_int = self.cohesion
         
         # Map similarity parameters
         # R ppmSuite uses simParms vector: c(m0, s20, v, k, nu0, s20, l)
         # For now, use defaults and control via similarity_function and consim
-        similarity_function = 1 if self.similarity_weight > 0 else 0
+        similarity_function = 1
         
         # Prepare R parameters
         r_params = {

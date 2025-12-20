@@ -780,7 +780,7 @@ if __name__ == "__main__":
                     similarity_weight=ppmx_similarity_weight,
                     similarity_bandwidth=ppmx_similarity_bandwidth,
                     random_state=sim_i,
-                    verbose=False
+                    verbose=verbose
                 )
                 ppmx.fit(X, y, D, n_chains=ppmx_n_chains)
                 y_ppmx = ppmx.predict(X)
@@ -812,7 +812,11 @@ if __name__ == "__main__":
 
                 # Get cached log posterior densities (computed during fit)
                 log_posteriors = ppmx.get_log_posteriors()
-                neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
+                # Handle R backend which doesn't compute log posteriors
+                if log_posteriors is None:
+                    neg_log_posteriors = np.zeros(n_posterior_samples)
+                else:
+                    neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
 
                 # Compute average profile indicators and store individual sample results
                 profile_indicators_sum = np.zeros(len(profiles))

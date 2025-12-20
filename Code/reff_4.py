@@ -126,7 +126,7 @@ ssl_theta_b = 1.0           # Beta prior shape parameter b
 
 # PPMX
 ppmx_n_iter = 1000
-ppmx_burnin = 300
+ppmx_burnin = 200
 ppmx_thin = 1
 ppmx_n_chains = 1
 ppmx_alpha = 1
