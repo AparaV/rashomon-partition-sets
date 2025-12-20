@@ -156,7 +156,7 @@ class PPMxR:
                 available_names.append(item_name)
                 if item_name == "Si":
                     Si = named_item.value  # shape: (n_samples, n_policies)
-                    partitions = [Si[i, :].astype(int) - 1 for i in range(Si.shape[0])]  # R uses 1-based indexing
+                    partitions = [Si[i, :].astype(int)-1 for i in range(Si.shape[0])]  # R uses 1-based indexing
             
             if partitions is None:
                 raise ValueError(f"Could not find partition information in R result. Available names: {available_names}")
@@ -202,6 +202,7 @@ class PPMxR:
         
         if mu is None:
             # Fallback: compute from data
+            print("'mu' not found in R result, computing cluster means from data.")
             for partition in partitions:
                 cluster_means = {}
                 unique_clusters = np.unique(partition)
