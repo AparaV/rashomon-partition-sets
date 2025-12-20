@@ -146,24 +146,25 @@ class PPMxR:
         # - nclus: number of clusters per sample
         # - fitted: fitted values
         
+        # Try to get Si (cluster assignments)
         try:
-            # Get list of names from R result (names is a method in rpy2)
-            result_names = list(r_result.names())
+            partitions = None
+            available_names = []
+            for named_item in r_result.items():
+                item_name = named_item.name
+                available_names.append(item_name)
+                if item_name == "Si":
+                    Si = named_item.value  # shape: (n_samples, n_policies)
+                    partitions = [Si[i, :].astype(int) - 1 for i in range(Si.shape[0])]  # R uses 1-based indexing
             
-            # Try to get Si (cluster assignments)
-            # NamedList supports dict-like access
-            if 'Si' in result_names:
-                Si = np.array(r_result['Si'])  # shape: (n_samples, n_policies)
-                partitions = [Si[i, :].astype(int) - 1 for i in range(Si.shape[0])]  # R uses 1-based indexing
-            else:
-                # Fallback: try to reconstruct from other outputs
-                raise ValueError(f"Could not find partition information in R result. Available names: {result_names}")
+            if partitions is None:
+                raise ValueError(f"Could not find partition information in R result. Available names: {available_names}")
             
             return partitions
-        
+
         except Exception as e:
             raise RuntimeError(f"Failed to extract partitions from R result: {e}")
-    
+
     def _extract_cluster_means_from_r(self, r_result, partitions):
         """
         Extract or compute cluster means from R result.
@@ -184,20 +185,21 @@ class PPMxR:
         
         # Try to get mu (cluster means) from R result
         # names() is a method in rpy2, not a property
-        result_names = list(r_result.names())
+        mu = None
+        for named_item in r_result.items():
+            item_name = named_item.name
+            if item_name == "mu":
+                mu = named_item.value  # shape: (n_samples, n_policies)
+                for sample_idx, partition in enumerate(partitions):
+                    cluster_means = {}
+                    unique_clusters = np.unique(partition)
+                    for cluster_id in unique_clusters:
+                        policies_in_cluster = np.where(partition == cluster_id)[0]
+                        # Use mean of mu values for policies in this cluster
+                        cluster_means[cluster_id] = np.mean(mu[sample_idx, policies_in_cluster])
+                    cluster_means_list.append(cluster_means)
         
-        if 'mu' in result_names:
-            mu = np.array(r_result['mu'])  # shape: (n_samples, n_policies)
-            
-            for sample_idx, partition in enumerate(partitions):
-                cluster_means = {}
-                unique_clusters = np.unique(partition)
-                for cluster_id in unique_clusters:
-                    policies_in_cluster = np.where(partition == cluster_id)[0]
-                    # Use mean of mu values for policies in this cluster
-                    cluster_means[cluster_id] = np.mean(mu[sample_idx, policies_in_cluster])
-                cluster_means_list.append(cluster_means)
-        else:
+        if mu is None:
             # Fallback: compute from data
             for partition in partitions:
                 cluster_means = {}
