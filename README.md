@@ -21,6 +21,48 @@ $ source venv/bin/activate
 (venv) $ pip install -r requirements.txt
 ```
 
+### Optional: R Backend for PPMx
+
+For significantly faster PPMx performance, install R and the ppmSuite package:
+
+**1. Install R**
+
+- **macOS**: Download from [CRAN](https://cran.r-project.org/bin/macosx/) or use Homebrew:
+  ```bash
+  $ brew install r
+  ```
+
+- **Linux (Ubuntu/Debian)**:
+  ```bash
+  $ sudo apt-get update
+  $ sudo apt-get install r-base r-base-dev
+  ```
+
+- **Windows**: Download from [CRAN](https://cran.r-project.org/bin/windows/base/)
+
+**2. Install ppmSuite R package**
+
+From terminal:
+```bash
+$ R -e 'install.packages("ppmSuite", repos="https://cloud.r-project.org")'
+```
+
+Or from within R:
+```r
+install.packages('ppmSuite')
+```
+
+**3. Verify installation**
+
+Run the verification script to ensure everything is set up correctly:
+```bash
+(venv) $ python verify_r_setup.py
+```
+
+This should report all checks passing. If not, follow the error messages for troubleshooting.
+
+**Note**: If R is not available, the code will automatically fall back to the Python implementation of PPMx.
+
 ## Developer instructions
 
 To update `requirements.txt`, run
