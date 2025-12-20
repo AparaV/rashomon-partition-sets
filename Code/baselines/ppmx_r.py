@@ -147,13 +147,17 @@ class PPMxR:
         # - fitted: fitted values
         
         try:
+            # Get list of names from R result (names is a method in rpy2)
+            result_names = list(r_result.names())
+            
             # Try to get Si (cluster assignments)
-            if 'Si' in r_result.names:
-                Si = np.array(r_result.rx2('Si'))  # shape: (n_samples, n_policies)
-                partitions = [Si[i, :].astype(int) for i in range(Si.shape[0])]
+            # NamedList supports dict-like access
+            if 'Si' in result_names:
+                Si = np.array(r_result['Si'])  # shape: (n_samples, n_policies)
+                partitions = [Si[i, :].astype(int) - 1 for i in range(Si.shape[0])]  # R uses 1-based indexing
             else:
                 # Fallback: try to reconstruct from other outputs
-                raise ValueError("Could not find partition information in R result")
+                raise ValueError(f"Could not find partition information in R result. Available names: {result_names}")
             
             return partitions
         
@@ -179,8 +183,11 @@ class PPMxR:
         cluster_means_list = []
         
         # Try to get mu (cluster means) from R result
-        if 'mu' in r_result.names:
-            mu = np.array(r_result.rx2('mu'))  # shape: (n_samples, n_policies)
+        # names() is a method in rpy2, not a property
+        result_names = list(r_result.names())
+        
+        if 'mu' in result_names:
+            mu = np.array(r_result['mu'])  # shape: (n_samples, n_policies)
             
             for sample_idx, partition in enumerate(partitions):
                 cluster_means = {}

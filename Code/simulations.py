@@ -17,6 +17,13 @@ from baselines import BootstrapLasso
 from baselines import SpikeSlabLasso
 from baselines import PPMx
 
+# Try to import R backend, fall back to Python if unavailable
+try:
+    from baselines.ppmx_r import PPMxR
+    HAS_PPMX_R = True
+except (ImportError, RuntimeError):
+    HAS_PPMX_R = False
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Parse command line arguments")
@@ -30,6 +37,13 @@ def parse_arguments():
                         help="Prefix for output file name")
     parser.add_argument("--method", type=str, required=True,
                         help="One of {r, lasso, blasso, bootstrap, ssl, ppmx}")
+    parser.add_argument(
+        "--ppmx-backend",
+        type=str,
+        default="r",
+        choices=["python", "r"],
+        help="Backend for PPMx method: 'r' for R's ppmSuite (50-100x faster), 'python' for native implementation"
+    )
     parser.add_argument(
         "--test",
         action="store_true",
@@ -743,7 +757,21 @@ if __name__ == "__main__":
             # Run PPMx
             #
             if method == "ppmx":
-                ppmx = PPMx(
+                # Select backend (R or Python)
+                if args.ppmx_backend == "r" and HAS_PPMX_R:
+                    PPMxClass = PPMxR
+                    if verbose:
+                        print("Using R backend (ppmSuite) for PPMx")
+                elif args.ppmx_backend == "r" and not HAS_PPMX_R:
+                    PPMxClass = PPMx
+                    if verbose:
+                        print("Warning: R backend requested but not available. Falling back to Python implementation.")
+                else:
+                    PPMxClass = PPMx
+                    if verbose:
+                        print("Using Python backend for PPMx")
+                
+                ppmx = PPMxClass(
                     n_iter=ppmx_n_iter,
                     burnin=ppmx_burnin,
                     thin=ppmx_thin,
