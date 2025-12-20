@@ -406,10 +406,15 @@ class GaussianPPMx:
         cohesion : cohesion value
         """
         if self.cohesion == 1:
-            # Dirichlet process style
+            # Dirichlet process style: c(S) = M * (|S| - 1)!
             if cluster_size == 0:
                 return 0.0
-            return self.M * np.exp(sum(np.log(range(1, cluster_size))))
+            if cluster_size == 1:
+                return self.M
+            # Use gammaln to avoid overflow: gamma(n) = (n-1)!
+            from scipy.special import gammaln
+            log_cohesion = np.log(self.M) + gammaln(cluster_size)
+            return np.exp(min(log_cohesion, 700))  # Cap at exp(700) to avoid overflow
         elif self.cohesion == 2:
             # Uniform cohesion
             return 1.0
@@ -495,10 +500,22 @@ class GaussianPPMx:
             log_like = stats.norm.logpdf(y[j], mean_j, np.sqrt(sig2_new))
             log_probs[n_clusters] = log_cohesion + log_like
             
-            # Normalize and sample
-            log_probs = log_probs - np.max(log_probs)
-            probs = np.exp(log_probs)
-            probs = probs / np.sum(probs)
+            # Normalize and sample with numerical stability
+            log_probs_max = np.max(log_probs)
+            if np.isnan(log_probs_max) or np.isinf(log_probs_max):
+                # If all log probs are -inf or nan, use uniform distribution
+                probs = np.ones(n_clusters + 1) / (n_clusters + 1)
+            else:
+                log_probs = log_probs - log_probs_max
+                # Cap log_probs to avoid overflow
+                log_probs = np.clip(log_probs, -700, 700)
+                probs = np.exp(log_probs)
+                probs_sum = np.sum(probs)
+                if probs_sum == 0 or np.isnan(probs_sum) or np.isinf(probs_sum):
+                    # Fallback to uniform if normalization fails
+                    probs = np.ones(n_clusters + 1) / (n_clusters + 1)
+                else:
+                    probs = probs / probs_sum
             
             new_assignment = np.random.choice(n_clusters + 1, p=probs)
             

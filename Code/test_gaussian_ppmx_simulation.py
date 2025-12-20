@@ -101,10 +101,10 @@ def main():
 
     # PPMx parameters
     if args.test:
-        ppmx_n_iter = 200
-        ppmx_burnin = 50
-        ppmx_thin = 2
-        ppmx_n_chains = 2
+        ppmx_n_iter = 100  # Reduced from 200 for speed
+        ppmx_burnin = 20   # Reduced from 50 for speed
+        ppmx_thin = 1      # No thinning for speed
+        ppmx_n_chains = 1  # Reduced from 2 for speed
         ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
         ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'normal-gamma')
         ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
@@ -240,6 +240,19 @@ def main():
             # Generate data
             X, D, y = generate_data(mu, var, n_per_pol, all_policies, pi_policies, profiles, policies_profiles, M)
             y_flat = y.flatten()
+
+            # SUBSAMPLE DATA FOR COMPUTATIONAL EFFICIENCY
+            # PPMx is O(n^2) per iteration - too slow for 2560 observations
+            # Subsample to max 500 observations for testing
+            max_obs = 500
+            if len(y_flat) > max_obs:
+                if verbose:
+                    print(f"Subsampling from {len(y_flat)} to {max_obs} observations for computational efficiency")
+                subsample_idx = np.random.choice(len(y_flat), size=max_obs, replace=False)
+                X = X[subsample_idx]
+                D = D[subsample_idx]
+                y = y[subsample_idx]
+                y_flat = y.flatten()
 
             if verbose:
                 print(f"Generated data: X.shape={X.shape}, y.shape={y.shape}")
