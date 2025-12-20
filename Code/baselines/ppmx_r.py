@@ -8,6 +8,7 @@ while maintaining compatibility with the existing Python PPMx interface.
 import numpy as np
 from collections import Counter
 import warnings
+from scipy.special import gammaln
 
 try:
     import rpy2.robjects as ro
@@ -32,6 +33,7 @@ class PPMxR:
                  alpha=1.0, cohesion='gaussian',
                  similarity_weight=0.5, similarity_bandwidth=1.0,
                  use_adaptive_proposals=True,
+                 M=1.0,
                  random_state=None, verbose=False):
         """
         Parameters
@@ -54,6 +56,8 @@ class PPMxR:
             (Note: R implementation may not support this)
         similarity_bandwidth : float, default=1.0
             Bandwidth for Gaussian kernel similarity
+        M : float, default=1.0
+            Cohesion precision parameter for prior computation
         random_state : int, optional
             Random seed
         verbose : bool, default=False
@@ -73,6 +77,7 @@ class PPMxR:
         self.similarity_weight = similarity_weight
         self.similarity_bandwidth = similarity_bandwidth
         self.use_adaptive_proposals = use_adaptive_proposals
+        self.M = M
         self.random_state = random_state
         self.verbose = verbose
         
@@ -86,6 +91,8 @@ class PPMxR:
         self.converged_ = None
         self.rhat_ = None
         self.coef_samples_ = None
+        self.log_likelihoods_ = None
+        self.similarity_matrix_ = None
         
         # Adaptive proposal probabilities (for interface compatibility)
         self.proposal_probs_ = [0.3, 0.3, 0.4]
@@ -125,9 +132,13 @@ class PPMxR:
             return 1
         return cohesion_map[cohesion_str]
     
-    def _extract_partitions_from_r(self, r_result):
+    def _extract_partitions_and_likelihoods_from_r(self, r_result):
         """
-        Extract partition samples from R ppmSuite result.
+        Extract partition samples and log likelihoods from R ppmSuite result.
+        
+        R's PPMx operates on observations and returns observation-level partitions.
+        We convert these to policy-level partitions by taking the cluster assignment
+        of the first observation for each policy.
         
         Parameters
         ----------
@@ -137,34 +148,47 @@ class PPMxR:
         Returns
         -------
         partitions : list of np.ndarray
-            List of partition samples (each shape (n_policies,))
+            List of policy-level partition samples (each shape (n_policies,))
+        log_likelihoods : np.ndarray
+            Log likelihoods for each sample (shape (n_samples,))
         """
-        # R ppmSuite returns a list with various components
-        # We need to extract the partition/clustering information
-        
-        # Common result components:
-        # - Si: cluster assignments matrix (samples x observations)
-        # - nclus: number of clusters per sample
-        # - fitted: fitted values
-        
-        # Try to get Si (cluster assignments)
         try:
-            partitions = None
+            partitions_obs = None
+            like_matrix = None
             available_names = []
+            
             for named_item in r_result.items():
                 item_name = named_item.name
                 available_names.append(item_name)
                 if item_name == "Si":
-                    Si = named_item.value  # shape: (n_samples, n_policies)
-                    partitions = [Si[i, :].astype(int)-1 for i in range(Si.shape[0])]  # R uses 1-based indexing
+                    Si = named_item.value  # shape: (n_samples, n_observations)
+                    partitions_obs = [Si[i, :].astype(int)-1 for i in range(Si.shape[0])]  # R uses 1-based indexing
+                elif item_name == "like":
+                    like_matrix = named_item.value  # shape: (n_samples, n_observations)
             
-            if partitions is None:
-                raise ValueError(f"Could not find partition information in R result. Available names: {available_names}")
+            if partitions_obs is None:
+                raise ValueError(f"Could not find partition information (Si) in R result. Available names: {available_names}")
             
-            return partitions
+            if like_matrix is None:
+                raise ValueError(f"Could not find likelihood matrix (like) in R result. Available names: {available_names}")
+            
+            # Convert observation-level partitions to policy-level partitions
+            partitions = []
+            for partition_obs in partitions_obs:
+                partition_policy = np.zeros(self.n_policies_, dtype=int)
+                for policy_id in range(self.n_policies_):
+                    obs_indices = self.policy_to_obs_[policy_id]
+                    if len(obs_indices) > 0:
+                        partition_policy[policy_id] = partition_obs[obs_indices[0]]
+                partitions.append(partition_policy)
+            
+            # Sum log likelihoods across observations for each sample
+            log_likelihoods = np.sum(np.log(like_matrix + 1e-300), axis=1)
+            
+            return partitions, log_likelihoods
 
         except Exception as e:
-            raise RuntimeError(f"Failed to extract partitions from R result: {e}")
+            raise RuntimeError(f"Failed to extract partitions and likelihoods from R result: {e}")
 
     def _extract_cluster_means_from_r(self, r_result, partitions):
         """
@@ -267,6 +291,104 @@ class PPMxR:
         
         return rhat
     
+    def _cohesion_function(self, cluster_size):
+        """
+        Compute cohesion function c(S) = M * (|S| - 1)!.
+        
+        Parameters
+        ----------
+        cluster_size : int
+            Size of the cluster
+        
+        Returns
+        -------
+        cohesion : float
+            Cohesion value
+        """
+        if cluster_size == 0:
+            return 0.0
+        elif cluster_size == 1:
+            return self.M
+        else:
+            # Use log-gamma for numerical stability: log(c(S)) = log(M) + log((|S|-1)!)
+            log_cohesion = np.log(self.M) + gammaln(cluster_size)
+            # Cap to prevent overflow
+            return np.exp(min(log_cohesion, 700))
+    
+    def _compute_similarity_matrix(self, X_policy):
+        """
+        Compute pairwise similarity matrix using Gaussian kernel.
+        
+        Parameters
+        ----------
+        X_policy : np.ndarray, shape (n_policies, n_features)
+            Policy features
+        
+        Returns
+        -------
+        similarity_matrix : np.ndarray, shape (n_policies, n_policies)
+            Symmetric similarity matrix with diagonal = 1
+        """
+        n_policies = X_policy.shape[0]
+        similarity_matrix = np.zeros((n_policies, n_policies))
+        
+        for i in range(n_policies):
+            for j in range(i, n_policies):
+                if i == j:
+                    similarity_matrix[i, j] = 1.0
+                else:
+                    dist_sq = np.sum((X_policy[i] - X_policy[j]) ** 2)
+                    sim = np.exp(-dist_sq / (2 * self.similarity_bandwidth ** 2))
+                    similarity_matrix[i, j] = sim
+                    similarity_matrix[j, i] = sim
+        
+        return similarity_matrix
+    
+    def _compute_prior_for_partition(self, partition, X_policy):
+        """
+        Compute log prior for a given partition.
+        
+        log p(partition | X) = k * log(alpha) + sum_i log(c(S_i)) + similarity_terms
+        
+        Parameters
+        ----------
+        partition : np.ndarray, shape (n_policies,)
+            Cluster assignments
+        X_policy : np.ndarray, shape (n_policies, n_features)
+            Policy features
+        
+        Returns
+        -------
+        log_prior : float
+            Log prior value
+        """
+        unique_clusters = np.unique(partition)
+        k = len(unique_clusters)
+        
+        # Term 1: k * log(alpha)
+        log_prior = k * np.log(self.alpha)
+        
+        # Term 2: Sum of log cohesion for each cluster
+        for cluster_id in unique_clusters:
+            cluster_size = np.sum(partition == cluster_id)
+            cohesion = self._cohesion_function(cluster_size)
+            log_prior += np.log(cohesion + 1e-300)
+        
+        # Term 3: Similarity terms (if weight > 0)
+        if self.similarity_weight > 0:
+            for cluster_id in unique_clusters:
+                policies_in_cluster = np.where(partition == cluster_id)[0]
+                if len(policies_in_cluster) > 1:
+                    # Add pairwise similarity for all pairs in cluster
+                    for i in range(len(policies_in_cluster)):
+                        for j in range(i + 1, len(policies_in_cluster)):
+                            pi = policies_in_cluster[i]
+                            pj = policies_in_cluster[j]
+                            sim = self.similarity_matrix_[pi, pj]
+                            log_prior += self.similarity_weight * np.log(sim + 1e-300)
+        
+        return log_prior
+    
     def fit(self, X, y, D=None, n_chains=4):
         """
         Fit PPMx model using R's ppmSuite with multiple chains.
@@ -309,6 +431,9 @@ class PPMxR:
         self.n_policies_ = n_policies
         self.y_ = y
         
+        # Compute and cache similarity matrix for prior computation
+        self.similarity_matrix_ = self._compute_similarity_matrix(X)
+        
         # Build observation-to-policy lookup
         self.policy_to_obs_ = {}
         for policy_id in range(n_policies):
@@ -339,6 +464,7 @@ class PPMxR:
         all_partition_samples = []
         all_n_clusters = []
         all_cluster_means = []
+        all_log_likelihoods = []
         
         for chain_idx in range(n_chains):
             if self.verbose:
@@ -369,8 +495,9 @@ class PPMxR:
                     raise RuntimeError(f"R gaussian_ppmx failed: {e}")
             
             # Extract results from R
-            partitions = self._extract_partitions_from_r(r_result)
+            partitions, log_likelihoods = self._extract_partitions_and_likelihoods_from_r(r_result)
             cluster_means_list = self._extract_cluster_means_from_r(r_result, partitions)
+            all_log_likelihoods.append(log_likelihoods)
             
             # Compute coefficient samples (mean for each policy)
             chain_samples = []
@@ -396,6 +523,9 @@ class PPMxR:
         # Flatten chains for easy access
         n_chains_actual, n_samples_per_chain, n_features = self.chains_.shape
         self.coef_samples_ = self.chains_.reshape(n_chains_actual * n_samples_per_chain, n_features)
+        
+        # Concatenate log likelihoods from all chains
+        self.log_likelihoods_ = np.concatenate(all_log_likelihoods)
         
         # Compute R-hat for convergence diagnostics
         self.rhat_ = self._compute_rhat(self.chains_)
@@ -465,17 +595,27 @@ class PPMxR:
         """
         Compute log posterior for each stored sample.
         
-        Note: R implementation may not provide log posteriors directly.
-        This would need to be computed from the data.
+        log p(partition | y, X) = log p(y | partition) + log p(partition | X)
+                                 = log_likelihood + log_prior
+        
+        The log likelihood comes from R's ppmSuite computation.
+        The log prior is computed in Python using cohesion and similarity.
         
         Returns
         -------
         log_posteriors : np.ndarray, shape (n_samples,)
-            Log posterior values for each sample (or None if not available)
+            Log posterior values for each sample
         """
-        warnings.warn(
-            "Log posteriors not directly available from R backend. "
-            "Would need to compute from likelihood + prior.",
-            UserWarning
-        )
-        return None
+        if self.log_likelihoods_ is None:
+            raise ValueError("Model must be fit before computing log posteriors")
+        
+        n_samples = len(self.partition_samples_)
+        log_posteriors = np.zeros(n_samples)
+        
+        for i in range(n_samples):
+            partition = self.partition_samples_[i]
+            log_likelihood = self.log_likelihoods_[i]
+            log_prior = self._compute_prior_for_partition(partition, self.X_policy_)
+            log_posteriors[i] = log_likelihood + log_prior
+        
+        return log_posteriors
