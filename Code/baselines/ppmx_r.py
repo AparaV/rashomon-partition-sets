@@ -18,6 +18,10 @@ try:
 except ImportError:
     HAS_RPY2 = False
 
+CONSIM_ENUM = {
+    'nn': 1
+}
+
 
 class PPMxR:
     """
@@ -32,6 +36,7 @@ class PPMxR:
     def __init__(self, n_iter=5000, burnin=1000, thin=2,
                  alpha=1.0, cohesion='gaussian',
                  similarity_weight=0.5, similarity_bandwidth=1.0,
+                 consim='nn',
                  use_adaptive_proposals=True,
                  M=1.0,
                  random_state=None, verbose=False):
@@ -49,8 +54,10 @@ class PPMxR:
             Higher alpha → more clusters
         cohesion : str, default='gaussian'
             Cohesion function type ('gaussian', 'normal-gamma')
-        similarity_weight : float in [0, 1], default=0.5
+        similarity_weight : float in [0, 1], default=1
             Weight for covariate similarity (0=ignore, 1=full)
+        consim: str, default='nn'
+            Values are 'nn' and 'nig'
         use_adaptive_proposals : bool, default=True
             Whether to adaptively adjust proposal probabilities during burnin
             (Note: R implementation may not support this)
@@ -74,7 +81,9 @@ class PPMxR:
         self.alpha = alpha
         # self.cohesion = cohesion
         self.cohesion = 1
-        self.similarity_weight = similarity_weight
+        # self.similarity_weight = similarity_weight
+        self.similarity_weight = 1
+        self.consim = CONSIM_ENUM[consim]
         self.similarity_bandwidth = similarity_bandwidth
         self.use_adaptive_proposals = use_adaptive_proposals
         self.M = M
@@ -260,7 +269,7 @@ class PPMxR:
         
         # Compute between-chain and within-chain variance
         chain_means = np.mean(chains, axis=1)  # (n_chains, n_features)
-        overall_mean = np.mean(chain_means, axis=0)  # (n_features,)
+        # overall_mean = np.mean(chain_means, axis=0)  # (n_features,)
         
         # Between-chain variance
         if n_chains > 1:
@@ -375,17 +384,18 @@ class PPMxR:
             log_prior += np.log(cohesion + 1e-300)
         
         # Term 3: Similarity terms (if weight > 0)
-        if self.similarity_weight > 0:
-            for cluster_id in unique_clusters:
-                policies_in_cluster = np.where(partition == cluster_id)[0]
-                if len(policies_in_cluster) > 1:
-                    # Add pairwise similarity for all pairs in cluster
-                    for i in range(len(policies_in_cluster)):
-                        for j in range(i + 1, len(policies_in_cluster)):
-                            pi = policies_in_cluster[i]
-                            pj = policies_in_cluster[j]
-                            sim = self.similarity_matrix_[pi, pj]
-                            log_prior += self.similarity_weight * np.log(sim + 1e-300)
+        # if self.similarity_weight > 0:
+        for cluster_id in unique_clusters:
+            policies_in_cluster = np.where(partition == cluster_id)[0]
+            if len(policies_in_cluster) > 1:
+                # Add pairwise similarity for all pairs in cluster
+                for i in range(len(policies_in_cluster)):
+                    for j in range(i + 1, len(policies_in_cluster)):
+                        pi = policies_in_cluster[i]
+                        pj = policies_in_cluster[j]
+                        sim = self.similarity_matrix_[pi, pj]
+                        # log_prior += self.similarity_weight * np.log(sim + 1e-300)
+                        log_prior += np.log(sim + 1e-300)
         
         return log_prior
     
@@ -452,7 +462,8 @@ class PPMxR:
         r_params = {
             'cohesion': cohesion_int,
             'similarity_function': similarity_function,
-            'consim': self.similarity_weight,
+            'consim': self.consim,
+            'M': self.M,
             'draws': self.n_iter - self.burnin,  # R counts post-burnin draws
             'burn': self.burnin,
             'thin': self.thin,
