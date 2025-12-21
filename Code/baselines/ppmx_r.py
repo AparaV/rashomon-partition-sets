@@ -464,7 +464,7 @@ class PPMxR:
             'similarity_function': similarity_function,
             'consim': self.consim,
             'M': self.M,
-            'draws': self.n_iter - self.burnin,  # R counts post-burnin draws
+            'draws': self.n_iter,  # R counts post-burnin draws
             'burn': self.burnin,
             'thin': self.thin,
             'verbose': self.verbose
