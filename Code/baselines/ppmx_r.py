@@ -10,10 +10,12 @@ from collections import Counter
 import warnings
 from scipy.special import gammaln
 
+
 try:
     import rpy2.robjects as ro
     from rpy2.robjects import numpy2ri
     from rpy2.robjects.conversion import localconverter
+    from rpy2.rlike.container import NamedItem, NamedList
     HAS_RPY2 = True
 except ImportError:
     HAS_RPY2 = False
@@ -34,7 +36,7 @@ class PPMxR:
     """
     
     def __init__(self, n_iter=5000, burnin=1000, thin=2,
-                 alpha=1.0, cohesion='gaussian',
+                 alpha=1.0, cohesion=1,
                  similarity_weight=0.5, similarity_bandwidth=1.0,
                  consim='nn',
                  use_adaptive_proposals=True,
@@ -52,8 +54,10 @@ class PPMxR:
         alpha : float, default=1.0
             Concentration parameter (prior on number of clusters)
             Higher alpha → more clusters
-        cohesion : str, default='gaussian'
-            Cohesion function type ('gaussian', 'normal-gamma')
+        cohesion : int, default=1
+            Cohesion function type:
+            1 = Dirichlet Process: c(S) = M * (|S| - 1)! 
+            2 = Uniform: c(S) = 1
         similarity_weight : float in [0, 1], default=1
             Weight for covariate similarity (0=ignore, 1=full)
         consim: str, default='nn'
@@ -79,8 +83,8 @@ class PPMxR:
         self.burnin = burnin
         self.thin = thin
         self.alpha = alpha
-        # self.cohesion = cohesion
-        self.cohesion = 1
+        self.cohesion = cohesion
+        # self.cohesion = 2
         # self.similarity_weight = similarity_weight
         self.similarity_weight = 1
         self.consim = CONSIM_ENUM[consim]
@@ -115,31 +119,31 @@ class PPMxR:
                 "Install with: R -e 'install.packages(\"ppmSuite\")'"
             )
     
-    def _cohesion_str_to_int(self, cohesion_str):
-        """
-        Map cohesion string to R ppmSuite integer code.
+    # def _cohesion_str_to_int(self, cohesion_str):
+    #     """
+    #     Map cohesion string to R ppmSuite integer code.
         
-        Parameters
-        ----------
-        cohesion_str : str
-            Python cohesion type ('gaussian' or 'normal-gamma')
+    #     Parameters
+    #     ----------
+    #     cohesion_str : str
+    #         Python cohesion type ('gaussian' or 'normal-gamma')
         
-        Returns
-        -------
-        cohesion_int : int
-            R ppmSuite cohesion code
-        """
-        cohesion_map = {
-            'gaussian': 1,
-            'normal-gamma': 2
-        }
-        if cohesion_str not in cohesion_map:
-            warnings.warn(
-                f"Unknown cohesion '{cohesion_str}', defaulting to 'gaussian'",
-                UserWarning
-            )
-            return 1
-        return cohesion_map[cohesion_str]
+    #     Returns
+    #     -------
+    #     cohesion_int : int
+    #         R ppmSuite cohesion code
+    #     """
+    #     cohesion_map = {
+    #         'gaussian': 1,
+    #         'normal-gamma': 2
+    #     }
+    #     if cohesion_str not in cohesion_map:
+    #         warnings.warn(
+    #             f"Unknown cohesion '{cohesion_str}', defaulting to 'gaussian'",
+    #             UserWarning
+    #         )
+    #         return 1
+    #     return cohesion_map[cohesion_str]
     
     def _extract_partitions_and_likelihoods_from_r(self, r_result):
         """
@@ -302,7 +306,7 @@ class PPMxR:
     
     def _cohesion_function(self, cluster_size):
         """
-        Compute cohesion function c(S) = M * (|S| - 1)!.
+        Compute log cohesion function c(S) = M * (|S| - 1)!.
         
         Parameters
         ----------
@@ -312,17 +316,21 @@ class PPMxR:
         Returns
         -------
         cohesion : float
-            Cohesion value
+            Log cohesion value
         """
         if cluster_size == 0:
             return 0.0
         elif cluster_size == 1:
             return self.M
         else:
-            # Use log-gamma for numerical stability: log(c(S)) = log(M) + log((|S|-1)!)
-            log_cohesion = np.log(self.M) + gammaln(cluster_size)
+            if self.cohesion == 1:
+                # Dirichlet Process cohesion
+                # Use log-gamma for numerical stability: log(c(S)) = log(M) + log((|S|-1)!)
+                log_cohesion = np.log(self.M) + gammaln(cluster_size)
+            elif self.cohesion == 2:
+                log_cohesion = 0.0  # log(1) = 0
             # Cap to prevent overflow
-            return np.exp(min(log_cohesion, 700))
+            return min(log_cohesion, 700)
     
     def _compute_similarity_matrix(self, X_policy):
         """
@@ -380,8 +388,8 @@ class PPMxR:
         # Term 2: Sum of log cohesion for each cluster
         for cluster_id in unique_clusters:
             cluster_size = np.sum(partition == cluster_id)
-            cohesion = self._cohesion_function(cluster_size)
-            log_prior += np.log(cohesion + 1e-300)
+            log_cohesion = self._cohesion_function(cluster_size)
+            log_prior += log_cohesion
         
         # Term 3: Similarity terms (if weight > 0)
         # if self.similarity_weight > 0:
@@ -437,12 +445,14 @@ class PPMxR:
             n_policies = X.shape[0]
             self.D_ = np.arange(n_policies)
         
+        X_standardized = (X - np.mean(X, axis=0)) / (np.std(X, axis=0) + 1e-10)
         self.X_policy_ = X
+        self.X_standardized_ = X_standardized
         self.n_policies_ = n_policies
         self.y_ = y
         
         # Compute and cache similarity matrix for prior computation
-        self.similarity_matrix_ = self._compute_similarity_matrix(X)
+        self.similarity_matrix_ = self._compute_similarity_matrix(X_standardized)
         
         # Build observation-to-policy lookup
         self.policy_to_obs_ = {}
@@ -457,16 +467,25 @@ class PPMxR:
         # R ppmSuite uses simParms vector: c(m0, s20, v, k, nu0, s20, l)
         # For now, use defaults and control via similarity_function and consim
         similarity_function = 1
+
+        simParams_m0 = 0.0
+        simParams_s20 = 1000.0
+        simParams_v = 10000.0
+        simParams_list = NamedList(
+            names=['mu0', 's20', 'v'],
+            seq=[simParams_m0, simParams_s20, simParams_v]
+        )
         
         # Prepare R parameters
         r_params = {
-            'cohesion': cohesion_int,
+            'cohesion': int(self.cohesion),
             'similarity_function': similarity_function,
             'consim': self.consim,
             'M': self.M,
             'draws': self.n_iter,  # R counts post-burnin draws
             'burn': self.burnin,
             'thin': self.thin,
+            'simParms': simParams_list,
             'verbose': self.verbose
         }
         
@@ -489,9 +508,9 @@ class PPMxR:
             with localconverter(ro.default_converter + numpy2ri.converter):
                 # Flatten X for R matrix conversion (R is column-major)
                 r_X = ro.r.matrix(
-                    ro.FloatVector(X.flatten('F')),  # Use Fortran order for R
+                    ro.FloatVector(X_standardized.flatten('F')),  # Use Fortran order for R
                     nrow=n_policies,
-                    ncol=X.shape[1]
+                    ncol=X_standardized.shape[1]
                 )
                 r_y = ro.FloatVector(y.flatten())
                 

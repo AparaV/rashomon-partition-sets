@@ -762,15 +762,17 @@ if __name__ == "__main__":
                     PPMxClass = PPMxR
                     if verbose:
                         print("Using R backend (ppmSuite) for PPMx")
-                elif args.ppmx_backend == "r" and not HAS_PPMX_R:
-                    PPMxClass = PPMx
-                    if verbose:
-                        print("Warning: R backend requested but not available. Falling back to Python implementation.")
+                # elif args.ppmx_backend == "r" and not HAS_PPMX_R:
+                #     PPMxClass = PPMx
+                #     if verbose:
+                #         print("Warning: R backend requested but not available. Falling back to Python implementation.")
+                # else:
+                #     PPMxClass = PPMx
+                #     if verbose:
+                #         print("Using Python backend for PPMx")
                 else:
-                    PPMxClass = PPMx
-                    if verbose:
-                        print("Using Python backend for PPMx")
-                
+                    raise RuntimeError("R backend for PPMx not available. Please ensure ppmSuite is installed in R.")
+
                 ppmx = PPMxClass(
                     n_iter=ppmx_n_iter,
                     burnin=ppmx_burnin,
@@ -830,8 +832,8 @@ if __name__ == "__main__":
                     # Get number of clusters for this specific sample
                     n_clusters_sample = ppmx.n_clusters_samples_[sample_idx]
 
-                    # if sample_idx == 0:
-                    #     print(coef_sample)
+                    if sample_idx == 0:
+                        print(coef_sample)
 
                     # Compute metrics for this sample
                     sample_results = metrics.compute_all_metrics(
