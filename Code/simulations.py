@@ -343,23 +343,17 @@ if __name__ == "__main__":
             # The dummy matrix for Lasso
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
 
+            # column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
+            # data = np.hstack([X, y])
+            # df = pd.DataFrame(data, columns=column_names)
+            # df.to_csv("../Data/sims/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
+
+            # continue
+
             #
             # Run Rashomon
             #
             if method == "r":
-                # if n_per_pol == 5:
-                #     if sim_i == 0 or sim_i == 3:
-                #         theta = 6.5
-                #     else:
-                #         theta = 6.5
-                # elif n_per_pol == 10:
-                #     theta = 4.2
-                # elif n_per_pol <= 50:
-                #     theta = 4.4
-                # elif n_per_pol <= 250:
-                #     theta = 4.3
-                # else:
-                #     theta = 4.2
 
                 # Adaptive expand R set threshold until we find a model that
                 # identifies the true best profile
@@ -785,19 +779,6 @@ if __name__ == "__main__":
                     verbose=verbose
                 )
                 ppmx.fit(X, y, D, n_chains=ppmx_n_chains)
-                y_ppmx = ppmx.predict(X)
-
-                # ppmx.fit(D_matrix, y, D, n_chains=ppmx_n_chains)
-                # y_ppmx = ppmx.predict(D_matrix)
-
-                ppmx_results = metrics.compute_all_metrics(
-                    y, y_ppmx, D, true_best, all_policies, profile_map,
-                    min_dosage_best_policy, true_best_effect)
-                sqrd_err_ppmx = ppmx_results["sqrd_err"]
-                iou_ppmx = ppmx_results["iou"]
-                best_profile_indicator_ppmx = ppmx_results["best_prof"]
-                min_dosage_present_ppmx = ppmx_results["min_dos_inc"]
-                best_policy_diff_ppmx = ppmx_results["best_pol_diff"]
 
                 # Store convergence information
                 converged = ppmx.converged_
