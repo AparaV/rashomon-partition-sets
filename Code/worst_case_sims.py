@@ -447,6 +447,16 @@ if __name__ == "__main__":
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
 
+            # # Save simulation data for PPMx
+            # column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
+            # data = np.hstack([X, y])
+            # df = pd.DataFrame(data, columns=column_names)
+            # df.to_csv("../Data/sims2/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
+            # pol_means_df = pd.DataFrame(pol_means, columns=["sumDi", "numDi"])
+            # pol_means_df.to_csv("../Data/sims2/sim_pol_means_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
+
+            # continue
+
             #
             # Run Rashomon
             #
@@ -663,6 +673,9 @@ if __name__ == "__main__":
                                best_policy_error_ppmx, mean_n_clusters, acceptance_rate,
                                iou_coverage, min_dosage_coverage]
                 ppmx_list.append(ppmx_list_i)
+
+    # import sys
+    # sys.exit(0)
 
     # Save results for methods that were run
     suffix = f"_{args.output_suffix}" if args.output_suffix else ""
