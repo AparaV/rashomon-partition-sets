@@ -135,7 +135,7 @@ def compute_te_het_metrics(te_true, te_est, max_te, max_te_policies,
     return metrics_results
 
 
-def compute_iou_coverage(coef_samples, X, D, true_best):
+def compute_iou_coverage(coef_samples, X, D, true_best, y_pred=None, n_samples=None):
     """
     Compute mean IOU across all posterior/bootstrap samples.
 
@@ -144,23 +144,30 @@ def compute_iou_coverage(coef_samples, X, D, true_best):
     X (np.ndarray): Design matrix
     D (np.ndarray): Policy assignments
     true_best: True best policies
+    y_pred (np.ndarray, optional): Precomputed predictions. If None, predictions
+        will be computed using X and coef_samples.
+    n_samples (int, optional): Number of samples to use. If None, use all samples
 
     Returns:
     float: Mean IOU across all samples
     """
-    n_samples = coef_samples.shape[0]
+    if n_samples is None:
+        n_samples = coef_samples.shape[0]
     iou_sum = 0.0
 
     for i in range(n_samples):
-        y_pred = np.dot(X, coef_samples[i])
-        pred_best = find_best_policies(D, y_pred)
+        if y_pred is None:
+            y_pred_i = np.dot(X, coef_samples[i])
+        else:
+            y_pred_i = y_pred[i]
+        pred_best = find_best_policies(D, y_pred_i)
         iou = intersect_over_union(set(true_best), set(pred_best))
         iou_sum += iou
 
     return iou_sum / n_samples
 
 
-def compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy):
+def compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy, y_pred=None, n_samples=None):
     """
     Compute mean min dosage coverage: fraction of posterior/bootstrap samples where the minimum
     dosage best policy is included in the predicted best policies.
@@ -170,16 +177,23 @@ def compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy):
     X (np.ndarray): Design matrix
     D (np.ndarray): Policy assignments
     min_dosage_best_policy: Minimum dosage policy among true best policies
+    y_pred (np.ndarray, optional): Precomputed predictions. If None, predictions
+        will be computed using X and coef_samples.
+    n_samples (int, optional): Number of samples to use. If None, use all samples
 
     Returns:
     float: Mean fraction of samples where min_dosage_best_policy is in predicted best
     """
-    n_samples = coef_samples.shape[0]
+    if n_samples is None:
+        n_samples = coef_samples.shape[0]
     coverage_sum = 0.0
 
     for i in range(n_samples):
-        y_pred = np.dot(X, coef_samples[i])
-        pred_best = find_best_policies(D, y_pred)
+        if y_pred is None:
+            y_pred_i = np.dot(X, coef_samples[i])
+        else:
+            y_pred_i = y_pred[i]
+        pred_best = find_best_policies(D, y_pred_i)
         if check_membership(min_dosage_best_policy, pred_best):
             coverage_sum += 1.0
 

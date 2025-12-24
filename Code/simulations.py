@@ -17,13 +17,6 @@ from baselines import BootstrapLasso
 from baselines import SpikeSlabLasso
 from baselines import PPMx
 
-# Try to import R backend, fall back to Python if unavailable
-try:
-    from baselines.ppmx_r import PPMxR
-    HAS_PPMX_R = True
-except (ImportError, RuntimeError):
-    HAS_PPMX_R = False
-
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Parse command line arguments")
@@ -65,7 +58,7 @@ def parse_arguments():
     return args
 
 
-def generate_data(mu, var, n_per_pol, all_policies, pi_policies, M):
+def generate_data(mu, var, n_per_pol, profiles, num_policies, all_policies, policies_profiles, pi_policies, M):
     num_data = num_policies * n_per_pol
     X = np.zeros(shape=(num_data, M))
     D = np.zeros(shape=(num_data, 1), dtype='int_')
@@ -319,6 +312,14 @@ if __name__ == "__main__":
     ssl_list = []
     ppmx_list = []
 
+    if method == "ppmx":
+        # Try to import R backend, fall back to Python if unavailable
+        try:
+            from baselines.ppmx_r import PPMxR
+            HAS_PPMX_R = True
+        except (ImportError, RuntimeError):
+            HAS_PPMX_R = False
+
     np.random.seed(3)
 
     #
@@ -338,7 +339,7 @@ if __name__ == "__main__":
                 print(f"\tSimulation {sim_i+1}")
 
             # Generate data
-            X, D, y = generate_data(mu, var, n_per_pol, all_policies, pi_policies, M)
+            X, D, y = generate_data(mu, var, n_per_pol, profiles, num_policies, all_policies, policies_profiles, pi_policies, M)
             policy_means = loss.compute_policy_means(D, y, num_policies)
             # The dummy matrix for Lasso
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
