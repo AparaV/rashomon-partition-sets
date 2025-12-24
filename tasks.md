@@ -1,11 +1,14 @@
-- Write email to ppmx authors
-  - Save data to csv
-  - Write sample R script
-  - Draft + send email
-- Add Rashomon to the HPD posterior plot
 - Run SSL for sim 2
-- Run PPMx for sim 1
 - Run PPMx for sim 2
+- Make plots for sim 2
+- Clean plots
+- Add plots to overleaf
+- Update discussion
+- Clean up the code
+    - Include R code and instructions
+    - Clean up notebooks keeping only necessary things
+    - Remove all python ppmx code
+    - Remove all test scripts created by copilot
 - Run blasso and SSL for longer chains in sim 1
 
 
