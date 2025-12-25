@@ -10,7 +10,7 @@ from rashomon import hasse
 from rashomon import metrics
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
-from baselines import BayesianLasso, BootstrapLasso, TVA
+from baselines import BayesianLasso, BootstrapLasso, TVA, SpikeSlabLasso
 
 from typing import Dict
 
@@ -244,6 +244,84 @@ def run_bootstrap_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, 
     return result
 
 
+def run_spike_slab_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best, min_dosage_best_policy,
+                         ssl_params: Dict, sim_seed: int, verbose: bool = False) -> dict:
+    """Run Spike and Slab Lasso regression on the data."""
+
+    ssl = SpikeSlabLasso(
+        n_iter=ssl_params["n_iter"],
+        burnin=ssl_params["burnin"],
+        thin=ssl_params["thin"],
+        lambda0=ssl_params["lambda0"],
+        lambda1=ssl_params["lambda1"],
+        theta_init=ssl_params["theta_init"],
+        update_theta=ssl_params["update_theta"],
+        theta_a=ssl_params["theta_a"],
+        theta_b=ssl_params["theta_b"],
+        tau2_a=ssl_params["tau2_a"],
+        tau2_b=ssl_params["tau2_b"],
+        fit_intercept=False,
+        random_state=sim_seed,
+        verbose=verbose
+    )
+
+    ssl.fit(X, y, n_chains=ssl_params["n_chains"])
+    y_ssl = ssl.predict(X)
+
+    # Compute point estimate metrics (using posterior mean predictions)
+    mse = mean_squared_error(y, y_ssl)
+
+    # IOU (point estimate)
+    ssl_best = metrics.find_best_policies(D, y_ssl)
+    iou_ssl = metrics.intersect_over_union(set(true_best), set(ssl_best))
+
+    # Min dosage inclusion (point estimate)
+    min_dosage_present_ssl = metrics.check_membership(min_dosage_best_policy, ssl_best)
+
+    # Best policy error (point estimate)
+    best_policy_error_ssl = np.max(mu) - np.max(y_ssl)
+
+    # Convergence diagnostics
+    converged = ssl.converged_
+    max_rhat = np.max(ssl.rhat_)
+
+    # SSL-specific metrics
+    mean_inclusion_prob = np.mean(ssl.inclusion_probs_)
+    posterior_theta = ssl.posterior_theta_
+    n_selected_features = np.sum(ssl.inclusion_probs_ > 0.5)
+
+    # Extract posterior samples and compute coverage metrics
+    # ssl.chains_ has shape (n_chains, n_samples, n_features)
+    # Reshape to (n_chains * n_samples, n_features)
+    n_chains, n_samples, n_features = ssl.chains_.shape
+    coef_samples = ssl.chains_.reshape(n_chains * n_samples, n_features)
+
+    # Compute distribution-based metrics
+    iou_coverage = metrics.compute_iou_coverage(coef_samples, X, D, true_best)
+    min_dosage_coverage = metrics.compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy)
+
+    # Get log posteriors for sample-level analysis
+    log_posteriors = ssl.get_log_posteriors()
+
+    result = {
+        "sqrd_err": mse,
+        "iou_ssl": iou_ssl,
+        "min_dosage_present_ssl": min_dosage_present_ssl,
+        "best_policy_error_ssl": best_policy_error_ssl,
+        "converged": converged,
+        "max_rhat": max_rhat,
+        "mean_inclusion_prob": mean_inclusion_prob,
+        "posterior_theta": posterior_theta,
+        "n_selected_features": n_selected_features,
+        "iou_coverage": iou_coverage,
+        "min_dosage_coverage": min_dosage_coverage,
+        "coef_samples": coef_samples,
+        "log_posteriors": log_posteriors
+    }
+
+    return result
+
+
 def generate_data(mu, var, n_per_pol, policies, pi_policies, M):
     num_data = len(policies) * n_per_pol
     X = np.ndarray(shape=(num_data, M))
@@ -396,6 +474,38 @@ if __name__ == "__main__":
             "confidence_level": 0.95
         }
 
+    # Spike and Slab Lasso parameters
+    if args.test:
+        ssl_params = {
+            "n_iter": 5000,
+            "burnin": 2000,
+            "thin": 2,
+            "n_chains": 3,
+            "lambda0": 15.0,
+            "lambda1": 1.0,
+            "theta_init": 0.5,
+            "update_theta": True,
+            "theta_a": 1.0,
+            "theta_b": 1.0,
+            "tau2_a": 1.0,
+            "tau2_b": 1.0
+        }
+    else:
+        ssl_params = {
+            "n_iter": 5000,
+            "burnin": 2000,
+            "thin": 2,
+            "n_chains": 3,
+            "lambda0": 10.0,
+            "lambda1": 0.5,
+            "theta_init": 0.5,
+            "update_theta": True,
+            "theta_a": 1e-1,
+            "theta_b": 1e-1,
+            "tau2_a": 1e-1,
+            "tau2_b": 1e-1
+        }
+
     # PPMx parameters
     if args.test:
         ppmx_params = {
@@ -426,6 +536,8 @@ if __name__ == "__main__":
     blasso_samples_list = [] if "blasso" in methods_to_run else None
     bootstrap_list = [] if "bootstrap" in methods_to_run else None
     bootstrap_samples_list = [] if "bootstrap" in methods_to_run else None
+    ssl_list = [] if "ssl" in methods_to_run else None
+    ssl_samples_list = [] if "ssl" in methods_to_run else None
     ppmx_list = [] if "ppmx" in methods_to_run else None
 
     #
@@ -612,6 +724,54 @@ if __name__ == "__main__":
                     ]
                     bootstrap_samples_list.append(sample_list)
 
+            # Run Spike and Slab Lasso
+            if "ssl" in methods_to_run:
+                ssl_result = run_spike_slab_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
+                                                  ssl_params, sim_i, verbose=False)
+                ssl_list_i = [
+                    n_per_pol, sim_i, ssl_result["sqrd_err"],
+                    ssl_result["iou_ssl"], ssl_result["min_dosage_present_ssl"],
+                    ssl_result["best_policy_error_ssl"], ssl_result["converged"],
+                    ssl_result["max_rhat"], ssl_result["mean_inclusion_prob"],
+                    ssl_result["posterior_theta"], ssl_result["n_selected_features"],
+                    ssl_result["iou_coverage"], ssl_result["min_dosage_coverage"]
+                ]
+                ssl_list.append(ssl_list_i)
+
+                # Store per-sample results
+                coef_samples = ssl_result["coef_samples"]
+                log_posteriors = ssl_result["log_posteriors"]
+                neg_log_posteriors = -log_posteriors
+
+                for sample_idx in range(coef_samples.shape[0]):
+                    coef_sample = coef_samples[sample_idx]
+                    y_sample = np.dot(D_matrix, coef_sample)
+
+                    # Compute metrics for this sample
+                    sqrd_err_sample = mean_squared_error(y, y_sample)
+
+                    # IOU for this sample
+                    sample_best = metrics.find_best_policies(D, y_sample)
+                    iou_sample = metrics.intersect_over_union(set(true_best), set(sample_best))
+
+                    # Min dosage for this sample
+                    min_dosage_sample = metrics.check_membership(min_dosage_best_policy, sample_best)
+
+                    # Best policy difference for this sample
+                    best_pol_diff_sample = np.max(mu) - np.max(y_sample)
+
+                    sample_list = [
+                        n_per_pol, sim_i, sample_idx,
+                        neg_log_posteriors[sample_idx],
+                        sqrd_err_sample,
+                        iou_sample,
+                        min_dosage_sample,
+                        best_pol_diff_sample,
+                        ssl_result["converged"],
+                        ssl_result["max_rhat"]
+                    ]
+                    ssl_samples_list.append(sample_list)
+
     # import sys
     # sys.exit(0)
 
@@ -681,6 +841,21 @@ if __name__ == "__main__":
         else:
             if verbose:
                 print("No Bootstrap Lasso results to save.")
+
+    if "ssl" in methods_to_run:
+        if len(ssl_samples_list) > 0:
+            ssl_samples_cols = [
+                "n_per_pol", "sim_num", "sample_idx",
+                "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                "converged", "max_rhat"
+            ]
+            ssl_samples_df = pd.DataFrame(ssl_samples_list, columns=ssl_samples_cols)
+            ssl_samples_df.to_csv(f"../Results/worst_case/worst_case_ssl{suffix}.csv")
+            if verbose:
+                print(f"Saved Spike and Slab Lasso results to worst_case_ssl{suffix}.csv")
+        else:
+            if verbose:
+                print("No Spike and Slab Lasso results to save.")
 
     if verbose:
         print("\nSimulations complete!")
