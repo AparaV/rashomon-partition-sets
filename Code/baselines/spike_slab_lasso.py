@@ -227,8 +227,16 @@ class SpikeSlabLasso:
 
         # Compute Gelman-Rubin diagnostic
         from .diagnostics import gelman_rubin, check_convergence
-        self.rhat_ = gelman_rubin(self.chains_)
-        self.converged_ = check_convergence(self.chains_, threshold=1.1)
+        if self.chains_.shape[0] < 2:
+            # warnings.warn(
+            #     "Gelman-Rubin diagnostic requires at least 2 chains. "
+            #     "Skipping convergence check."
+            # )
+            self.rhat_ = np.array([np.nan] * n_features)
+            self.converged_ = False
+        else:
+            self.rhat_ = gelman_rubin(self.chains_)
+            self.converged_ = check_convergence(self.chains_, threshold=1.1)
 
         if self.verbose:
             print(f"  Convergence: {self.converged_} (max R-hat: {np.max(self.rhat_):.4f})")

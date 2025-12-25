@@ -287,7 +287,7 @@ def run_spike_slab_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best,
 
     # SSL-specific metrics
     mean_inclusion_prob = np.mean(ssl.inclusion_probs_)
-    posterior_theta = ssl.posterior_theta_
+    # posterior_theta = ssl.posterior_theta_
     n_selected_features = np.sum(ssl.inclusion_probs_ > 0.5)
 
     # Extract posterior samples and compute coverage metrics
@@ -311,7 +311,7 @@ def run_spike_slab_lasso(y: np.ndarray, X: np.ndarray, D: np.ndarray, true_best,
         "converged": converged,
         "max_rhat": max_rhat,
         "mean_inclusion_prob": mean_inclusion_prob,
-        "posterior_theta": posterior_theta,
+        # "posterior_theta": posterior_theta,
         "n_selected_features": n_selected_features,
         "iou_coverage": iou_coverage,
         "min_dosage_coverage": min_dosage_coverage,
@@ -419,15 +419,18 @@ if __name__ == "__main__":
 
     # Simulation parameters and variables
     if args.test:
-        samples_per_pol = [10, 50]
-        num_sims = 5
-        if verbose:
-            print("Running in TEST mode: 2 sample sizes, 5 iterations, reduced MCMC/bootstrap samples")
+        samples_per_pol_default = [10, 50]
+        num_sims_default = 5
+        prefix = "Running in TEST mode."
     else:
-        samples_per_pol = args.samples if args.samples is not None else [10, 20, 50, 100, 500, 1000]
-        num_sims = args.iters if args.iters is not None else 100
+        samples_per_pol_default = [10, 20, 50, 100, 500, 1000]
+        num_sims_default = 100
+        prefix = ""
+    samples_per_pol = args.samples if args.samples is not None else samples_per_pol_default
+    num_sims = args.iters if args.iters is not None else num_sims_default
 
     if verbose:
+        print(prefix)
         print(f"Methods to run: {methods_to_run}")
         print(f"Sample sizes: {samples_per_pol}")
         print(f"Iterations: {num_sims}")
@@ -477,31 +480,31 @@ if __name__ == "__main__":
     # Spike and Slab Lasso parameters
     if args.test:
         ssl_params = {
-            "n_iter": 5000,
-            "burnin": 2000,
-            "thin": 2,
-            "n_chains": 3,
-            "lambda0": 15.0,
-            "lambda1": 1.0,
-            "theta_init": 0.5,
+            "n_iter": 500,
+            "burnin": 10,
+            "thin": 1,
+            "n_chains": 1,
+            "lambda0": 1.0,
+            "lambda1": 2.0,
+            "theta_init": 0.3,
             "update_theta": True,
-            "theta_a": 1.0,
-            "theta_b": 1.0,
-            "tau2_a": 1.0,
-            "tau2_b": 1.0
+            "theta_a": 1,
+            "theta_b": 1,
+            "tau2_a": 1e-1,
+            "tau2_b": 1e-1
         }
     else:
         ssl_params = {
-            "n_iter": 5000,
-            "burnin": 2000,
+            "n_iter": 2000,
+            "burnin": 200,
             "thin": 2,
             "n_chains": 3,
-            "lambda0": 10.0,
-            "lambda1": 0.5,
-            "theta_init": 0.5,
+            "lambda0": 1.0,
+            "lambda1": 2.0,
+            "theta_init": 0.3,
             "update_theta": True,
-            "theta_a": 1e-1,
-            "theta_b": 1e-1,
+            "theta_a": 1,
+            "theta_b": 1,
             "tau2_a": 1e-1,
             "tau2_b": 1e-1
         }
@@ -728,15 +731,15 @@ if __name__ == "__main__":
             if "ssl" in methods_to_run:
                 ssl_result = run_spike_slab_lasso(y, D_matrix, D, true_best, min_dosage_best_policy,
                                                   ssl_params, sim_i, verbose=False)
-                ssl_list_i = [
-                    n_per_pol, sim_i, ssl_result["sqrd_err"],
-                    ssl_result["iou_ssl"], ssl_result["min_dosage_present_ssl"],
-                    ssl_result["best_policy_error_ssl"], ssl_result["converged"],
-                    ssl_result["max_rhat"], ssl_result["mean_inclusion_prob"],
-                    ssl_result["posterior_theta"], ssl_result["n_selected_features"],
-                    ssl_result["iou_coverage"], ssl_result["min_dosage_coverage"]
-                ]
-                ssl_list.append(ssl_list_i)
+                # ssl_list_i = [
+                #     n_per_pol, sim_i, ssl_result["sqrd_err"],
+                #     ssl_result["iou_ssl"], ssl_result["min_dosage_present_ssl"],
+                #     ssl_result["best_policy_error_ssl"], ssl_result["converged"],
+                #     ssl_result["max_rhat"], ssl_result["mean_inclusion_prob"],
+                #     ssl_result["posterior_theta"], ssl_result["n_selected_features"],
+                #     ssl_result["iou_coverage"], ssl_result["min_dosage_coverage"]
+                # ]
+                # ssl_list.append(ssl_list_i)
 
                 # Store per-sample results
                 coef_samples = ssl_result["coef_samples"]
