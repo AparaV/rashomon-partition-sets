@@ -1,8 +1,3 @@
-- Run SSL for sim 2
-- Run PPMx for sim 2
-    - Write R code
-    - Write python analysis code
-- Make plots for sim 2
 - Clean plots
     - Common font scheme
     - Common color scheme
