@@ -198,3 +198,50 @@ def compute_min_dosage_coverage(coef_samples, X, D, min_dosage_best_policy, y_pr
             coverage_sum += 1.0
 
     return coverage_sum / n_samples
+
+
+def compute_posterior_weights(df, neg_log_posterior_col='neg_log_posterior',
+                              group_cols=None):
+    """
+    Compute normalized posterior weights for samples using softmax.
+
+    This function converts negative log posterior values to posterior probabilities
+    via the softmax transformation, normalized within each simulation group.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with samples/models
+    neg_log_posterior_col : str, default='neg_log_posterior'
+        Column name containing negative log posterior values
+    group_cols : list of str, optional
+        Columns to group by for normalization. Default is ['n_per_pol', 'sim_num']
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of input dataframe with added columns:
+        - 'log_posterior': Converted log posterior values
+        - 'log_posterior_normalized': Log posterior normalized to max=0 within groups
+        - 'posterior_weight': Softmax-normalized posterior probabilities (sum to 1 per group)
+    """
+    if group_cols is None:
+        group_cols = ['n_per_pol', 'sim_num']
+
+    df_copy = df.copy()
+
+    # Convert to log posterior
+    df_copy['log_posterior'] = -df_copy[neg_log_posterior_col]
+
+    # Normalize log posterior to max=0 within each group (for numerical stability)
+    df_copy['log_posterior_normalized'] = df_copy.groupby(group_cols)['log_posterior'].transform(
+        lambda x: x - x.max()
+    )
+
+    # Compute posterior weights via softmax
+    df_copy['posterior_weight'] = np.exp(df_copy['log_posterior_normalized'])
+    df_copy['posterior_weight'] = df_copy.groupby(group_cols)['posterior_weight'].transform(
+        lambda x: x / x.sum()
+    )
+
+    return df_copy
