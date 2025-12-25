@@ -10,7 +10,7 @@ from rashomon import hasse
 from rashomon import metrics
 from rashomon.aggregate import RAggregate_profile
 from rashomon.extract_pools import extract_pools
-from baselines import BayesianLasso, BootstrapLasso, PPMx, TVA
+from baselines import BayesianLasso, BootstrapLasso, TVA
 
 from typing import Dict
 
@@ -24,7 +24,7 @@ def parse_arguments():
         "--methods",
         type=str,
         nargs="+",
-        choices=["rashomon", "lasso", "tva", "blasso", "bootstrap", "ppmx"],
+        choices=["rashomon", "lasso", "tva", "blasso", "bootstrap", "ssl"],
         default=["rashomon", "lasso", "tva", "blasso", "bootstrap"],
         help="Methods to run (default: all methods)"
     )
@@ -453,7 +453,10 @@ if __name__ == "__main__":
             # df = pd.DataFrame(data, columns=column_names)
             # df.to_csv("../Data/sims2/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
             # pol_means_df = pd.DataFrame(pol_means, columns=["sumDi", "numDi"])
-            # pol_means_df.to_csv("../Data/sims2/sim_pol_means_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
+            # pol_means_df.to_csv(
+            #     "../Data/sims2/sim_pol_means_" + str(n_per_pol) + "_" + str(sim_i) + ".csv",
+            #     index=False
+            # )
 
             # continue
 
@@ -609,71 +612,6 @@ if __name__ == "__main__":
                     ]
                     bootstrap_samples_list.append(sample_list)
 
-            # Run PPMx
-            if "ppmx" in methods_to_run:
-                ppmx = PPMx(
-                    n_iter=ppmx_params["n_iter"],
-                    burnin=ppmx_params["burnin"],
-                    thin=ppmx_params["thin"],
-                    alpha=ppmx_params["alpha"],
-                    cohesion=ppmx_params["cohesion"],
-                    similarity_weight=ppmx_params["similarity_weight"],
-                    similarity_bandwidth=ppmx_params["similarity_bandwidth"],
-                    random_state=sim_i,
-                    verbose=False
-                )
-
-                # X contains policy features, D contains policy assignments
-                ppmx.fit(X, y, D)
-                y_ppmx = ppmx.predict(X)
-
-                # Compute point estimate metrics (using mean predictions)
-                mse = mean_squared_error(y, y_ppmx)
-
-                # IOU (point estimate)
-                ppmx_best = metrics.find_best_policies(D, y_ppmx)
-                iou_ppmx = metrics.intersect_over_union(set(true_best), set(ppmx_best))
-
-                # Min dosage inclusion (point estimate)
-                min_dosage_present_ppmx = metrics.check_membership(min_dosage_best_policy, ppmx_best)
-
-                # Best policy error (point estimate)
-                best_policy_error_ppmx = np.max(mu) - np.max(y_ppmx)
-
-                # PPMx diagnostics
-                mean_n_clusters = np.mean([len(np.unique(partition)) for partition in ppmx.partition_samples_])
-                acceptance_rate = ppmx.acceptance_rate_
-
-                # Extract posterior samples and convert to coefficient matrix
-                # For each partition sample, compute cluster means and map to coefficients
-                n_samples = len(ppmx.partition_samples_)
-                n_policies = len(policies)
-                coef_samples = np.zeros((n_samples, n_policies))
-
-                for sample_idx, (partition, cluster_means) in enumerate(zip(ppmx.partition_samples_, ppmx.cluster_means_samples_)):
-                    # Map cluster means to policies based on partition
-                    for policy_idx in range(n_policies):
-                        cluster_id = partition[policy_idx]
-                        coef_samples[sample_idx, policy_idx] = cluster_means[cluster_id]
-
-                # For coverage metrics, create one-hot encoding of policy assignments
-                # This maps observations to policies for prediction
-                n_obs = len(D)
-                policy_indicator = np.zeros((n_obs, n_policies))
-                for obs_idx in range(n_obs):
-                    policy_id = D[obs_idx, 0]
-                    policy_indicator[obs_idx, policy_id] = 1.0
-
-                # Compute distribution-based metrics
-                iou_coverage = metrics.compute_iou_coverage(coef_samples, policy_indicator, D, true_best)
-                min_dosage_coverage = metrics.compute_min_dosage_coverage(
-                    coef_samples, policy_indicator, D, min_dosage_best_policy)
-
-                ppmx_list_i = [n_per_pol, sim_i, mse, iou_ppmx, min_dosage_present_ppmx,
-                               best_policy_error_ppmx, mean_n_clusters, acceptance_rate,
-                               iou_coverage, min_dosage_coverage]
-                ppmx_list.append(ppmx_list_i)
-
     # import sys
     # sys.exit(0)
 
@@ -683,55 +621,66 @@ if __name__ == "__main__":
         suffix += "_test"
 
     if "rashomon" in methods_to_run:
-        rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
-        rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
-        rashomon_df.to_csv(f"../Results/worst_case/worst_case_rashomon{suffix}.csv")
-        if verbose:
-            print(f"Saved Rashomon results to worst_case_rashomon{suffix}.csv")
+        if len(rashomon_list) > 0:
+            rashomon_cols = ["n_per_pol", "sim_num", "num_pools", "MSE", "IOU", "min_dosage", "best_pol_diff"]
+            rashomon_df = pd.DataFrame(rashomon_list, columns=rashomon_cols)
+            rashomon_df.to_csv(f"../Results/worst_case/worst_case_rashomon{suffix}.csv")
+            if verbose:
+                print(f"Saved Rashomon results to worst_case_rashomon{suffix}.csv")
+        else:
+            if verbose:
+                print("No Rashomon results to save.")
 
     if "lasso" in methods_to_run:
-        lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
-        lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
-        lasso_df.to_csv(f"../Results/worst_case/worst_case_lasso{suffix}.csv")
-        if verbose:
-            print(f"Saved Lasso results to worst_case_lasso{suffix}.csv")
+        if len(lasso_list) > 0:
+            lasso_cols = ["n_per_pol", "sim_num", "MSE", "L1_loss", "IOU", "min_dosage", "best_pol_diff"]
+            lasso_df = pd.DataFrame(lasso_list, columns=lasso_cols)
+            lasso_df.to_csv(f"../Results/worst_case/worst_case_lasso{suffix}.csv")
+            if verbose:
+                print(f"Saved Lasso results to worst_case_lasso{suffix}.csv")
+        else:
+            if verbose:
+                print("No Lasso results to save.")
 
     if "tva" in methods_to_run:
-        tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
-        tva_df = pd.DataFrame(tva_list, columns=tva_cols)
-        tva_df.to_csv(f"../Results/worst_case/worst_case_tva{suffix}.csv")
-        if verbose:
-            print(f"Saved TVA results to worst_case_tva{suffix}.csv")
+        if len(tva_list) > 0:
+            tva_cols = ["n_per_pol", "sim_num", "MSE", "TVA_loss", "IOU", "min_dosage", "best_pol_diff"]
+            tva_df = pd.DataFrame(tva_list, columns=tva_cols)
+            tva_df.to_csv(f"../Results/worst_case/worst_case_tva{suffix}.csv")
+            if verbose:
+                print(f"Saved TVA results to worst_case_tva{suffix}.csv")
+        else:
+            if verbose:
+                print("No TVA results to save.")
 
     if "blasso" in methods_to_run:
-        blasso_samples_cols = [
-            "n_per_pol", "sim_num", "sample_idx",
-            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
-            "converged", "max_rhat"
-        ]
-        blasso_samples_df = pd.DataFrame(blasso_samples_list, columns=blasso_samples_cols)
-        blasso_samples_df.to_csv(f"../Results/worst_case/worst_case_blasso{suffix}.csv")
-        if verbose:
-            print(f"Saved Bayesian Lasso results to worst_case_blasso{suffix}.csv")
+        if len(blasso_samples_list) > 0:
+            blasso_samples_cols = [
+                "n_per_pol", "sim_num", "sample_idx",
+                "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
+                "converged", "max_rhat"
+            ]
+            blasso_samples_df = pd.DataFrame(blasso_samples_list, columns=blasso_samples_cols)
+            blasso_samples_df.to_csv(f"../Results/worst_case/worst_case_blasso{suffix}.csv")
+            if verbose:
+                print(f"Saved Bayesian Lasso results to worst_case_blasso{suffix}.csv")
+        else:
+            if verbose:
+                print("No Bayesian Lasso results to save.")
 
     if "bootstrap" in methods_to_run:
-        bootstrap_samples_cols = [
-            "n_per_pol", "sim_num", "sample_idx",
-            "penalized_loss", "MSE", "IOU", "min_dosage", "best_pol_diff"
-        ]
-        bootstrap_samples_df = pd.DataFrame(bootstrap_samples_list, columns=bootstrap_samples_cols)
-        bootstrap_samples_df.to_csv(f"../Results/worst_case/worst_case_bootstrap{suffix}.csv")
-        if verbose:
-            print(f"Saved Bootstrap Lasso results to worst_case_bootstrap{suffix}.csv")
-
-    if "ppmx" in methods_to_run:
-        ppmx_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
-                     "mean_n_clusters", "acceptance_rate",
-                     "IOU_coverage", "min_dosage_coverage"]
-        ppmx_df = pd.DataFrame(ppmx_list, columns=ppmx_cols)
-        ppmx_df.to_csv(f"../Results/worst_case/worst_case_ppmx{suffix}.csv")
-        if verbose:
-            print(f"Saved PPMx results to worst_case_ppmx{suffix}.csv")
+        if len(bootstrap_samples_list) > 0:
+            bootstrap_samples_cols = [
+                "n_per_pol", "sim_num", "sample_idx",
+                "penalized_loss", "MSE", "IOU", "min_dosage", "best_pol_diff"
+            ]
+            bootstrap_samples_df = pd.DataFrame(bootstrap_samples_list, columns=bootstrap_samples_cols)
+            bootstrap_samples_df.to_csv(f"../Results/worst_case/worst_case_bootstrap{suffix}.csv")
+            if verbose:
+                print(f"Saved Bootstrap Lasso results to worst_case_bootstrap{suffix}.csv")
+        else:
+            if verbose:
+                print("No Bootstrap Lasso results to save.")
 
     if verbose:
         print("\nSimulations complete!")
