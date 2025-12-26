@@ -178,9 +178,17 @@ def plot_single_metric_bar(comparison_df, metric_column, ax=None,
     if metric_column not in comparison_df.columns:
         raise ValueError(f"Column '{metric_column}' not found in dataframe")
 
-    # Get colors based on method names
-    colors = [METHOD_COLORS.get(m.lower(), 'gray')
-              for m in comparison_df['Method']]
+    # Map display names back to method keys for color lookup
+    name_to_key = {v: k for k, v in METHOD_NAMES.items()}
+    colors = []
+    for m in comparison_df['Method']:
+        # Try exact match with METHOD_NAMES values
+        key = name_to_key.get(m)
+        if key is None:
+            # Try lowercase match as fallback
+            key = m.lower().replace(' ', '')
+        colors.append(METHOD_COLORS.get(key, 'gray'))
+
     x_pos = np.arange(len(comparison_df))
 
     # Extract values more robustly - handle various DataFrame structures
