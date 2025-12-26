@@ -25,11 +25,16 @@ def parse_arguments():
                         help="Number of samples per feature combination")
     parser.add_argument("--iters", type=int, default=5,
                         help="Number of iterations")
-    parser.add_argument("--output_prefix", type=str, required=True,
+    parser.add_argument("--output_prefix", type=str, required=False,
                         help="Prefix for output file name")
-    parser.add_argument("--method", type=str, required=True,
+    parser.add_argument("--method", type=str, required=False,
                         help="One of {r, lasso, blasso, bootstrap, ssl}")
-
+    parser.add_argument(
+        "--store-data",
+        action="store_true",
+        dest="store_data",
+        help="Store simulation data"
+    )
     parser.add_argument(
         "--test",
         action="store_true",
@@ -38,14 +43,8 @@ def parse_arguments():
     parser.add_argument(
         "--verbose",
         action="store_true",
-        default=True,
+        default=False,
         help="Print progress information (default: True)"
-    )
-    parser.add_argument(
-        "--no-verbose",
-        action="store_false",
-        dest="verbose",
-        help="Disable progress printing"
     )
     args = parser.parse_args()
     return args
@@ -111,6 +110,12 @@ def hash_best_policies(y_pred, D, all_policies, profile_map):
 if __name__ == "__main__":
 
     args = parse_arguments()
+
+    if args.output_prefix is None or args.method is None:
+        if not args.store_data:
+            msg = "Both --output_prefix and --method arguments are required. "
+            msg += "Use --store-data to only store simulation data without running methods."
+            raise ValueError(msg)
 
     # from sim_4_params import M, R, sigma, mu, var
     params_module_name = args.params
@@ -308,12 +313,12 @@ if __name__ == "__main__":
             # The dummy matrix for Lasso
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
 
-            # column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
-            # data = np.hstack([X, y])
-            # df = pd.DataFrame(data, columns=column_names)
-            # df.to_csv("../Data/sims/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
-
-            # continue
+            # Store data
+            if args.store_data:
+                column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
+                data = np.hstack([X, y])
+                df = pd.DataFrame(data, columns=column_names)
+                df.to_csv("../Data/reff_sims/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
 
             #
             # Run Rashomon

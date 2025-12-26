@@ -8,7 +8,7 @@ from copy import deepcopy
 from rashomon import extract_pools
 from rashomon import metrics
 
-from run_reff_simulations import generate_data
+from reff_simulations import generate_data
 
 
 def read_ppmx_sim_data(file_dir, sim_num):
@@ -55,10 +55,6 @@ def setup_params(params_module_name="reff_4"):
     sigma = params.sigma
     mu = params.mu
     var = params.var
-    # H = params.H
-    # theta = params.theta
-    # reg = params.reg
-    # lasso_reg = params.lasso_reg
 
     num_profiles = 2**M
     profiles, profile_map = hasse.enumerate_profiles(M)
@@ -138,8 +134,8 @@ def setup_params(params_module_name="reff_4"):
 
 if __name__ == "__main__":
 
-    raw_file_dir = "../Data/sims"
-    results_file_dir = "../../PPMxReplicate/Results/posterior"
+    raw_file_dir = "../Data/reff_sims"
+    results_file_dir = "../Results/reff/ppmx"
     output_dir = "../Results/4arms/"
     verbose = True
 

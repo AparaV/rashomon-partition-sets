@@ -25,7 +25,7 @@ def parse_arguments():
         type=str,
         nargs="+",
         choices=["rashomon", "lasso", "tva", "blasso", "bootstrap", "ssl"],
-        default=["rashomon", "lasso", "tva", "blasso", "bootstrap"],
+        default=None,
         help="Methods to run (default: all methods)"
     )
     parser.add_argument(
@@ -55,14 +55,14 @@ def parse_arguments():
     parser.add_argument(
         "--verbose",
         action="store_true",
-        default=True,
+        default=False,
         help="Print progress information (default: True)"
     )
     parser.add_argument(
-        "--no-verbose",
-        action="store_false",
-        dest="verbose",
-        help="Disable progress printing"
+        "--store-data",
+        action="store_true",
+        dest="store_data",
+        help="Store simulation data"
     )
     return parser.parse_args()
 
@@ -352,6 +352,12 @@ if __name__ == "__main__":
 
     args = parse_arguments()
 
+    if args.methods is None:
+        if not args.store_data:
+            msg = "No methods specified. Please provide methods using --methods argument. "
+            msg += "Use --store-data to only store simulation data without running methods."
+            raise ValueError(msg)
+
     np.random.seed(3)
 
     #
@@ -378,32 +384,12 @@ if __name__ == "__main__":
     # The transformation matrix for Lasso
     G = hasse.alpha_matrix(policies)
 
-    # # Anirudh's method
-    # alpha = np.zeros((num_policies, 1))
-    # for i, pol in enumerate(policies):
-    #     if pol[0] <= 2 and pol[1] <= 2:
-    #         alpha[i, 0] = 0
-    #     else:
-    #         arm_a = pol[0]
-    #         arm_b = pol[1] - 1
-    #         alpha[i, 0] = -1 + 0.1 * arm_b  #+ np.random.normal(0, 0.01)
-    #     print(f"Policy {i}: {pol}, alpha: {alpha[i, 0]}")
-    # mu = np.matmul(G, alpha)[::-1]
-    # print(mu)
-
-    # Set data parameters
-    # # Original parameters
-    # mu_pools = np.array([0, 1.5, 3, 3, 6, 4.5])
-
     # New parameters to break TVA
     mu_pools = np.array([0, 1.5, 3, 4.5])
     mu = np.zeros((num_policies, 1))
     for idx, policy in enumerate(policies):
         pool_i = pi_policies[idx]
         mu[idx, 0] = mu_pools[pool_i]
-        # var_i = var[pool_i]
-    # se = 1
-    # var = se * np.ones_like(mu)
     var = 1
 
     # true_best = pi_pools[np.argmax(mu)]
@@ -539,18 +525,17 @@ if __name__ == "__main__":
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
 
-            # # Save simulation data
-            # column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
-            # data = np.hstack([X, y])
-            # df = pd.DataFrame(data, columns=column_names)
-            # df.to_csv("../Data/sims2/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
-            # pol_means_df = pd.DataFrame(pol_means, columns=["sumDi", "numDi"])
-            # pol_means_df.to_csv(
-            #     "../Data/sims2/sim_pol_means_" + str(n_per_pol) + "_" + str(sim_i) + ".csv",
-            #     index=False
-            # )
-
-            # continue
+            # Save simulation data
+            if args.store_data:
+                column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
+                data = np.hstack([X, y])
+                df = pd.DataFrame(data, columns=column_names)
+                df.to_csv("../Data/worst_case_sims/sim_data_" + str(n_per_pol) + "_" + str(sim_i) + ".csv", index=False)
+                pol_means_df = pd.DataFrame(pol_means, columns=["sumDi", "numDi"])
+                pol_means_df.to_csv(
+                    "../Data/worst_case_sims/sim_pol_means_" + str(n_per_pol) + "_" + str(sim_i) + ".csv",
+                    index=False
+                )
 
             #
             # Run Rashomon
