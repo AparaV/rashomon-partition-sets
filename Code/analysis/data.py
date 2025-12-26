@@ -23,7 +23,7 @@ METHOD_CONFIG = {
         'columns_to_drop': ['MSE', 'IOU', 'min_dosage', 'best_pol_diff'],
     },
     'blasso': {
-        'filename': 'blasso_samples',
+        'filename': 'blasso',
         'loss_col': 'neg_log_posterior',
         'needs_loss_computation': False,
         'sign_flip': False,
@@ -48,13 +48,6 @@ METHOD_CONFIG = {
     },
     'bootstrap': {
         'filename': 'bootstrap',
-        'loss_col': None,  # Summary file, no loss column
-        'needs_loss_computation': False,
-        'sign_flip': False,
-        'columns_to_drop': ['MSE', 'IOU', 'min_dosage', 'best_pol_diff'],
-    },
-    'bootstrap_samples': {
-        'filename': 'bootstrap_samples',
         'loss_col': 'penalized_loss',
         'needs_loss_computation': False,
         'sign_flip': False,

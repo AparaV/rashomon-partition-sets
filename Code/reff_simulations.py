@@ -219,7 +219,6 @@ if __name__ == "__main__":
     lasso_fname = args.output_prefix + "_lasso" + output_suffix
     blasso_fname = args.output_prefix + "_blasso" + output_suffix
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
-    bootstrap_samples_fname = args.output_prefix + "_bootstrap_samples" + output_suffix
     ssl_fname = args.output_prefix + "_ssl" + output_suffix
 
     if verbose:
@@ -549,9 +548,9 @@ if __name__ == "__main__":
                     min_dosage_best_policy, true_best_effect)
                 sqrd_err_bootstrap = bootstrap_results["sqrd_err"]
                 iou_bootstrap = bootstrap_results["iou"]
-                best_profile_indicator_bootstrap = bootstrap_results["best_prof"]
-                min_dosage_present_bootstrap = bootstrap_results["min_dos_inc"]
-                best_policy_diff_bootstrap = bootstrap_results["best_pol_diff"]
+                # best_profile_indicator_bootstrap = bootstrap_results["best_prof"]
+                # min_dosage_present_bootstrap = bootstrap_results["min_dos_inc"]
+                # best_policy_diff_bootstrap = bootstrap_results["best_pol_diff"]
 
                 # Store bootstrap-specific diagnostics
                 coverage = bootstrap.coverage_
@@ -600,17 +599,6 @@ if __name__ == "__main__":
 
                     # Accumulate for average
                     profile_indicators_sum += np.array(profile_indicator_sample)
-
-                avg_profile_indicators = (profile_indicators_sum / n_bootstrap_samples).tolist()
-
-                this_list = [
-                    n_per_pol, sim_i, sqrd_err_bootstrap, iou_bootstrap,
-                    min_dosage_present_bootstrap, best_policy_diff_bootstrap,
-                    coverage, mean_ci_width, n_stable_features,
-                    iou_coverage, min_dosage_coverage
-                ]
-                this_list += avg_profile_indicators
-                bootstrap_list.append(this_list)
 
             #
             # Run Spike-Slab Lasso
@@ -745,25 +733,15 @@ if __name__ == "__main__":
             print(f"\nSaved Bayesian Lasso results to {blasso_fname}")
 
     if method == "bootstrap":
-        bootstrap_cols = ["n_per_pol", "sim_num", "MSE", "IOU", "min_dosage", "best_pol_diff",
-                          "coverage", "mean_ci_width", "n_stable_features",
-                          "IOU_coverage", "min_dosage_coverage"]
-        bootstrap_cols += profiles_str
-        bootstrap_df = pd.DataFrame(bootstrap_list, columns=bootstrap_cols)
-        bootstrap_df.to_csv(os.path.join(output_dir, bootstrap_fname))
-        if verbose:
-            print(f"\nSaved Bootstrap Lasso results to {bootstrap_fname}")
-
-        # Save sample-level results
         bootstrap_samples_cols = [
             "n_per_pol", "sim_num", "sample_idx",
             "penalized_loss", "MSE", "IOU", "min_dosage", "best_pol_diff"
         ]
         bootstrap_samples_cols += profiles_str
         bootstrap_samples_df = pd.DataFrame(bootstrap_samples_list, columns=bootstrap_samples_cols)
-        bootstrap_samples_df.to_csv(os.path.join(output_dir, bootstrap_samples_fname))
+        bootstrap_samples_df.to_csv(os.path.join(output_dir, bootstrap_fname))
         if verbose:
-            print(f"Saved Bootstrap Lasso sample-level results to {bootstrap_samples_fname}")
+            print(f"Saved Bootstrap Lasso results to {bootstrap_fname}")
 
     if method == "ssl":
         ssl_cols = [

@@ -56,7 +56,7 @@ EPS_MAX_CUTOFF = 15  # For Bayesian methods, cap epsilon at 25%
 
 # Methods to analyze
 METHODS_BAYESIAN = ['rashomon', 'blasso', 'ssl', 'ppmx']  # Methods with posterior
-METHODS_FREQUENTIST = ['bootstrap_samples']  # Methods without posterior
+METHODS_FREQUENTIST = ['bootstrap']  # Methods without posterior
 METHOD_LASSO = 'lasso'  # Point estimate baseline
 
 # Figures directory
@@ -110,9 +110,9 @@ for method in METHODS_BAYESIAN:
     print(f"  {len(df)} samples loaded")
 
 # Load Bootstrap
-print("Loading bootstrap_samples...")
-df = load_simulation_results('bootstrap_samples', N_PER_POL, N_SIMS, RESULTS_DIR, FILE_PREFIX)
-df = prepare_method_dataframe(df, 'bootstrap_samples', true_best_profile)
+print("Loading bootstrap...")
+df = load_simulation_results('bootstrap', N_PER_POL, N_SIMS, RESULTS_DIR, FILE_PREFIX)
+df = prepare_method_dataframe(df, 'bootstrap', true_best_profile)
 data['bootstrap'] = df
 print(f"  {len(df)} samples loaded")
 
