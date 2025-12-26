@@ -19,7 +19,7 @@ from baselines import SpikeSlabLasso
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Parse command line arguments")
-    parser.add_argument("--params", type=str, default="reff_4",
+    parser.add_argument("--params", type=str, default="reff_params",
                         help=".py file where parameters are stored")
     parser.add_argument("--sample_size", type=int, default=10,
                         help="Number of samples per feature combination")
