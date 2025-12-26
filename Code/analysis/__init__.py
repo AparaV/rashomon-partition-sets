@@ -5,10 +5,18 @@ This module provides tools for loading, processing, and analyzing simulation res
 from various methods (Rashomon sets, Bayesian Lasso, Spike-Slab Lasso, PPMx, Bootstrap).
 """
 
+from .config import (
+    METHOD_COLORS,
+    METHOD_NAMES,
+    METHOD_MARKERS,
+    MARKER_SIZES,
+)
+
 from .data import (
     load_simulation_results,
     setup_profile_config,
     prepare_method_dataframe,
+    aggregate_worst_case_results,
     METHOD_CONFIG,
 )
 
@@ -29,16 +37,25 @@ from .visualization import (
     plot_credible_interval_sweep,
     plot_coverage_vs_credible,
     plot_sample_size_vs_credible,
-    METHOD_COLORS,
-    METHOD_NAMES,
-    METHOD_MARKERS,
+    plot_method_comparison,
+    plot_method_panel_comparison,
+)
+
+from .heatmaps import (
+    plot_rashomon_heatmap_grid,
 )
 
 __all__ = [
+    # Config
+    'METHOD_COLORS',
+    'METHOD_NAMES',
+    'METHOD_MARKERS',
+    'MARKER_SIZES',
     # Data loading
     'load_simulation_results',
     'setup_profile_config',
     'prepare_method_dataframe',
+    'aggregate_worst_case_results',
     'METHOD_CONFIG',
     # Metrics
     'compute_frequency_inclusion',
@@ -55,7 +72,8 @@ __all__ = [
     'plot_credible_interval_sweep',
     'plot_coverage_vs_credible',
     'plot_sample_size_vs_credible',
-    'METHOD_COLORS',
-    'METHOD_NAMES',
-    'METHOD_MARKERS',
+    'plot_method_comparison',
+    'plot_method_panel_comparison',
+    # Heatmaps
+    'plot_rashomon_heatmap_grid',
 ]
