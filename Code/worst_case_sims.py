@@ -509,28 +509,6 @@ if __name__ == "__main__":
             "tau2_b": 1e-1
         }
 
-    # PPMx parameters
-    if args.test:
-        ppmx_params = {
-            "n_iter": 1000,
-            "burnin": 200,
-            "thin": 2,
-            "alpha": 1.0,
-            "cohesion": 'gaussian',
-            "similarity_weight": 0.5,
-            "similarity_bandwidth": 1.0
-        }
-    else:
-        ppmx_params = {
-            "n_iter": 5000,
-            "burnin": 1000,
-            "thin": 2,
-            "alpha": 1.0,
-            "cohesion": 'gaussian',
-            "similarity_weight": 0.5,
-            "similarity_bandwidth": 1.0
-        }
-
     # Simulation results data structure (initialize only for selected methods)
     rashomon_list = [] if "rashomon" in methods_to_run else None
     lasso_list = [] if "lasso" in methods_to_run else None
@@ -541,7 +519,6 @@ if __name__ == "__main__":
     bootstrap_samples_list = [] if "bootstrap" in methods_to_run else None
     ssl_list = [] if "ssl" in methods_to_run else None
     ssl_samples_list = [] if "ssl" in methods_to_run else None
-    ppmx_list = [] if "ppmx" in methods_to_run else None
 
     #
     # Simulations
@@ -562,7 +539,7 @@ if __name__ == "__main__":
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
             pol_means = loss.compute_policy_means(D, y, num_policies)
 
-            # # Save simulation data for PPMx
+            # # Save simulation data
             # column_names = [f"X{i}" for i in range(X.shape[1])] + ["y"]
             # data = np.hstack([X, y])
             # df = pd.DataFrame(data, columns=column_names)

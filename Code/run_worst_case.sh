@@ -11,8 +11,8 @@ if [ "$1" == "--test" ]; then
 fi
 
 # Methods to run (can be modified to run specific methods)
-# Options: rashomon, lasso, tva, blasso, bootstrap, ppmx
-METHODS=("rashomon" "lasso" "tva" "blasso" "bootstrap" "ppmx")
+# Options: rashomon, lasso, tva, blasso, bootstrap
+METHODS=("rashomon" "lasso" "tva" "blasso" "bootstrap")
 
 # Sample sizes (overridden in test mode to [10, 50])
 SAMPLE_SIZES=(10 20 50 100 500 1000)

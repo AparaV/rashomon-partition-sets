@@ -6,14 +6,12 @@ This module provides alternative regression methods including:
 - SpikeSlabLasso: Spike and Slab Lasso for Bayesian variable selection
 - BootstrapLasso: Bootstrap Lasso for empirical uncertainty quantification
 - TVA: Treatment Variance Analysis using Puffer transform
-- PPMx: Product Partition Model with Covariates
 """
 
 from .bayesian_lasso import BayesianLasso
 from .spike_slab_lasso import SpikeSlabLasso
 from .bootstrap_lasso import BootstrapLasso
 from .tva import TVA
-from .ppmx import PPMx
 from .diagnostics import (
     gelman_rubin,
     check_convergence,
@@ -27,7 +25,6 @@ __all__ = [
     'SpikeSlabLasso',
     'BootstrapLasso',
     'TVA',
-    'PPMx',
     'gelman_rubin',
     'check_convergence',
     'plot_traces',

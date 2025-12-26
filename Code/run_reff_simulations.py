@@ -28,14 +28,8 @@ def parse_arguments():
     parser.add_argument("--output_prefix", type=str, required=True,
                         help="Prefix for output file name")
     parser.add_argument("--method", type=str, required=True,
-                        help="One of {r, lasso, blasso, bootstrap, ssl, ppmx}")
-    parser.add_argument(
-        "--ppmx-backend",
-        type=str,
-        default="r",
-        choices=["python", "r"],
-        help="Backend for PPMx method: 'r' for R's ppmSuite (50-100x faster), 'python' for native implementation"
-    )
+                        help="One of {r, lasso, blasso, bootstrap, ssl}")
+
     parser.add_argument(
         "--test",
         action="store_true",
@@ -161,26 +155,6 @@ if __name__ == "__main__":
         bootstrap_confidence_level = getattr(params, 'bootstrap_confidence_level', 0.95)
         bootstrap_random_state = getattr(params, 'bootstrap_random_state', None)
 
-    # PPMx parameters (with defaults)
-    if args.test:
-        ppmx_n_iter = 1000
-        ppmx_burnin = 200
-        ppmx_thin = 2
-        ppmx_n_chains = 2
-        ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
-        ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
-        ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
-        ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
-    else:
-        ppmx_n_iter = getattr(params, 'ppmx_n_iter', 1000)
-        ppmx_burnin = getattr(params, 'ppmx_burnin', 500)
-        ppmx_thin = getattr(params, 'ppmx_thin', 2)
-        ppmx_n_chains = getattr(params, 'ppmx_n_chains', 4)
-        ppmx_alpha = getattr(params, 'ppmx_alpha', 1.0)
-        ppmx_cohesion = getattr(params, 'ppmx_cohesion', 'gaussian')
-        ppmx_similarity_weight = getattr(params, 'ppmx_similarity_weight', 0.5)
-        ppmx_similarity_bandwidth = getattr(params, 'ppmx_similarity_bandwidth', 1.0)
-
     # Spike-Slab Lasso parameters (with defaults)
     if args.test:
         ssl_n_iter = 1000
@@ -242,7 +216,6 @@ if __name__ == "__main__":
     bootstrap_fname = args.output_prefix + "_bootstrap" + output_suffix
     bootstrap_samples_fname = args.output_prefix + "_bootstrap_samples" + output_suffix
     ssl_fname = args.output_prefix + "_ssl" + output_suffix
-    ppmx_fname = args.output_prefix + "_ppmx" + output_suffix
 
     if verbose:
         print(f"Method to run: {args.method}")
@@ -300,8 +273,8 @@ if __name__ == "__main__":
 
     # Simulation results data structure
     method = args.method
-    if method not in ["r", "lasso", "blasso", "bootstrap", "ssl", "ppmx"]:
-        print(f"method should be one of [r, lasso, blasso, bootstrap, ssl, ppmx]. Received {method}. Defaulting to r")
+    if method not in ["r", "lasso", "blasso", "bootstrap", "ssl"]:
+        print(f"method should be one of [r, lasso, blasso, bootstrap, ssl]. Received {method}. Defaulting to r")
         method = "r"
     rashomon_list = []
     lasso_list = []
@@ -309,15 +282,6 @@ if __name__ == "__main__":
     bootstrap_list = []
     bootstrap_samples_list = []
     ssl_list = []
-    ppmx_list = []
-
-    if method == "ppmx":
-        # Try to import R backend, fall back to Python if unavailable
-        try:
-            from baselines.ppmx_r import PPMxR
-            HAS_PPMX_R = True
-        except (ImportError, RuntimeError):
-            HAS_PPMX_R = False
 
     np.random.seed(3)
 
@@ -745,107 +709,6 @@ if __name__ == "__main__":
 
                 avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
-                # Store summary info in first sample row via special fields
-                # (we only keep sample-level output now)
-
-            #
-            # Run PPMx
-            #
-            if method == "ppmx":
-                # Select backend (R or Python)
-                if args.ppmx_backend == "r" and HAS_PPMX_R:
-                    PPMxClass = PPMxR
-                    if verbose:
-                        print("Using R backend (ppmSuite) for PPMx")
-                else:
-                    raise RuntimeError("R backend for PPMx not available. Please ensure ppmSuite is installed in R.")
-
-                ppmx = PPMxClass(
-                    n_iter=ppmx_n_iter,
-                    burnin=ppmx_burnin,
-                    thin=ppmx_thin,
-                    alpha=ppmx_alpha,
-                    cohesion=ppmx_cohesion,
-                    similarity_weight=ppmx_similarity_weight,
-                    similarity_bandwidth=ppmx_similarity_bandwidth,
-                    random_state=sim_i,
-                    verbose=verbose
-                )
-                ppmx.fit(X, y, D, n_chains=ppmx_n_chains)
-
-                # Store convergence information
-                converged = ppmx.converged_
-                max_rhat = np.max(ppmx.rhat_)
-
-                # Extract posterior samples (coefficient samples already computed)
-                coef_samples = ppmx.coef_samples_
-                n_posterior_samples = coef_samples.shape[0]
-
-                # Compute coverage metrics
-                iou_coverage = metrics.compute_iou_coverage(coef_samples, D_matrix, D, true_best)
-                min_dosage_coverage = metrics.compute_min_dosage_coverage(
-                    coef_samples, D_matrix, D, min_dosage_best_policy)
-
-                # Get cached log posterior densities (computed during fit)
-                log_posteriors = ppmx.get_log_posteriors()
-                # Handle R backend which doesn't compute log posteriors
-                if log_posteriors is None:
-                    neg_log_posteriors = np.zeros(n_posterior_samples)
-                else:
-                    neg_log_posteriors = -log_posteriors  # Convert to loss (lower is better)
-
-                # Compute average profile indicators and store individual sample results
-                profile_indicators_sum = np.zeros(len(profiles))
-
-                for sample_idx in range(n_posterior_samples):
-                    coef_sample = coef_samples[sample_idx]
-                    # Map each observation to its policy's predicted outcome
-                    # D contains policy indices, coef_sample contains outcome for each unique policy
-                    y_sample = coef_sample[D.flatten()].reshape(-1, 1)
-
-                    # Get number of clusters for this specific sample
-                    n_clusters_sample = ppmx.n_clusters_samples_[sample_idx]
-
-                    if sample_idx == 0:
-                        print(coef_sample)
-
-                    # Compute metrics for this sample
-                    sample_results = metrics.compute_all_metrics(
-                        y, y_sample, D, true_best, all_policies, profile_map,
-                        min_dosage_best_policy, true_best_effect)
-
-                    sqrd_err_sample = sample_results["sqrd_err"]
-                    iou_sample = sample_results["iou"]
-                    profile_indicator_sample = sample_results["best_prof"]
-                    min_dosage_sample = sample_results["min_dos_inc"]
-                    best_pol_diff_sample = sample_results["best_pol_diff"]
-
-                    # Accumulate for average
-                    profile_indicators_sum += np.array(profile_indicator_sample)
-
-                    # Store individual sample results with summary metrics
-                    sample_list = [
-                        n_per_pol, sim_i, sample_idx,
-                        neg_log_posteriors[sample_idx],  # loss (negative log posterior)
-                        sqrd_err_sample,  # MSE component of loss
-                        iou_sample,
-                        min_dosage_sample,
-                        best_pol_diff_sample,
-                        converged,
-                        max_rhat,
-                        iou_coverage,
-                        min_dosage_coverage,
-                        n_clusters_sample,  # number of clusters for this sample
-                        ppmx.acceptance_rate_
-                    ]
-                    sample_list += profile_indicator_sample
-                    ppmx_list.append(sample_list)
-
-                avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
-
-                # Store summary info in first sample row via special fields
-                # (we only keep sample-level output now)
-
     profiles_str = [str(prof) for prof in profiles]
 
     if method == "r":
@@ -909,19 +772,6 @@ if __name__ == "__main__":
         ssl_df.to_csv(os.path.join(output_dir, ssl_fname))
         if verbose:
             print(f"\nSaved Spike-Slab Lasso results to {ssl_fname}")
-
-    if method == "ppmx":
-        ppmx_cols = [
-            "n_per_pol", "sim_num", "sample_idx",
-            "neg_log_posterior", "MSE", "IOU", "min_dosage", "best_pol_diff",
-            "converged", "max_rhat", "IOU_coverage", "min_dosage_coverage",
-            "n_clusters", "acceptance_rate"
-        ]
-        ppmx_cols += profiles_str
-        ppmx_df = pd.DataFrame(ppmx_list, columns=ppmx_cols)
-        ppmx_df.to_csv(os.path.join(output_dir, ppmx_fname))
-        if verbose:
-            print(f"\nSaved PPMx results to {ppmx_fname}")
 
     if verbose:
         print("\nSimulations complete!")
