@@ -479,12 +479,12 @@ def plot_credible_interval_sweep(sweep_results, methods=None,
 
     # Plot 3: Coverage (magnified)
     plot_coverage_vs_credible(sweep_results, methods, ax=axes[1, 0],
-                              xlim=(99, 100), use_log_x=True,
+                              xlim=(99, 100+1e-2), use_log_x=True,
                               show_legend=False, title_suffix=' (Magnified)')
 
     # Plot 4: Sample size (magnified)
     plot_sample_size_vs_credible(sweep_results, methods, ax=axes[1, 1],
-                                 xlim=(99, 100), use_log_x=True,
+                                 xlim=(99, 100+1e-2), use_log_x=True,
                                  show_legend=False, title_suffix=' (Magnified)')
 
     plt.tight_layout()
