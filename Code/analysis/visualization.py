@@ -502,7 +502,7 @@ def plot_method_comparison(data_dict, x_col, y_col, ylabel, ylim=None,
 
         ax.plot(df[x_col], df[y_col],
                 color=color, marker=marker, markersize=markersize,
-                markeredgecolor='black', clip_on=False,
+                clip_on=False,
                 label=label)
 
     ax.set_xscale('log')
@@ -574,7 +574,7 @@ def plot_method_panel_comparison(data_dict, x_col, metrics_config,
 
             axes[i].plot(df[x_col], df[y_col],
                          color=color, marker=marker, markersize=markersize,
-                         markeredgecolor='black', clip_on=False,
+                         clip_on=False,
                          label=label)
 
         axes[i].set_ylabel(ylabel, fontsize=12)
