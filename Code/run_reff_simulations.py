@@ -15,7 +15,6 @@ from rashomon.aggregate import RAggregate
 from baselines import BayesianLasso
 from baselines import BootstrapLasso
 from baselines import SpikeSlabLasso
-from baselines import PPMx
 
 
 def parse_arguments():
@@ -339,7 +338,8 @@ if __name__ == "__main__":
                 print(f"\tSimulation {sim_i+1}")
 
             # Generate data
-            X, D, y = generate_data(mu, var, n_per_pol, profiles, num_policies, all_policies, policies_profiles, pi_policies, M)
+            X, D, y = generate_data(mu, var, n_per_pol, profiles, num_policies, all_policies, policies_profiles,
+                                    pi_policies, M)
             policy_means = loss.compute_policy_means(D, y, num_policies)
             # The dummy matrix for Lasso
             D_matrix = hasse.get_dummy_matrix(D, G, num_policies)
@@ -757,14 +757,6 @@ if __name__ == "__main__":
                     PPMxClass = PPMxR
                     if verbose:
                         print("Using R backend (ppmSuite) for PPMx")
-                # elif args.ppmx_backend == "r" and not HAS_PPMX_R:
-                #     PPMxClass = PPMx
-                #     if verbose:
-                #         print("Warning: R backend requested but not available. Falling back to Python implementation.")
-                # else:
-                #     PPMxClass = PPMx
-                #     if verbose:
-                #         print("Using Python backend for PPMx")
                 else:
                     raise RuntimeError("R backend for PPMx not available. Please ensure ppmSuite is installed in R.")
 
