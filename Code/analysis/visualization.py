@@ -6,6 +6,7 @@ comparing different methods across various metrics.
 """
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 
@@ -182,8 +183,22 @@ def plot_single_metric_bar(comparison_df, metric_column, ax=None,
               for m in comparison_df['Method']]
     x_pos = np.arange(len(comparison_df))
 
+    # Extract values more robustly - handle various DataFrame structures
+    values = []
+    for idx in comparison_df.index:
+        val = comparison_df.loc[idx, metric_column]
+        # Handle Series, DataFrame, or scalar
+        if hasattr(val, 'item'):
+            val = val.item()
+        elif hasattr(val, 'iloc'):
+            val = val.iloc[0] if len(val) > 0 else 0.0
+        try:
+            values.append(float(val) if pd.notna(val) else 0.0)
+        except (TypeError, ValueError):
+            values.append(0.0)
+
     # Plot bars
-    bars = ax.bar(x_pos, comparison_df[metric_column], color=colors,
+    bars = ax.bar(x_pos, values, color=colors,
                   alpha=0.7, edgecolor='black', linewidth=1.5)
 
     ax.set_xticks(x_pos)
@@ -207,7 +222,7 @@ def plot_single_metric_bar(comparison_df, metric_column, ax=None,
 
 
 def plot_hpd_bar_comparison(comparison_df, metrics_to_plot=None,
-                            figsize=(20, 12), save_path=None):
+                            figsize=(20, 6), save_path=None):
     """
     Plot bar chart comparison of methods across multiple metrics.
 
@@ -268,6 +283,7 @@ def plot_hpd_bar_comparison(comparison_df, metrics_to_plot=None,
         plot_single_metric_bar(comparison_df, column, ax=ax,
                                ylabel=metric_spec['ylabel'],
                                title=metric_spec['title'],
+                               figsize=(20/n_cols, 12/n_rows),
                                show_values=True)
 
     # Hide unused subplots

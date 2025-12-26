@@ -379,7 +379,6 @@ fig, axes = plot_credible_interval_sweep(
 )
 plt.close()
 print(f"  Saved to: {FIGURES_DIR}/credible_interval_sweep.png")
-print()
 
 
 # ==============================================================================
@@ -393,10 +392,4 @@ print("\nGenerated files:")
 print(f"  1. {FIGURES_DIR}/epsilon_comparison.png")
 print(f"  2. {FIGURES_DIR}/hpd_bar_comparison.png")
 print(f"  3. {FIGURES_DIR}/credible_interval_sweep.png")
-print("\nKey findings:")
-print("  - Best profile recovery in 95% HPD:")
-for method, freq in zip(comparison_df['Method'], comparison_df['HPD_Frequency']):
-    print(f"    {method:20s}: {freq:.3f} ({freq*100:.1f}%)")
-print()
 print("Analysis completed successfully!")
-print()
