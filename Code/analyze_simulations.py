@@ -225,7 +225,7 @@ metrics_results = {
 
 # Rashomon
 print("Computing metrics for rashomon...")
-_, _, hpd_freq = compute_hpd_frequency(data['rashomon'], true_best_profile, CREDIBLE_MASS)
+_, hpd_freq, _ = compute_hpd_frequency(data['rashomon'], true_best_profile, CREDIBLE_MASS)
 _, hpd_pres = compute_hpd_binary_presence(data['rashomon'], true_best_profile, CREDIBLE_MASS)
 _, full_freq = compute_frequency_inclusion(data['rashomon'], true_best_profile)
 _, full_pres = compute_binary_presence(data['rashomon'], true_best_profile)
@@ -237,7 +237,7 @@ metrics_results['Full_Presence'].append(full_pres)
 
 # Bayesian Lasso
 print("Computing metrics for blasso...")
-_, _, hpd_freq = compute_hpd_frequency(data['blasso'], true_best_profile, CREDIBLE_MASS)
+_, hpd_freq, _ = compute_hpd_frequency(data['blasso'], true_best_profile, CREDIBLE_MASS)
 _, hpd_pres = compute_hpd_binary_presence(data['blasso'], true_best_profile, CREDIBLE_MASS)
 _, full_freq = compute_frequency_inclusion(data['blasso'], true_best_profile)
 _, full_pres = compute_binary_presence(data['blasso'], true_best_profile)
@@ -249,7 +249,7 @@ metrics_results['Full_Presence'].append(full_pres)
 
 # SSL
 print("Computing metrics for ssl...")
-_, _, hpd_freq = compute_hpd_frequency(data['ssl'], true_best_profile, CREDIBLE_MASS)
+_, hpd_freq, _ = compute_hpd_frequency(data['ssl'], true_best_profile, CREDIBLE_MASS)
 _, hpd_pres = compute_hpd_binary_presence(data['ssl'], true_best_profile, CREDIBLE_MASS)
 _, full_freq = compute_frequency_inclusion(data['ssl'], true_best_profile)
 _, full_pres = compute_binary_presence(data['ssl'], true_best_profile)
@@ -261,7 +261,7 @@ metrics_results['Full_Presence'].append(full_pres)
 
 # PPMx
 print("Computing metrics for ppmx...")
-_, _, hpd_freq = compute_hpd_frequency(data['ppmx'], true_best_profile, CREDIBLE_MASS)
+_, hpd_freq, _ = compute_hpd_frequency(data['ppmx'], true_best_profile, CREDIBLE_MASS)
 _, hpd_pres = compute_hpd_binary_presence(data['ppmx'], true_best_profile, CREDIBLE_MASS)
 _, full_freq = compute_frequency_inclusion(data['ppmx'], true_best_profile)
 _, full_pres = compute_binary_presence(data['ppmx'], true_best_profile)
@@ -287,9 +287,6 @@ metrics_results['Full_Presence'].append(full_pres)
 
 # Create comparison dataframe
 comparison_df = pd.DataFrame(metrics_results)
-# print("\nMetrics Summary:")
-# print(comparison_df.to_string(index=False))
-# print()
 
 # Plot bar comparison
 print("Generating HPD bar comparison plot...")
