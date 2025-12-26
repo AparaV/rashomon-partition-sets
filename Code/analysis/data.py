@@ -190,6 +190,7 @@ def prepare_method_dataframe(df, method, true_best_profile,
     # Handle Rashomon loss computation
     if config['needs_loss_computation'] and method == 'rashomon':
         df['loss'] = df['MSE'] + lambda_reg * df['num_pools']
+        df['neg_log_posterior'] = -df['loss']  # For consistency
 
     # Handle PPMx sign flip
     if config['sign_flip']:
