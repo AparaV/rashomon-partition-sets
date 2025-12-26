@@ -8,7 +8,7 @@ from copy import deepcopy
 from rashomon import extract_pools
 from rashomon import metrics
 
-from simulations import generate_data
+from run_reff_simulations import generate_data
 
 
 def read_ppmx_sim_data(file_dir, sim_num):
