@@ -141,13 +141,77 @@ def plot_epsilon_comparison(epsilon_curves, lasso_point=None, figsize=(10, 6),
 
 
 # ==============================================================================
-# Bar Chart Comparison
+# Bar Chart Comparison - Individual and Multi-Panel
 # ==============================================================================
+
+def plot_single_metric_bar(comparison_df, metric_column, ax=None,
+                           ylabel='Metric Value', title='',
+                           figsize=(8, 6), show_values=True):
+    """
+    Plot a single metric as a bar chart.
+
+    Parameters
+    ----------
+    comparison_df : pd.DataFrame
+        DataFrame with columns: 'Method' and metric column
+    metric_column : str
+        Column name for the metric to plot
+    ax : matplotlib.axes.Axes, optional
+        Axis to plot on. If None, creates new figure.
+    ylabel : str, default='Metric Value'
+        Y-axis label
+    title : str, default=''
+        Plot title
+    figsize : tuple, default=(8, 6)
+        Figure size (only used if ax is None)
+    show_values : bool, default=True
+        Show value labels on bars
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    if metric_column not in comparison_df.columns:
+        raise ValueError(f"Column '{metric_column}' not found in dataframe")
+
+    # Get colors based on method names
+    colors = [METHOD_COLORS.get(m.lower(), 'gray')
+              for m in comparison_df['Method']]
+    x_pos = np.arange(len(comparison_df))
+
+    # Plot bars
+    bars = ax.bar(x_pos, comparison_df[metric_column], color=colors,
+                  alpha=0.7, edgecolor='black', linewidth=1.5)
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(comparison_df['Method'], rotation=30, fontsize=11)
+    ax.set_ylabel(ylabel, fontsize=13)
+    ax.set_title(title, fontsize=12)
+    ax.set_ylim(0, 1.05)
+
+    apply_clean_style(ax)
+
+    # Add value labels on bars
+    if show_values:
+        for bar in bars:
+            height = bar.get_height()
+            if not np.isnan(height):
+                ax.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                        f'{height:.3f}', ha='center', va='bottom',
+                        fontsize=10, fontweight='bold')
+
+    return ax
+
 
 def plot_hpd_bar_comparison(comparison_df, metrics_to_plot=None,
                             figsize=(20, 12), save_path=None):
     """
     Plot bar chart comparison of methods across multiple metrics.
+
+    For individual metric plots, use plot_single_metric_bar() directly.
 
     Parameters
     ----------
@@ -191,11 +255,6 @@ def plot_hpd_bar_comparison(comparison_df, metrics_to_plot=None,
     elif n_cols == 1:
         axes = axes.reshape(-1, 1)
 
-    # Get colors based on method names in dataframe
-    colors = [METHOD_COLORS.get(m.lower(), 'gray')
-              for m in comparison_df['Method']]
-    x_pos = np.arange(len(comparison_df))
-
     for idx, metric_spec in enumerate(metrics_to_plot):
         row = idx // n_cols
         col = idx % n_cols
@@ -205,25 +264,11 @@ def plot_hpd_bar_comparison(comparison_df, metrics_to_plot=None,
         if column not in comparison_df.columns:
             continue
 
-        # Plot bars
-        bars = ax.bar(x_pos, comparison_df[column], color=colors,
-                      alpha=0.7, edgecolor='black', linewidth=1.5)
-
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(comparison_df['Method'], rotation=30, fontsize=11)
-        ax.set_ylabel(metric_spec['ylabel'], fontsize=13)
-        ax.set_title(metric_spec['title'], fontsize=12)
-        ax.set_ylim(0, 1.05)
-
-        apply_clean_style(ax)
-
-        # Add value labels on bars
-        for bar in bars:
-            height = bar.get_height()
-            if not np.isnan(height):
-                ax.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                        f'{height:.3f}', ha='center', va='bottom',
-                        fontsize=10, fontweight='bold')
+        # Use the helper function to plot on this axis
+        plot_single_metric_bar(comparison_df, column, ax=ax,
+                               ylabel=metric_spec['ylabel'],
+                               title=metric_spec['title'],
+                               show_values=True)
 
     # Hide unused subplots
     for idx in range(n_metrics, n_rows * n_cols):

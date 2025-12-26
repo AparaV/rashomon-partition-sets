@@ -25,6 +25,7 @@ from .metrics import (
 from .visualization import (
     plot_epsilon_comparison,
     plot_hpd_bar_comparison,
+    plot_single_metric_bar,
     plot_credible_interval_sweep,
     plot_coverage_vs_credible,
     plot_sample_size_vs_credible,
@@ -50,6 +51,7 @@ __all__ = [
     # Visualization
     'plot_epsilon_comparison',
     'plot_hpd_bar_comparison',
+    'plot_single_metric_bar',
     'plot_credible_interval_sweep',
     'plot_coverage_vs_credible',
     'plot_sample_size_vs_credible',

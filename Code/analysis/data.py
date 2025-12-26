@@ -60,6 +60,14 @@ METHOD_CONFIG = {
         'sign_flip': False,
         'columns_to_drop': [],
     },
+    'tva': {
+        'filename': 'tva',
+        'loss_col': 'neg_log_posterior',
+        'needs_loss_computation': False,
+        'sign_flip': False,
+        'columns_to_drop': ['MSE', 'IOU', 'min_dosage', 'best_pol_diff', 'converged',
+                            'max_rhat'],
+    },
 }
 
 
