@@ -22,6 +22,15 @@ from .metrics import (
     compute_epsilon_curve,
 )
 
+from .visualization import (
+    plot_epsilon_comparison,
+    plot_hpd_bar_comparison,
+    plot_credible_interval_sweep,
+    METHOD_COLORS,
+    METHOD_NAMES,
+    METHOD_MARKERS,
+)
+
 __all__ = [
     # Data loading
     'load_simulation_results',
@@ -36,4 +45,11 @@ __all__ = [
     'compute_hpd_binary_presence',
     'compute_top_k_binary_presence',
     'compute_epsilon_curve',
+    # Visualization
+    'plot_epsilon_comparison',
+    'plot_hpd_bar_comparison',
+    'plot_credible_interval_sweep',
+    'METHOD_COLORS',
+    'METHOD_NAMES',
+    'METHOD_MARKERS',
 ]
