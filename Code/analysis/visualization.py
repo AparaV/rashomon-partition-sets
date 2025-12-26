@@ -94,25 +94,26 @@ def plot_epsilon_comparison(epsilon_curves, lasso_point=None, figsize=(10, 6),
     # Find max epsilon for consistent x-axis
     max_eps = max(np.max(df['eps_levels']) for df in epsilon_curves.values())
 
-    # Reference line for perfect recovery
+    # Reference line for perfect recovery (no legend)
     len_x = 10
     x_horizontal = np.linspace(0, max_eps, num=len_x)
     y_best = np.array([1] * len_x)
     ax.plot(x_horizontal, y_best, color='black', ls='--', linewidth=1,
-            alpha=0.5, label='Perfect recovery')
+            alpha=0.5)
 
     # Plot epsilon curves for each method
     for method, df in epsilon_curves.items():
         color = METHOD_COLORS.get(method, 'gray')
         label = METHOD_NAMES.get(method, method)
 
-        # Plot line
+        # Plot line (no label for legend)
         ax.plot(df['eps_levels'], df['profile_rate_eps'],
-                color=color, linewidth=2.5, zorder=3, clip_on=False, label=label)
+                color=color, linewidth=2.5, zorder=3, clip_on=False)
 
-        # Add scatter point at start for emphasis
+        # Add scatter point at start with legend
         ax.scatter(df['eps_levels'].iloc[0], df['profile_rate_eps'].iloc[0],
-                   color=color, edgecolor='black', s=60, zorder=3.2, clip_on=False)
+                   color=color, edgecolor='black', s=60, zorder=3.2,
+                   clip_on=False, label=label)
 
     # Add Lasso point if provided
     if lasso_point is not None:
@@ -132,7 +133,7 @@ def plot_epsilon_comparison(epsilon_curves, lasso_point=None, figsize=(10, 6),
     ax.set_title('Best Profile Recovery Rate', fontsize=14, pad=15)
 
     # Legend and grid
-    ax.legend(loc='lower right', fontsize=11, frameon=True, shadow=True)
+    ax.legend(loc='lower right', fontsize=11)
     ax.grid(alpha=0.3, linestyle='--')
 
     if save_path:

@@ -53,8 +53,8 @@ CREDIBLE_MASS = 0.95    # HPD region size (95%)
 
 # Epsilon curve parameters
 N_BINS = 15
-EPS_EXTEND_MAX = 25
-EPS_MAX_CUTOFF = 25  # For Bayesian methods, cap epsilon at 25%
+EPS_EXTEND_MAX = 15
+EPS_MAX_CUTOFF = 15  # For Bayesian methods, cap epsilon at 25%
 
 # Methods to analyze
 METHODS_BAYESIAN = ['rashomon', 'blasso', 'ssl', 'ppmx']  # Methods with posterior
