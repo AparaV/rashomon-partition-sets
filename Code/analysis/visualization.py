@@ -21,6 +21,7 @@ METHOD_COLORS = {
     'ppmx': 'darkorange',
     'bootstrap': 'orangered',
     'lasso': 'indianred',
+    'tva': 'mediumpurple',
 }
 
 # Method display names
@@ -31,6 +32,7 @@ METHOD_NAMES = {
     'ppmx': 'PPMx',
     'bootstrap': 'Bootstrap Lasso',
     'lasso': 'Lasso',
+    'tva': 'TVA',
 }
 
 # Markers for line plots
@@ -40,6 +42,7 @@ METHOD_MARKERS = {
     'ssl': 's',        # square
     'ppmx': '*',       # star
     'bootstrap': '^',  # triangle
+    'tva': 'p',        # pentagon
 }
 
 # Marker sizes
@@ -49,6 +52,7 @@ MARKER_SIZES = {
     'ssl': 8,
     'ppmx': 10,  # Larger for star
     'bootstrap': 8,
+    'tva': 8,
 }
 
 
@@ -236,8 +240,128 @@ def plot_hpd_bar_comparison(comparison_df, metrics_to_plot=None,
 
 
 # ==============================================================================
-# Credible Interval Sweep
+# Credible Interval Sweep - Individual Plot Functions
 # ==============================================================================
+
+def plot_coverage_vs_credible(sweep_results, methods=None, ax=None,
+                              xlim=(0, 105), use_log_x=False,
+                              show_legend=False, title_suffix=''):
+    """
+    Plot coverage (recovery rate) vs credible level.
+
+    Parameters
+    ----------
+    sweep_results : pd.DataFrame
+        DataFrame with 'credible_level' and '{method}_coverage' columns
+    methods : list of str, optional
+        Methods to plot. If None, uses ['rashomon', 'blasso', 'ssl', 'ppmx']
+    ax : matplotlib.axes.Axes, optional
+        Axis to plot on. If None, creates new figure.
+    xlim : tuple, default=(0, 105)
+        X-axis limits
+    use_log_x : bool, default=False
+        Use log scale for x-axis
+    show_legend : bool, default=False
+        Show legend
+    title_suffix : str, default=''
+        Suffix to add to title (e.g., ' (Magnified)')
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if methods is None:
+        methods = ['rashomon', 'blasso', 'ssl', 'ppmx']
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+    x_full = sweep_results['credible_level'] * 100
+
+    for method in methods:
+        col = f'{method}_coverage'
+        if col not in sweep_results.columns:
+            continue
+        ax.plot(x_full, sweep_results[col],
+                marker=METHOD_MARKERS.get(method, 'o'),
+                markersize=MARKER_SIZES.get(method, 8),
+                linewidth=2.5,
+                label=METHOD_NAMES.get(method, method),
+                color=METHOD_COLORS.get(method, 'gray'))
+
+    ax.set_xlabel('HPD Region Cutoff (%)', fontsize=13)
+    ax.set_ylabel('Recovery Rate', fontsize=13)
+    ax.set_title(f'Best Profile Recovery Rate in HPD Region{title_suffix}', fontsize=13)
+    ax.set_ylim(0, 1.05)
+    ax.set_xlim(xlim)
+    if use_log_x:
+        ax.set_xscale('log')
+    if show_legend:
+        ax.legend(loc='best', fontsize=11)
+    apply_clean_style(ax)
+
+    return ax
+
+
+def plot_sample_size_vs_credible(sweep_results, methods=None, ax=None,
+                                 xlim=(0, 105), use_log_x=False,
+                                 show_legend=True, title_suffix=''):
+    """
+    Plot sample size vs credible level.
+
+    Parameters
+    ----------
+    sweep_results : pd.DataFrame
+        DataFrame with 'credible_level' and '{method}_mean_size' columns
+    methods : list of str, optional
+        Methods to plot. If None, uses ['rashomon', 'blasso', 'ssl', 'ppmx']
+    ax : matplotlib.axes.Axes, optional
+        Axis to plot on. If None, creates new figure.
+    xlim : tuple, default=(0, 105)
+        X-axis limits
+    use_log_x : bool, default=False
+        Use log scale for x-axis
+    show_legend : bool, default=True
+        Show legend
+    title_suffix : str, default=''
+        Suffix to add to title (e.g., ' (Magnified)')
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if methods is None:
+        methods = ['rashomon', 'blasso', 'ssl', 'ppmx']
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+    x_full = sweep_results['credible_level'] * 100
+
+    for method in methods:
+        col = f'{method}_mean_size'
+        if col not in sweep_results.columns:
+            continue
+        ax.plot(x_full, sweep_results[col],
+                marker=METHOD_MARKERS.get(method, 'o'),
+                markersize=MARKER_SIZES.get(method, 8),
+                linewidth=2.5,
+                label=METHOD_NAMES.get(method, method),
+                color=METHOD_COLORS.get(method, 'gray'))
+
+    ax.set_yscale('log')
+    ax.set_xlim(xlim)
+    if use_log_x:
+        ax.set_xscale('log')
+    ax.set_xlabel('HPD Region Cutoff (%)', fontsize=13)
+    ax.set_ylabel('Number of Models', fontsize=13)
+    ax.set_title(f'Number of Models in HPD Region{title_suffix}', fontsize=13)
+    if show_legend:
+        ax.legend(loc='upper left', fontsize=11)
+    apply_clean_style(ax)
+
+    return ax
+
 
 def plot_credible_interval_sweep(sweep_results, methods=None,
                                  figsize=(16, 12), save_path=None):
@@ -247,6 +371,9 @@ def plot_credible_interval_sweep(sweep_results, methods=None,
     Creates a 2x2 grid showing:
     - Coverage vs credible level (full range and magnified)
     - Sample size vs credible level (full range and magnified)
+
+    For individual plots, use plot_coverage_vs_credible() or
+    plot_sample_size_vs_credible() directly.
 
     Parameters
     ----------
@@ -272,91 +399,23 @@ def plot_credible_interval_sweep(sweep_results, methods=None,
 
     fig, axes = plt.subplots(2, 2, figsize=figsize)
 
-    # Convert credible_level to percentage
-    x_full = sweep_results['credible_level'] * 100
+    # Plot 1: Coverage (full range)
+    plot_coverage_vs_credible(sweep_results, methods, ax=axes[0, 0],
+                              xlim=(0, 105), show_legend=False)
 
-    # Plot 1: Coverage vs Credible Level (full range)
-    ax1 = axes[0, 0]
-    for method in methods:
-        col = f'{method}_coverage'
-        if col not in sweep_results.columns:
-            continue
-        ax1.plot(x_full, sweep_results[col],
-                 marker=METHOD_MARKERS.get(method, 'o'),
-                 markersize=MARKER_SIZES.get(method, 8),
-                 linewidth=2.5,
-                 label=METHOD_NAMES.get(method, method),
-                 color=METHOD_COLORS.get(method, 'gray'))
+    # Plot 2: Sample size (full range)
+    plot_sample_size_vs_credible(sweep_results, methods, ax=axes[0, 1],
+                                 xlim=(0, 105), show_legend=True)
 
-    ax1.set_xlabel('HPD Region Cutoff (%)', fontsize=13)
-    ax1.set_ylabel('Recovery Rate', fontsize=13)
-    ax1.set_title('Best Profile Recovery Rate in HPD Region', fontsize=13)
-    ax1.set_ylim(0, 1.05)
-    ax1.set_xlim(0, 105)
-    apply_clean_style(ax1)
-
-    # Plot 2: Mean sample size (full range)
-    ax2 = axes[0, 1]
-    for method in methods:
-        col = f'{method}_mean_size'
-        if col not in sweep_results.columns:
-            continue
-        ax2.plot(x_full, sweep_results[col],
-                 marker=METHOD_MARKERS.get(method, 'o'),
-                 markersize=MARKER_SIZES.get(method, 8),
-                 linewidth=2.5,
-                 label=METHOD_NAMES.get(method, method),
-                 color=METHOD_COLORS.get(method, 'gray'))
-
-    ax2.set_yscale('log')
-    ax2.set_xlim(0, 105)
-    ax2.set_xlabel('HPD Region Cutoff (%)', fontsize=13)
-    ax2.set_ylabel('Number of Models', fontsize=13)
-    ax2.set_title('Number of Models in HPD Region', fontsize=13)
-    ax2.legend(loc='upper left', fontsize=11)
-    apply_clean_style(ax2)
-
-    # Plot 3: Coverage (magnified near 100%)
-    ax3 = axes[1, 0]
-    for method in methods:
-        col = f'{method}_coverage'
-        if col not in sweep_results.columns:
-            continue
-        ax3.plot(x_full, sweep_results[col],
-                 marker=METHOD_MARKERS.get(method, 'o'),
-                 markersize=MARKER_SIZES.get(method, 8),
-                 linewidth=2.5,
-                 label=METHOD_NAMES.get(method, method),
-                 color=METHOD_COLORS.get(method, 'gray'))
-
-    ax3.set_xlabel('HPD Region Cutoff (%)', fontsize=13)
-    ax3.set_ylabel('Recovery Rate', fontsize=13)
-    ax3.set_title('Best Profile Recovery Rate in HPD Region (Magnified)', fontsize=13)
-    ax3.set_ylim(0, 1.05)
-    ax3.set_xlim(99, 100)
-    ax3.set_xscale('log')
-    apply_clean_style(ax3)
+    # Plot 3: Coverage (magnified)
+    plot_coverage_vs_credible(sweep_results, methods, ax=axes[1, 0],
+                              xlim=(99, 100), use_log_x=True,
+                              show_legend=False, title_suffix=' (Magnified)')
 
     # Plot 4: Sample size (magnified)
-    ax4 = axes[1, 1]
-    for method in methods:
-        col = f'{method}_mean_size'
-        if col not in sweep_results.columns:
-            continue
-        ax4.plot(x_full, sweep_results[col],
-                 marker=METHOD_MARKERS.get(method, 'o'),
-                 markersize=MARKER_SIZES.get(method, 8),
-                 linewidth=2.5,
-                 label=METHOD_NAMES.get(method, method),
-                 color=METHOD_COLORS.get(method, 'gray'))
-
-    ax4.set_yscale('log')
-    ax4.set_xlim(99, 100)
-    ax4.set_xscale('log')
-    ax4.set_xlabel('HPD Region Cutoff (%)', fontsize=13)
-    ax4.set_ylabel('Number of Models', fontsize=13)
-    ax4.set_title('Number of Models in HPD Region (Magnified)', fontsize=13)
-    apply_clean_style(ax4)
+    plot_sample_size_vs_credible(sweep_results, methods, ax=axes[1, 1],
+                                 xlim=(99, 100), use_log_x=True,
+                                 show_legend=False, title_suffix=' (Magnified)')
 
     plt.tight_layout()
 
