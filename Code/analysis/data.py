@@ -101,8 +101,8 @@ def setup_profile_config(n_arms=4):
 
 
 def load_simulation_results(method, n_per_pol=30, n_sims=100,
-                            results_dir='../Results/4arms',
-                            file_prefix='4arms_'):
+                            results_dir='../Results/reff',
+                            file_prefix='reff_'):
     """
     Load simulation results for a specific method.
 
@@ -115,9 +115,9 @@ def load_simulation_results(method, n_per_pol=30, n_sims=100,
         Number of samples per policy
     n_sims : int, default=100
         Number of simulation runs
-    results_dir : str, default='../Results/4arms'
+    results_dir : str, default='../Results/reff'
         Directory containing results files
-    file_prefix : str, default='4arms_'
+    file_prefix : str, default='reff_'
         Prefix for result filenames
 
     Returns

@@ -42,8 +42,8 @@ from analysis import (
 # Simulation parameters
 N_PER_POL = 30
 N_SIMS = 100
-RESULTS_DIR = '../Results/4arms'
-FILE_PREFIX = '4arms_'
+RESULTS_DIR = '../Results/reff'
+FILE_PREFIX = 'reff'
 
 # Analysis parameters
 LAMBDA_RASHOMON = 1e-1  # Regularization for Rashomon loss

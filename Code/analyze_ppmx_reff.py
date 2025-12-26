@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
     raw_file_dir = "../Data/reff_sims"
     results_file_dir = "../Results/reff/ppmx"
-    output_dir = "../Results/4arms/"
+    output_dir = "../Results/reff/"
     verbose = True
 
     params = setup_params("reff_4")
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     ppmx_list = []
     num_sims = 100
 
-    output_prefix = "4arms"
+    output_prefix = "reff"
     output_suffix = f"_{n_per_pol}_{num_sims}"
     ppmx_fname = output_prefix + "_ppmx" + output_suffix + ".csv"
 

@@ -204,8 +204,7 @@ if __name__ == "__main__":
 
     # Output file names
     start_sim = 0
-    output_dir = "../Results/4arms/"
-    # output_suffix = f"_{args.sample_size}_{args.iters}_{start_sim}.csv"
+    output_dir = "../Results/reff/"
     if start_sim != 0:
         start_idx_suffix = str(start_sim) + "_"
     else:
