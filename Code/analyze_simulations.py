@@ -30,8 +30,6 @@ from analysis import (
     # Visualization
     plot_epsilon_comparison,
     plot_hpd_bar_comparison,
-    plot_single_metric_bar,
-    plot_credible_interval_sweep,
     plot_coverage_vs_credible,
     plot_sample_size_vs_credible,
 )
@@ -367,15 +365,42 @@ for level in credible_levels:
 sweep_df = pd.DataFrame(sweep_results)
 print("Credible interval sweep completed!")
 
-# Plot credible interval sweep
-print("\nGenerating credible interval sweep plot...")
-fig, axes = plot_credible_interval_sweep(
-    sweep_df,
-    methods=METHODS_BAYESIAN,
-    save_path=f'{FIGURES_DIR}/credible_interval_sweep.png'
-)
+# Generate individual credible interval plots
+print("\nGenerating credible interval sweep plots...")
+
+# Plot 1: Coverage (full range) - with legend
+fig1, ax1 = plt.subplots(figsize=(8, 6))
+plot_coverage_vs_credible(sweep_df, methods=METHODS_BAYESIAN, ax=ax1,
+                          xlim=(0, 105), show_legend=True)
+plt.savefig(f'{FIGURES_DIR}/credible_interval_sweep_coverage.png', dpi=300, bbox_inches='tight')
 plt.close()
-print(f"  Saved to: {FIGURES_DIR}/credible_interval_sweep.png")
+print(f"  Saved to: {FIGURES_DIR}/credible_interval_sweep_coverage.png")
+
+# Plot 2: Sample size (full range) - with legend
+fig2, ax2 = plt.subplots(figsize=(8, 6))
+plot_sample_size_vs_credible(sweep_df, methods=METHODS_BAYESIAN, ax=ax2,
+                             xlim=(0, 105), show_legend=True)
+plt.savefig(f'{FIGURES_DIR}/credible_interval_sweep_sample_size.png', dpi=300, bbox_inches='tight')
+plt.close()
+print(f"  Saved to: {FIGURES_DIR}/credible_interval_sweep_sample_size.png")
+
+# Plot 3: Coverage (magnified) - no legend
+fig3, ax3 = plt.subplots(figsize=(8, 6))
+plot_coverage_vs_credible(sweep_df, methods=METHODS_BAYESIAN, ax=ax3,
+                          xlim=(99, 100+1e-2), use_log_x=True,
+                          show_legend=False, title_suffix=' (Magnified)')
+plt.savefig(f'{FIGURES_DIR}/credible_interval_sweep_coverage_magnified.png', dpi=300, bbox_inches='tight')
+plt.close()
+print(f"  Saved to: {FIGURES_DIR}/credible_interval_sweep_coverage_magnified.png")
+
+# Plot 4: Sample size (magnified) - no legend
+fig4, ax4 = plt.subplots(figsize=(8, 6))
+plot_sample_size_vs_credible(sweep_df, methods=METHODS_BAYESIAN, ax=ax4,
+                             xlim=(99, 100+1e-2), use_log_x=True,
+                             show_legend=False, title_suffix=' (Magnified)')
+plt.savefig(f'{FIGURES_DIR}/credible_interval_sweep_sample_size_magnified.png', dpi=300, bbox_inches='tight')
+plt.close()
+print(f"  Saved to: {FIGURES_DIR}/credible_interval_sweep_sample_size_magnified.png")
 
 
 # ==============================================================================
@@ -388,5 +413,8 @@ print("=" * 80)
 print("\nGenerated files:")
 print(f"  1. {FIGURES_DIR}/epsilon_comparison.png")
 print(f"  2. {FIGURES_DIR}/hpd_bar_comparison.png")
-print(f"  3. {FIGURES_DIR}/credible_interval_sweep.png")
+print(f"  3. {FIGURES_DIR}/credible_interval_sweep_coverage.png")
+print(f"  4. {FIGURES_DIR}/credible_interval_sweep_sample_size.png")
+print(f"  5. {FIGURES_DIR}/credible_interval_sweep_coverage_magnified.png")
+print(f"  6. {FIGURES_DIR}/credible_interval_sweep_sample_size_magnified.png")
 print("Analysis completed successfully!")
