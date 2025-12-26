@@ -9,52 +9,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from .config import METHOD_COLORS, METHOD_NAMES, METHOD_MARKERS, MARKER_SIZES
+
 
 # ==============================================================================
-# Styling Configuration
+# Styling Helpers
 # ==============================================================================
-
-# Method colors (consistent across all plots)
-METHOD_COLORS = {
-    'rashomon': 'dodgerblue',
-    'blasso': 'seagreen',
-    'ssl': 'purple',
-    'ppmx': 'darkorange',
-    'bootstrap': 'orangered',
-    'lasso': 'indianred',
-    'tva': 'mediumpurple',
-}
-
-# Method display names
-METHOD_NAMES = {
-    'rashomon': 'Rashomon Set',
-    'blasso': 'Bayesian Lasso',
-    'ssl': 'Spike-Slab Lasso',
-    'ppmx': 'PPMx',
-    'bootstrap': 'Bootstrap Lasso',
-    'lasso': 'Lasso',
-    'tva': 'TVA',
-}
-
-# Markers for line plots
-METHOD_MARKERS = {
-    'rashomon': 'd',   # diamond
-    'blasso': 'o',     # circle
-    'ssl': 's',        # square
-    'ppmx': '*',       # star
-    'bootstrap': '^',  # triangle
-    'tva': 'p',        # pentagon
-}
-
-# Marker sizes
-MARKER_SIZES = {
-    'rashomon': 8,
-    'blasso': 8,
-    'ssl': 8,
-    'ppmx': 10,  # Larger for star
-    'bootstrap': 8,
-    'tva': 8,
-}
 
 
 def apply_clean_style(ax):
@@ -486,6 +446,143 @@ def plot_credible_interval_sweep(sweep_results, methods=None,
     plot_sample_size_vs_credible(sweep_results, methods, ax=axes[1, 1],
                                  xlim=(99, 100+1e-2), use_log_x=True,
                                  show_legend=False, title_suffix=' (Magnified)')
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    return fig, axes
+
+
+def plot_method_comparison(data_dict, x_col, y_col, ylabel, ylim=None,
+                           methods_order=None, save_path=None, figsize=(5, 5)):
+    """Plot comparison of multiple methods on a single metric.
+
+    Parameters
+    ----------
+    data_dict : dict
+        Dictionary mapping method names to DataFrames with results.
+    x_col : str
+        Column name for x-axis (e.g., 'n_per_pol').
+    y_col : str
+        Column name for y-axis (e.g., 'MSE', 'IOU').
+    ylabel : str
+        Label for y-axis.
+    ylim : tuple, optional
+        Y-axis limits (ymin, ymax).
+    methods_order : list, optional
+        Order of methods to plot (default: order in data_dict).
+    save_path : str, optional
+        Path to save figure.
+    figsize : tuple, optional
+        Figure size (width, height).
+
+    Returns
+    -------
+    fig, ax : matplotlib figure and axes
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    apply_clean_style(ax)
+
+    # Determine plotting order
+    if methods_order is None:
+        methods_order = list(data_dict.keys())
+
+    # Plot each method
+    for method in methods_order:
+        if method not in data_dict:
+            continue
+
+        df = data_dict[method]
+        color = METHOD_COLORS.get(method, 'gray')
+        marker = METHOD_MARKERS.get(method, 'o')
+        markersize = MARKER_SIZES.get(method, 8)
+        label = METHOD_NAMES.get(method, method)
+
+        ax.plot(df[x_col], df[y_col],
+                color=color, marker=marker, markersize=markersize,
+                markeredgecolor='black', clip_on=False,
+                label=label)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('Samples per feature', fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    return fig, ax
+
+
+def plot_method_panel_comparison(data_dict, x_col, metrics_config,
+                                 methods_order=None, save_path=None,
+                                 figsize=(18, 5)):
+    """Plot 1x3 panel comparison of multiple metrics across methods.
+
+    Parameters
+    ----------
+    data_dict : dict
+        Dictionary mapping method names to DataFrames with results.
+    x_col : str
+        Column name for x-axis (e.g., 'n_per_pol').
+    metrics_config : list of dict
+        List of 3 dicts, each containing 'y_col', 'ylabel', 'ylim'.
+    methods_order : list, optional
+        Order of methods to plot.
+    save_path : str, optional
+        Path to save figure.
+    figsize : tuple, optional
+        Figure size (width, height).
+
+    Returns
+    -------
+    fig, axes : matplotlib figure and axes array
+    """
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=figsize)
+
+    # Determine plotting order
+    if methods_order is None:
+        methods_order = list(data_dict.keys())
+
+    # Configure all axes
+    for ax in axes:
+        apply_clean_style(ax)
+        ax.set_xscale('log')
+        ax.set_xlabel('Samples per feature', fontsize=12)
+
+    # Plot each metric in its own panel
+    for i, config in enumerate(metrics_config):
+        y_col = config['y_col']
+        ylabel = config['ylabel']
+        ylim = config.get('ylim')
+
+        for method in methods_order:
+            if method not in data_dict:
+                continue
+
+            df = data_dict[method]
+            color = METHOD_COLORS.get(method, 'gray')
+            marker = METHOD_MARKERS.get(method, 'o')
+            markersize = MARKER_SIZES.get(method, 8)
+            label = METHOD_NAMES.get(method, method)
+
+            axes[i].plot(df[x_col], df[y_col],
+                         color=color, marker=marker, markersize=markersize,
+                         markeredgecolor='black', clip_on=False,
+                         label=label)
+
+        axes[i].set_ylabel(ylabel, fontsize=12)
+        if ylim is not None:
+            axes[i].set_ylim(ylim)
+
+    # Add legend to last panel
+    axes[-1].legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
     plt.tight_layout()
 
