@@ -216,3 +216,96 @@ def prepare_method_dataframe(df, method, true_best_profile,
     df['best_profile_present'] = (df[true_best_profile] > 0).astype(int)
 
     return df
+
+
+def aggregate_worst_case_results(raw_df, method, metrics=None):
+    """
+    Aggregate worst case simulation results.
+
+    This function handles two aggregation patterns:
+    1. Point estimates (lasso, tva): directly average metrics across simulations
+    2. Sample-based (rashomon, blasso, bootstrap, ssl, ppmx): first average
+       within each simulation, then average across simulations
+
+    Parameters
+    ----------
+    raw_df : pd.DataFrame
+        Raw results with columns: n_per_pol, sim_num, and metric columns.
+    method : str
+        Method name. One of: 'rashomon', 'lasso', 'tva', 'blasso',
+        'bootstrap', 'ssl', 'ppmx'.
+    metrics : list of str, optional
+        Metrics to aggregate. Default depends on method:
+        - rashomon: ['num_pools', 'MSE', 'IOU', 'min_dosage', 'best_pol_MSE']
+        - others: ['MSE', 'IOU', 'min_dosage', 'best_pol_MSE']
+
+    Returns
+    -------
+    pd.DataFrame
+        Aggregated dataframe with columns: n_per_pol and metric columns.
+        For sample-based methods, averages are computed at two levels.
+        For point estimates, a single average is computed.
+
+    Notes
+    -----
+    - Assumes 'best_pol_diff' column exists and computes 'best_pol_MSE' from it
+    - Drops unnecessary columns based on method type
+    - Returns one row per n_per_pol value
+    """
+    df = raw_df.copy()
+    df['best_pol_MSE'] = df['best_pol_diff'] ** 2
+
+    # Set default metrics
+    if metrics is None:
+        if method == 'rashomon':
+            metrics = ['num_pools', 'MSE', 'IOU', 'min_dosage', 'best_pol_MSE']
+        else:
+            metrics = ['MSE', 'IOU', 'min_dosage', 'best_pol_MSE']
+
+    # Point estimate methods: lasso and tva
+    if method in ['lasso', 'tva']:
+        # Directly average across simulations (grouped by n_per_pol)
+        for metric in metrics:
+            df[metric] = df.groupby('n_per_pol')[metric].transform('mean')
+
+        # Drop duplicates and unnecessary columns
+        df = df.drop_duplicates('n_per_pol')
+        cols_to_drop = ['best_pol_diff', 'sim_num']
+        if method == 'lasso':
+            cols_to_drop.append('L1_loss')
+        df = df.drop([col for col in cols_to_drop if col in df.columns], axis=1)
+
+    # Sample-based methods: rashomon, blasso, bootstrap, ssl, ppmx
+    else:
+        # Step 1: Average within each simulation
+        group_by_cols = ['n_per_pol', 'sim_num']
+        for metric in metrics:
+            df[metric] = df.groupby(group_by_cols)[metric].transform('mean')
+
+        # Drop duplicates within simulations
+        df = df.drop_duplicates(group_by_cols)
+
+        # Drop method-specific columns
+        cols_to_drop = ['best_pol_diff']
+        if method == 'rashomon':
+            pass  # Rashomon doesn't have extra columns to drop
+        elif method == 'blasso':
+            cols_to_drop.extend(['sample_idx', 'neg_log_posterior'])
+        elif method == 'bootstrap':
+            cols_to_drop.extend(['sample_idx', 'penalized_loss'])
+        elif method == 'ssl':
+            cols_to_drop.extend(['sample_idx', 'neg_log_posterior'])
+        elif method == 'ppmx':
+            cols_to_drop.extend(['sample_idx', 'neg_log_posterior'])
+
+        df = df.drop([col for col in cols_to_drop if col in df.columns], axis=1)
+
+        # Step 2: Average across simulations
+        for metric in metrics:
+            df[metric] = df.groupby('n_per_pol')[metric].transform('mean')
+
+        # Drop duplicates and sim_num column
+        df = df.drop_duplicates('n_per_pol')
+        df = df.drop('sim_num', axis=1)
+
+    return df
