@@ -342,7 +342,6 @@ if __name__ == "__main__":
                     best_loss = np.inf
 
                     for idx, r_set in enumerate(R_set):
-                        # print(idx)
 
                         # MSE
                         pi_policies_profiles_r = {}
@@ -379,7 +378,6 @@ if __name__ == "__main__":
 
                         if best_profile_indicator[true_best_profile_idx] == 1:
                             found_best_profile = True
-                            # print("Found", this_loss)
 
                     if found_best_profile and verbose:
                         print("\tFound best profile")
@@ -391,18 +389,9 @@ if __name__ == "__main__":
                     if found_best_profile or this_theta >= (eps_factor * best_loss):
                         found_best_profile = True
                     else:
-                        # this_theta = eps_factor * best_loss
                         this_theta += 0.1
                         found_best_profile = False
                     counter += 1
-
-                    # if this_theta >= 6.5:
-                    #     found_best_profile = True
-                    # if len(R_set) > 1e5:
-                    # if len(R_set) >= 8377:
-                    #     found_best_profile = True
-                    # this_theta += 0.5
-                    # break
 
                 rashomon_list += current_results
 
@@ -444,31 +433,6 @@ if __name__ == "__main__":
                 )
                 blasso.fit(D_matrix, y, n_chains=blasso_n_chains)
 
-                # Predictions using posterior mean
-                y_blasso = blasso.predict(D_matrix)
-                # Predictions using MAP estimate
-                y_blasso_map = blasso.predict_map(D_matrix)
-
-                # Compute metrics for posterior mean
-                blasso_results = metrics.compute_all_metrics(
-                    y, y_blasso, D, true_best, all_policies, profile_map,
-                    min_dosage_best_policy, true_best_effect)
-                sqrd_err_blasso = blasso_results["sqrd_err"]
-                iou_blasso = blasso_results["iou"]
-                best_profile_indicator_blasso = blasso_results["best_prof"]
-                min_dosage_present_blasso = blasso_results["min_dos_inc"]
-                best_policy_diff_blasso = blasso_results["best_pol_diff"]
-
-                # Compute metrics for MAP estimate
-                blasso_map_results = metrics.compute_all_metrics(
-                    y, y_blasso_map, D, true_best, all_policies, profile_map,
-                    min_dosage_best_policy, true_best_effect)
-                sqrd_err_blasso_map = blasso_map_results["sqrd_err"]
-                iou_blasso_map = blasso_map_results["iou"]
-                best_profile_indicator_blasso_map = blasso_map_results["best_prof"]
-                min_dosage_present_blasso_map = blasso_map_results["min_dos_inc"]
-                best_policy_diff_blasso_map = blasso_map_results["best_pol_diff"]
-
                 # Store convergence information
                 converged = blasso.converged_
                 max_rhat = np.max(blasso.rhat_)
@@ -480,8 +444,6 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
-                # Compute average profile indicators and store individual sample results
-                profile_indicators_sum = np.zeros(len(profiles))
                 n_posterior_samples = coef_samples.shape[0]
 
                 # Get cached log posterior densities (computed during fit)
@@ -503,9 +465,6 @@ if __name__ == "__main__":
                     min_dosage_sample = sample_results["min_dos_inc"]
                     best_pol_diff_sample = sample_results["best_pol_diff"]
 
-                    # Accumulate for average
-                    profile_indicators_sum += np.array(profile_indicator_sample)
-
                     # Store individual sample results with summary metrics
                     sample_list = [
                         n_per_pol, sim_i, sample_idx,
@@ -522,11 +481,6 @@ if __name__ == "__main__":
                     sample_list += profile_indicator_sample
                     blasso_list.append(sample_list)
 
-                avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
-
-                # Store summary info in first sample row via special fields
-                # (we only keep sample-level output now)
-
             #
             # Run Bootstrap Lasso
             #
@@ -541,31 +495,9 @@ if __name__ == "__main__":
                 )
                 bootstrap.fit(D_matrix, y)
 
-                y_bootstrap = bootstrap.predict(D_matrix)
-
-                bootstrap_results = metrics.compute_all_metrics(
-                    y, y_bootstrap, D, true_best, all_policies, profile_map,
-                    min_dosage_best_policy, true_best_effect)
-                sqrd_err_bootstrap = bootstrap_results["sqrd_err"]
-                iou_bootstrap = bootstrap_results["iou"]
-                # best_profile_indicator_bootstrap = bootstrap_results["best_prof"]
-                # min_dosage_present_bootstrap = bootstrap_results["min_dos_inc"]
-                # best_policy_diff_bootstrap = bootstrap_results["best_pol_diff"]
-
-                # Store bootstrap-specific diagnostics
-                coverage = bootstrap.coverage_
-                mean_ci_width = np.mean(bootstrap.coef_ci_[:, 1] - bootstrap.coef_ci_[:, 0])
-                feature_importance = bootstrap.get_feature_importance()
-                n_stable_features = np.sum(feature_importance > 0.5)  # Features selected in >50% of iterations
-
-                # Extract bootstrap samples and compute coverage metrics
+                # Extract bootstrap samples
                 coef_samples = bootstrap.bootstrap_coefs_
-                iou_coverage = metrics.compute_iou_coverage(coef_samples, D_matrix, D, true_best)
-                min_dosage_coverage = metrics.compute_min_dosage_coverage(
-                    coef_samples, D_matrix, D, min_dosage_best_policy)
 
-                # Compute average profile indicators and store individual sample results
-                profile_indicators_sum = np.zeros(len(profiles))
                 n_bootstrap_samples = coef_samples.shape[0]
 
                 for sample_idx in range(n_bootstrap_samples):
@@ -597,9 +529,6 @@ if __name__ == "__main__":
                     sample_list += profile_indicator_sample
                     bootstrap_samples_list.append(sample_list)
 
-                    # Accumulate for average
-                    profile_indicators_sum += np.array(profile_indicator_sample)
-
             #
             # Run Spike-Slab Lasso
             #
@@ -619,31 +548,6 @@ if __name__ == "__main__":
                 )
                 ssl.fit(D_matrix, y, n_chains=ssl_n_chains)
 
-                # Predictions using posterior mean
-                y_ssl = ssl.predict(D_matrix)
-                # Predictions using MAP estimate
-                y_ssl_map = ssl.predict_map(D_matrix)
-
-                # Compute metrics for posterior mean
-                ssl_results = metrics.compute_all_metrics(
-                    y, y_ssl, D, true_best, all_policies, profile_map,
-                    min_dosage_best_policy, true_best_effect)
-                sqrd_err_ssl = ssl_results["sqrd_err"]
-                iou_ssl = ssl_results["iou"]
-                best_profile_indicator_ssl = ssl_results["best_prof"]
-                min_dosage_present_ssl = ssl_results["min_dos_inc"]
-                best_policy_diff_ssl = ssl_results["best_pol_diff"]
-
-                # Compute metrics for MAP estimate
-                ssl_map_results = metrics.compute_all_metrics(
-                    y, y_ssl_map, D, true_best, all_policies, profile_map,
-                    min_dosage_best_policy, true_best_effect)
-                sqrd_err_ssl_map = ssl_map_results["sqrd_err"]
-                iou_ssl_map = ssl_map_results["iou"]
-                best_profile_indicator_ssl_map = ssl_map_results["best_prof"]
-                min_dosage_present_ssl_map = ssl_map_results["min_dos_inc"]
-                best_policy_diff_ssl_map = ssl_map_results["best_pol_diff"]
-
                 # Store convergence information
                 converged = ssl.converged_
                 max_rhat = np.max(ssl.rhat_)
@@ -659,8 +563,6 @@ if __name__ == "__main__":
                 min_dosage_coverage = metrics.compute_min_dosage_coverage(
                     coef_samples, D_matrix, D, min_dosage_best_policy)
 
-                # Compute average profile indicators and store individual sample results
-                profile_indicators_sum = np.zeros(len(profiles))
                 n_posterior_samples = coef_samples.shape[0]
 
                 # Get cached log posterior densities (computed during fit)
@@ -681,8 +583,6 @@ if __name__ == "__main__":
                     best_pol_diff_sample = sample_results["best_pol_diff"]
                     profile_indicators_sample = sample_results["best_prof"]
 
-                    profile_indicators_sum += np.array(profile_indicators_sample)
-
                     sample_list = [
                         n_per_pol, sim_i, sample_idx,
                         neg_log_posteriors[sample_idx],
@@ -699,8 +599,6 @@ if __name__ == "__main__":
                     ]
                     sample_list += profile_indicators_sample
                     ssl_list.append(sample_list)
-
-                avg_profile_indicators = (profile_indicators_sum / n_posterior_samples).tolist()
 
     profiles_str = [str(prof) for prof in profiles]
 
