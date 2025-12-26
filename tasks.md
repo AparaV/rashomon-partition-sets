@@ -3,5 +3,5 @@
 - Clean up the code
     - Include R code and instructions
     - Clean up notebooks keeping only necessary things
-    - Remove all test scripts created by copilot
+    - Add instructions to run simulations
 - Run blasso and SSL for longer chains in sim 1
