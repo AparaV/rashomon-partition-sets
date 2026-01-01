@@ -5,7 +5,7 @@ from matplotlib import colors
 
 def plot_size_histogram(fig_size, model_sizes, xlabel, ylabel, title,
                         fname=None,
-                        label_fontsize=14, title_fontsize=16,
+                        label_fontsize=10, title_fontsize=12,
                         **kwargs):
     fig, ax = plt.subplots(figsize=fig_size)
 
@@ -28,6 +28,7 @@ def plot_rps_heatmap(fig_size, model_sizes, rel_post_prob_ratio,
                      xlabel, ylabel, label_fontsize=10,
                      ticks=[1, 10, 100, 250, 700],
                      hline_val=None,
+                     hline_range=None,
                      fname=None,
                      **kwargs):
 
@@ -41,7 +42,7 @@ def plot_rps_heatmap(fig_size, model_sizes, rel_post_prob_ratio,
     cb.set_ticklabels(ticks)
 
     if hline_val:
-        ax.plot([-2, 80], [hline_val, hline_val], color="black", linestyle="--", linewidth=2)
+        ax.plot(hline_range, [hline_val, hline_val], color="black", linestyle="--", linewidth=2)
 
     ax.set_xlabel(xlabel, fontsize=label_fontsize)
     ax.set_ylabel(ylabel, fontsize=label_fontsize)
