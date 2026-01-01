@@ -14,4 +14,4 @@ python run_microfinance.py --outcome_col $outcome_col --q $q --reg $lambda --trt
 python run_microfinance.py --outcome_col $outcome_col --q $q --reg $lambda --trt --gen
 python run_microfinance.py --outcome_col $outcome_col --q $q --reg $lambda --trt --edu --gen
 
-# python run_microfinance_te.py --outcome_col $outcome_col
+python run_microfinance_te.py --outcome_col $outcome_col

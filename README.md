@@ -84,6 +84,24 @@ The telomere data is obtained from https://wwwn.cdc.gov/nchs/nhanes/search/datap
 
 See `Code/process_nhanes_data.py` for processing the data before consuming it.
 
+## Reproducing real data results
+
+### Charitable donations
+
+1. Run the `Code/real_data_charitable_donations.ipynb` notebook.
+
+### Microfinance
+
+1. Run `Code/process_microfinance_data.py`
+2. Run `Code/run_mf_all.sh` changing the variable `outcome_col` to each of `[14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]`
+3. Run `Code/microfinance_analysis.ipynb`
+
+### NHANES
+
+1. Run `Code/process_nhanes_data.py`
+2. Run `Code/nhanes_generate_rps.py`
+3. Run `Code/NHANES_data_analysis.ipynb`
+
 
 ## Contact
 
