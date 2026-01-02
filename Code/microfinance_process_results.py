@@ -174,7 +174,7 @@ with open(ALL_DETAILS_PICKLE_FNAME, "wb") as f:
     pickle.dump(all_details, f, pickle.HIGHEST_PROTOCOL)
 
 #
-# Calculating Effective Counts in each bin
+# Calculating Effect Counts in each bin
 #
 
 bins = {}
