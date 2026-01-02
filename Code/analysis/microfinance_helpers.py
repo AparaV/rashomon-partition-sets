@@ -134,10 +134,10 @@ def assign_label(a, bins):
 def get_counts(
     R_set, R_profiles, policies_profiles_masked, policies_profiles,
     policies_ids_profiles, policy_means, R_vals,
-    collect_effects=False, bins=None
+    collect_effects=False, bins=None, collect_effects_by_profile=False
 ):
 
-    assert (collect_effects or bins is not None)
+    assert (collect_effects or bins is not None or collect_effects_by_profile)
 
     n_models = len(R_set)
 
@@ -245,6 +245,11 @@ def get_counts(
     if collect_effects:
         gen_trt_eff_array = []
         trt_eff_array = []
+
+    if collect_effects_by_profile:
+        # Store effects per profile with their probabilities
+        profile_effects = {i: {'treatment': [], 'gender': [], 'probabilities': []}
+                           for i in range(num_active_profiles)}
 
     for r, model_r in enumerate(R_set):
         pi_policies_profiles_r = {}
@@ -376,6 +381,15 @@ def get_counts(
                 trt_eff_array += [trt_eff_mal, trt_eff_fem]
                 gen_trt_eff_array += [gen_trt_eff]
 
+            if collect_effects_by_profile:
+                # Store both male and female treatment effects with probability
+                profile_effects[profile_i]['treatment'].append(trt_eff_mal)
+                profile_effects[profile_i]['treatment'].append(trt_eff_fem)
+                profile_effects[profile_i]['gender'].append(gen_trt_eff)
+                # Add probability twice for male and female effects, once for gender effect
+                profile_effects[profile_i]['probabilities'].append(prob_r)
+                profile_effects[profile_i]['probabilities'].append(prob_r)
+
             else:
                 '''
                 vec = np.array(cov_counts_r)
@@ -412,6 +426,17 @@ def get_counts(
         results = {
             "gender_effects": gen_trt_eff_array,
             "treatment_effects": trt_eff_array,
+            "total_prob": total_prob
+        }
+    elif collect_effects_by_profile:
+        # Convert lists to arrays and return organized by profile
+        for profile_i in range(num_active_profiles):
+            profile_effects[profile_i]['treatment'] = np.array(profile_effects[profile_i]['treatment'])
+            profile_effects[profile_i]['gender'] = np.array(profile_effects[profile_i]['gender'])
+            profile_effects[profile_i]['probabilities'] = np.array(profile_effects[profile_i]['probabilities'])
+
+        results = {
+            "profile_effects": profile_effects,
             "total_prob": total_prob
         }
     else:

@@ -12,6 +12,7 @@ LAMBDA_STR = "_1.50e-06"
 NUM_BINS = 5
 
 ALL_DETAILS_PICKLE_FNAME = f"{RESULTS_DIR}stddev_prob_data.pkl"
+RIDGELINE_PICKLE_FNAME = f"{RESULTS_DIR}ridgeline_data{LAMBDA_STR}.pkl"
 COUNTER_FNAME = f"{RESULTS_DIR}counter_results{LAMBDA_STR}_{NUM_BINS}_bins.pkl"
 MICROFINANCE_OUTCOMES_CSV = "../Results/microfinance/outcomes.csv"
 MICROFINANCE_TREATMENT_EFFECTS_CSV = "../Results/microfinance/te.csv"
@@ -172,6 +173,98 @@ for outcome_col_id in range(14, 26):
 
 with open(ALL_DETAILS_PICKLE_FNAME, "wb") as f:
     pickle.dump(all_details, f, pickle.HIGHEST_PROTOCOL)
+
+#
+# Collecting per-profile effects for ridgeline plots
+#
+
+all_ridgeline_data = {}
+
+for outcome_col_id in range(14, 26):
+    outcome_col = cols[outcome_col_id]
+    outcome_title = outcome_names[outcome_col_id-14]
+
+    results_subdir = RESULTS_DIR + outcome_col + "/"
+    pkl_prefix = results_subdir + outcome_col + LAMBDA_STR
+
+    num_active_arms = 4
+    num_active_profiles = 2**num_active_arms
+
+    print(f"Collecting ridgeline data for {outcome_col}")
+
+    ridgeline_profile_data = None
+
+    for suffix in suffix_possibilities:
+
+        this_df = df.copy()
+        this_R = np.array([2, 2, 2, 4, 4, 4, 4])
+        if "trt" not in suffix:
+            this_df["treatment"] = this_df["treatment"] + 1
+            this_R[0] += 1
+        if "edu" not in suffix:
+            this_df["hh_edu"] = this_df["hh_edu"] + 1
+            this_R[1] += 1
+        if "gen" not in suffix:
+            this_df["hh_gender"] = this_df["hh_gender"] + 1
+            this_R[2] += 1
+
+        R_set, R_profiles = mh.read_pickle(results_subdir, outcome_col + suffix + LAMBDA_STR + "_pruned_te")
+
+        if len(R_set) == 0:
+            print(f"\tSuffix {suffix} has no models")
+            continue
+        print(f"\tWorking on suffix {suffix} - {len(R_set)} models")
+
+        all_policies = hasse.enumerate_policies(M, this_R)
+        policies_str = []
+        for pol in all_policies:
+            polx = list(pol)
+            pol_str = ""
+            for m in range(M):
+                if this_R[m] == 3:
+                    polx[m] = pol[m] - 1
+                pol_str += maps[m][polx[m]] + ","
+            policies_str.append(pol_str)
+
+        X, y = mh.format_data(this_df, outcome_col_id, chosen_covariates_idx)
+
+        pol_res = mh.get_policy_means(M, this_R, X, y)
+        policy_means_profiles = pol_res[0]
+        policies_profiles_masked = pol_res[1]
+        policies_profiles = pol_res[2]
+        policies_means = pol_res[3]
+        policies_ids_profiles = pol_res[4]
+
+        ridgeline_res = mh.get_counts(
+            R_set, R_profiles, policies_profiles_masked, policies_profiles, policies_ids_profiles,
+            policies_means, this_R, collect_effects_by_profile=True
+        )
+
+        if ridgeline_profile_data is None:
+            ridgeline_profile_data = ridgeline_res['profile_effects']
+        else:
+            # Concatenate data from different suffixes
+            for profile_i in range(num_active_profiles):
+                ridgeline_profile_data[profile_i]['treatment'] = np.concatenate([
+                    ridgeline_profile_data[profile_i]['treatment'],
+                    ridgeline_res['profile_effects'][profile_i]['treatment']
+                ])
+                ridgeline_profile_data[profile_i]['gender'] = np.concatenate([
+                    ridgeline_profile_data[profile_i]['gender'],
+                    ridgeline_res['profile_effects'][profile_i]['gender']
+                ])
+                ridgeline_profile_data[profile_i]['probabilities'] = np.concatenate([
+                    ridgeline_profile_data[profile_i]['probabilities'],
+                    ridgeline_res['profile_effects'][profile_i]['probabilities']
+                ])
+
+    all_ridgeline_data[outcome_col] = ridgeline_profile_data
+
+with open(RIDGELINE_PICKLE_FNAME, "wb") as f:
+    pickle.dump(all_ridgeline_data, f, pickle.HIGHEST_PROTOCOL)
+
+print(f"Ridgeline data saved to {RIDGELINE_PICKLE_FNAME}")
+
 
 #
 # Calculating Effect Counts in each bin
