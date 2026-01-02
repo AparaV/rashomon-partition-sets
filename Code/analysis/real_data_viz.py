@@ -59,7 +59,7 @@ def plot_rps_heatmap(fig_size, model_sizes, rel_post_prob_ratio,
 def create_rps_heterogeneity_heatmap(
     plots_matrices, titles, labels, bin_labels,
     gap_between_panels=2, figsize=(12, 4), cmap="OrRd", vmin=0, vmax=1,
-    xlabels=None, xlabel_fontsize=10, ylabel=None, fname=None, **kwargs
+    xlabels=None, xlabel_fontsize=10, xlabelpad=10, ylabel=None, fname=None, **kwargs
 ):
     """
     Create a generalized mosaic heatmap.
@@ -174,7 +174,7 @@ def create_rps_heterogeneity_heatmap(
                     ax_col.set_title(titles[i][panel], fontsize=10)
 
                 if xlabels and col == (num_cols) // 2:
-                    ax_col.set_xlabel(xlabels[i][panel], fontsize=xlabel_fontsize, labelpad=10)
+                    ax_col.set_xlabel(xlabels[i][panel], fontsize=xlabel_fontsize, labelpad=xlabelpad)
 
     if ylabel:
         fig.supylabel(ylabel)
