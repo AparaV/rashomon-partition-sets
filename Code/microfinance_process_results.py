@@ -13,6 +13,8 @@ NUM_BINS = 5
 
 ALL_DETAILS_PICKLE_FNAME = f"{RESULTS_DIR}stddev_prob_data.pkl"
 COUNTER_FNAME = f"{RESULTS_DIR}counter_results{LAMBDA_STR}_{NUM_BINS}_bins.pkl"
+MICROFINANCE_OUTCOMES_CSV = "../Results/microfinance/outcomes.csv"
+MICROFINANCE_TREATMENT_EFFECTS_CSV = "../Results/microfinance/te.csv"
 
 M = 7
 R = np.array([3, 3, 3, 4, 4, 4, 4])
@@ -296,3 +298,28 @@ for k, v in all_results.items():
 
 with open(COUNTER_FNAME, "wb") as f:
     pickle.dump(all_results, f, pickle.HIGHEST_PROTOCOL)
+
+df_dict = {}
+for k, v in all_results.items():
+    for pol, beta_i in zip(v["policies"], v["beta"]):
+        if pol in df_dict.keys():
+            df_dict[pol].append(beta_i)
+        else:
+            df_dict[pol] = [beta_i]
+
+cols = chosen_covariates + list(all_results.keys())
+df_list = []
+for k, v in df_dict.items():
+    df_list.append(k.split(",")[:-1] + v)
+
+df = pd.DataFrame(df_list, columns=cols)
+
+df.to_csv(MICROFINANCE_OUTCOMES_CSV)
+
+ctl_df = df[df["treatment"] == "ctl"].copy().reset_index()
+trt_df = df[df["treatment"] == "trt"].copy().reset_index()
+
+for k in all_results.keys():
+    trt_df[k] = trt_df[k] - ctl_df[k]
+
+trt_df.to_csv(MICROFINANCE_TREATMENT_EFFECTS_CSV)
