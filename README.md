@@ -88,7 +88,7 @@ See `Code/process_nhanes_data.py` for processing the data before consuming it.
 
 ### Charitable donations
 
-1. Run the `Code/real_data_charitable_donations.ipynb` notebook.
+1. Run the `Code/karlan_data_analysis.ipynb` notebook.
 
 ### Microfinance
 
