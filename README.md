@@ -93,8 +93,9 @@ See `Code/process_nhanes_data.py` for processing the data before consuming it.
 ### Microfinance
 
 1. Run `Code/process_microfinance_data.py`
-2. Run `Code/run_mf_all.sh` changing the variable `outcome_col` to each of `[14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]`
-3. Run `Code/microfinance_analysis.ipynb`
+2. Run `Code/run_mf_all.sh` changing the variable `outcome_col_idx` in line 3 to each of `[14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]`
+3. Run `Code/microfinance_process_results.py`
+4. Run `Code/microfinance_analysis.ipynb`
 
 ### NHANES
 
