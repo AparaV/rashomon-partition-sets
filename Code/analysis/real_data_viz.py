@@ -3,6 +3,7 @@ import seaborn as sns
 import numpy as np
 
 from matplotlib import colors
+from scipy import stats
 
 
 def plot_size_histogram(fig_size, model_sizes, xlabel, ylabel, title,
@@ -182,3 +183,78 @@ def create_rps_heterogeneity_heatmap(
         plt.savefig(fname, dpi=300, bbox_inches="tight")
 
     return fig
+
+
+def plot_ridgeline(data_list, posterior_probabilities, labels, xlabel="Effect", title="",
+                   overlap=0.7, figsize=(10, 8), color="steelblue",
+                   alpha=0.7, fname=None):
+    """
+    Create a ridgeline plot from a list of data arrays.
+
+    Parameters:
+    -----------
+    data_list : list of arrays
+        List of data arrays to plot
+    labels : list of str
+        Labels for each distribution
+    overlap : float
+        Overlap between distributions (higher = more overlap)
+    """
+    fig, axes = plt.subplots(len(data_list), 1, figsize=figsize, sharex=True)
+    fig.subplots_adjust(hspace=-1)  # Negative value creates overlap
+    if len(data_list) == 1:
+        axes = [axes]
+
+    # Calculate global x-range
+    all_data = np.concatenate(data_list)
+    x_min, x_max = np.min(all_data), np.max(all_data)
+    # x_range = x_max - x_min
+    # x_min -= 0.1 * x_range
+    # x_max += 0.1 * x_range
+
+    # Plot each distribution
+    for idx, (ax, data, label) in enumerate(zip(axes, data_list, labels)):
+        # Create KDE
+        x = np.linspace(x_min, x_max, 1000)
+        kde = stats.gaussian_kde(data, weights=posterior_probabilities[idx])
+        y = kde(x)
+
+        # Plot
+        ax.fill_between(x, y, alpha=alpha)
+        ax.plot(x, y, linewidth=2)
+
+        # Plot zero line for reference
+        ax.plot([0, 0], [0, ax.get_ylim()[1]], color='black', linestyle='--', linewidth=1)
+
+        # Styling
+        ax.set_ylabel(label, rotation=0, ha='right', va='center')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(True)
+        ax.set_yticks([])
+        ax.set_ylim(0)
+        ax.set_xlim(x_min, x_max)
+
+        # # Only show x-axis for bottom plot
+        # if idx < len(data_list) - 1:
+        #     ax.spines['bottom'].set_visible(False)
+        #     ax.set_xticks([])
+        # else:
+        # if idx < len(data_list) - 1:
+        #     print("Hiding x-axis for idx:", idx)
+        #     ax.set_xticks([])
+        # else:
+        #     print("Showing x-axis for idx:", idx)
+        #     # ax.set_xticks(ax.get_xticks())
+
+    axes[-1].set_xlabel(xlabel)
+    axes[0].set_title(title, pad=20)
+
+    # plt.suptitle(title, fontsize=14, y=0.98)
+    plt.tight_layout()
+
+    if fname:
+        plt.savefig(fname, dpi=300, bbox_inches='tight')
+
+    return fig, axes
