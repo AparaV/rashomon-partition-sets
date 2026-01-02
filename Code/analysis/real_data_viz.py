@@ -55,12 +55,11 @@ def plot_rps_heatmap(fig_size, model_sizes, rel_post_prob_ratio,
     plt.show()
 
 
-def create_mosaic_heatmap(plots_matrices, titles, labels, bin_labels,
-                          gap_between_panels=2, figsize=(12, 4),
-                          cmap="OrRd", vmin=0, vmax=1,
-                          xlabels=None, xlabel_fontsize=10,
-                          ylabel=None, fname=None,
-                          **kwargs):
+def create_rps_heterogeneity_heatmap(
+    plots_matrices, titles, labels, bin_labels,
+    gap_between_panels=2, figsize=(12, 4), cmap="OrRd", vmin=0, vmax=1,
+    xlabels=None, xlabel_fontsize=10, ylabel=None, fname=None, **kwargs
+):
     """
     Create a generalized mosaic heatmap.
 
@@ -74,8 +73,10 @@ def create_mosaic_heatmap(plots_matrices, titles, labels, bin_labels,
         Shape: [n_rows][n_panels_per_row][n_cols_in_panel], labels for columns
     bin_labels : list
         Y-axis labels (rows)
-    gap_between_panels : int
-        Number of empty columns between panels
+    gap_between_panels : int or list
+        Number of empty columns between panels. Can be:
+        - Single int: same gap between all panels
+        - List of ints: specific gap after each panel (length = n_panels - 1)
     """
 
     n_rows = len(plots_matrices)
@@ -162,7 +163,8 @@ def create_mosaic_heatmap(plots_matrices, titles, labels, bin_labels,
                                       bin_labels, rotation=0)
 
                 # Add x-axis labels on bottom row
-                ax_col.set_xticks([0.5], [labels[i][panel][col]], rotation=90)
+                if labels[i][panel][col]:
+                    ax_col.set_xticks([0.5], [labels[i][panel][col]], rotation=90)
 
                 # Add title to middle column of each panel
                 if num_cols % 2 == 0 and col == 0:
